@@ -23,6 +23,7 @@ class Room(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str] = mapped_column(String)
+    room_type: Mapped[str] = mapped_column(String, nullable=False, server_default="ethereal")
 
     north_id: Mapped[str | None] = mapped_column(String, ForeignKey("rooms.id"), nullable=True)
     south_id: Mapped[str | None] = mapped_column(String, ForeignKey("rooms.id"), nullable=True)

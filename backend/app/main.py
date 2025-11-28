@@ -18,7 +18,7 @@ from fastapi import (
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .db import engine, get_session
+from .db import engine, get_session, AsyncSessionLocal
 from .models import Base, Room, Player
 from .engine.loader import load_world
 from .engine.engine import WorldEngine
@@ -55,9 +55,12 @@ async def lifespan(app: FastAPI):
         logger.info("Sample room IDs: %s", sample_rooms)
 
     # 4) Create engine and start game loop
-    engine_instance = WorldEngine(world)
+    engine_instance = WorldEngine(world, db_session_factory=AsyncSessionLocal)
     app.state.world_engine = engine_instance
     app.state.engine_task = asyncio.create_task(engine_instance.game_loop())
+    
+    # 5) Start time event system (Phase 2)
+    await engine_instance.start_time_system()
 
     logger.info(
         "World engine started with %d rooms, %d players",
@@ -68,6 +71,11 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
+    # Stop time system first
+    world_engine: Optional[WorldEngine] = getattr(app.state, "world_engine", None)
+    if world_engine is not None:
+        await world_engine.stop_time_system()
+    
     # Cancel the background engine loop gracefully on application shutdown
     engine_task: Optional[asyncio.Task] = getattr(app.state, "engine_task", None)
     if engine_task is not None:
@@ -119,6 +127,7 @@ async def seed_world(session: AsyncSession) -> None:
                     id=room_id,
                     name=name,
                     description=description,
+                    room_type="ethereal",
                     north_id=north_id,
                     south_id=south_id,
                     east_id=east_id,

@@ -30,6 +30,15 @@ All messages are JSON objects sent as text frames.
 - `north`, `south`, `east`, `west`, `up`, `down` - Movement in cardinal directions
 - `n`, `s`, `e`, `w`, `u`, `d` - Short forms of movement commands
 - `say <message>` - Speak to other players in the same room
+- `stats`, `sheet`, `status` - View your character stats
+- `effects`, `status` - View active buffs/debuffs with durations
+- `time` - View current in-game time with area-specific context
+- `smile`, `nod`, `laugh`, `cringe`, `smirk`, `frown`, `wink`, `lookaround` - Emotes
+- `heal <player_name>`, `hurt <player_name>` - Debug/admin commands for stat manipulation
+- `bless <player_name>` - Apply +5 Armor Class buff for 30 seconds (debug/admin)
+- `poison <player_name>` - Apply damage over time: 5 damage every 3s for 15s (debug/admin)
+- `testtimer [seconds]` - Test the time event system (debug)
+- **Keyword:** `self` - Auto-replaces with your character name in commands
 
 ## Server → Client Messages
 
@@ -61,6 +70,33 @@ All messages are JSON objects sent as text frames.
 - Invalid movement directions: "You can't go that way."
 - Malformed JSON or invalid message types are logged server-side but not sent to client
 
+### Stat Update Event
+```json
+{
+  "type": "stat_update",
+  "player_id": "uuid-string",
+  "payload": {
+    "current_health": 85,
+    "max_health": 100,
+    "current_energy": 50,
+    "max_energy": 50
+  }
+}
+```
+
+**Fields:**
+- `type`: Always `"stat_update"`
+- `player_id`: UUID of the player this update is for
+- `payload`: Object containing updated stat values
+
+**When Sent:**
+- When a player's stats change (damage, healing, level up, effects applied/expired, etc.)
+- When effects tick (e.g., poison damage every 3 seconds)
+- Client should update its local stat display if maintained
+- Common stats include: `current_health`, `max_health`, `current_energy`, `max_energy`, `level`, `experience`, `armor_class`
+
+**Note:** Stats can have modifiers from active effects. The `stats` command shows effective values (e.g., "15 (10 base)" for armor_class with a +5 buff).
+
 ## Event Scoping
 
 The server uses internal scoping to determine which players receive which events:
@@ -76,14 +112,16 @@ The server uses internal scoping to determine which players receive which events
 ### On Connect
 1. Client opens WebSocket connection with `player_id` parameter
 2. Server registers player and marks them as connected
-3. If player was in stasis, other players in room see reconnection message
-4. Client typically sends initial "look" command
+3. Server sends initial `stat_update` event with current HP/energy
+4. If player was in stasis, other players in room see reconnection message
+5. Client typically sends initial "look" command
 
 ### On Disconnect
 1. WebSocket connection closes
-2. Server marks player as disconnected (stasis mode)
-3. Other players in room see stasis message
-4. Player remains in world but listed as "(In Stasis)"
+2. **Server persists player stats to database** (current_health, current_energy, level, experience, location)
+3. Server marks player as disconnected (stasis mode)
+4. Other players in room see stasis message
+5. Player remains in world but listed as "(In Stasis)"
 
 ### Stasis State
 - Disconnected players remain visible in their last location
@@ -106,13 +144,31 @@ Client connects with player_id=abc123
 ← {"type": "message", "player_id": "abc123", "text": "You say: Hello everyone!"}
 ← (Other players in room receive: "PlayerName says: Hello everyone!")
 
+→ {"type": "command", "text": "heal test_player"}
+← {"type": "stat_update", "player_id": "abc123", "payload": {"current_health": 100, "max_health": 100}}
+← {"type": "message", "player_id": "abc123", "text": "*A warm glow surrounds you.* You are healed for 20 HP."}
+
+→ {"type": "command", "text": "bless self"}
+← {"type": "stat_update", "player_id": "abc123", "payload": {"armor_class": 15}}
+← {"type": "message", "player_id": "abc123", "text": "✨ *Divine light surrounds you!* You feel blessed. (+5 Armor Class for 30 seconds)"}
+
+→ {"type": "command", "text": "effects"}
+← {"type": "message", "player_id": "abc123", "text": "═══ Active Effects ═══\n\n**Blessed** (buff)\n  Duration: 27.3s remaining\n  Modifiers: armor_class +5"}
+
+→ {"type": "command", "text": "time"}
+← {"type": "message", "player_id": "abc123", "text": "🌄 Day 1, 06:45 (morning)\n*The Ethereal Nexus*\n\nThe morning sun shines brightly overhead.\n\n*A gentle humming resonates through the air.*\n\n⚡ *Time flows 4.0x faster here.*"}
+
 Client disconnects
 ← (Other players receive: "A bright flash engulfs PlayerName. Their form flickers and freezes, suspended in prismatic stasis.")
 ```
 
 ## Future Extensions
 
-The protocol is designed to be extensible. Potential future message types:
+The protocol is designed to be extensible. Implemented event types:
+- ✅ `message` - Text-based messages and room descriptions
+- ✅ `stat_update` - Player stat changes
+
+Potential future message types:
 - `combat` events with structured damage/health data
 - `inventory` updates with item lists
 - `quest` notifications

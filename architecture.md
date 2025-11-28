@@ -105,13 +105,25 @@ The `WorldEngine` instance is stored in `app.state` (or a global), and all WS co
 
 - `Room` model:
   - `id`, `name`, `description`
+  - `room_type` - Type category with emoji indicators (forest, urban, underground, etc.)
   - Exit fields: `north_id`, `south_id`, `east_id`, `west_id`, `up_id`, `down_id`.
   - Self-referential `ForeignKey` to `rooms.id`.
+  - Movement effects: `on_enter_effect`, `on_exit_effect` (future hook)
 - `Player` model:
   - `id` (UUID string)
   - `name`
   - `current_room_id` (FK to `Room.id`)
-  - `data` JSON field for future extension (stats, flags, etc.)
+  - **Character progression:**
+    - `character_class` - Class/archetype (adventurer, etc.)
+    - `level` - Character level (default: 1)
+    - `experience` - Experience points (default: 0)
+  - **Base stats (primary attributes):**
+    - `strength`, `dexterity`, `intelligence`, `vitality` (default: 10)
+  - **Derived stats (combat/survival):**
+    - `max_health`, `current_health` (default: 100)
+    - `armor_class` (default: 10)
+    - `max_energy`, `current_energy` (default: 50)
+  - `data` JSON field for misc data (flags, temporary effects, etc.)
 
 ### 3.3 In-memory world model
 
@@ -121,14 +133,47 @@ The `WorldEngine` instance is stored in `app.state` (or a global), and all WS co
 
   - `WorldPlayer`:
     - `id`, `name`, `room_id`
+    - `is_connected` - Connection status (False = in stasis)
+    - **Character stats:** `character_class`, `level`, `experience`
+    - **Primary attributes:** `strength`, `dexterity`, `intelligence`, `vitality`
+    - **Combat stats:** `max_health`, `current_health`, `armor_class`, `max_energy`, `current_energy`
+    - **Effects:** `active_effects: Dict[str, Effect]` - Active buffs/debuffs
+    - **Effect methods:** `apply_effect()`, `remove_effect()`, `get_effective_stat()`
     - `inventory` (currently a simple list; future hook for items)
   - `WorldRoom`:
     - `id`, `name`, `description`
+    - `room_type`, `emoji` - Room categorization with visual indicator
     - `exits: dict[Direction, RoomId]`
     - `players: set[PlayerId]` – IDs of players currently in the room
+    - `effects` - Movement effects (future hook)
+  - `Effect`:
+    - `effect_id`, `name`, `effect_type` (buff/debuff/dot/hot)
+    - `stat_modifiers: Dict[str, int]` - Stat changes while active
+    - `duration`, `applied_at` - Timing tracking
+    - `interval`, `magnitude` - For periodic effects (DoT/HoT)
+    - `expiration_event_id`, `periodic_event_id` - Time event references
+  - `TimeEvent`:
+    - `event_id`, `execute_at` (Unix timestamp)
+    - `callback` - Async function to execute
+    - `recurring` - Whether to reschedule after execution
+  - `WorldTime`:
+    - `day`, `hour`, `minute` - In-game time tracking
+    - `last_update` - Unix timestamp of last advancement
+    - `advance()` - Updates time based on real seconds elapsed
+    - `get_current_time()` - Calculates current time dynamically
+    - Time conversion: 24 game hours = 12 real minutes
+  - `WorldArea`:
+    - `area_id`, `name`, `description`
+    - `area_time: WorldTime` - Independent time for this area
+    - `time_scale` - Time flow multiplier (e.g., 4.0 = 4x faster)
+    - Environmental properties: `biome`, `climate`, `ambient_lighting`, `weather_profile`
+    - `time_phases` - Custom flavor text for different times of day
+    - `ambient_sound` - Area-specific ambient audio description
   - `World`:
     - `rooms: dict[RoomId, WorldRoom]`
     - `players: dict[PlayerId, WorldPlayer]`
+    - `areas: dict[AreaId, WorldArea]`
+    - `world_time: WorldTime` - Global time for rooms not in areas
 
 This layer is framework-agnostic (no FastAPI/SQLAlchemy here).  
 It represents the “live world” in memory.
@@ -167,6 +212,17 @@ Key pieces:
   - `self._listeners: dict[player_id, asyncio.Queue[event]]`
   - Each connected player has a queue of outgoing events.
   - `_ws_sender` reads from these queues and sends messages to clients.
+- **Time event system**:
+  - `self._time_events: list[TimeEvent]` - Min-heap priority queue
+  - `self._time_loop()`: Background async task processing due events
+  - `schedule_event()` - Schedule one-shot or recurring events
+  - `cancel_event()` - Cancel scheduled events by ID
+  - Events execute at precise Unix timestamps (not tick-quantized)
+  - Dynamic sleep until next event (efficient, no wasted CPU)
+- **World time advancement**:
+  - Recurring time event every 30 seconds
+  - Advances `area_time` for each WorldArea based on `time_scale`
+  - Each area progresses independently
 - **Game loop**:
   - `game_loop()`:
     - Runs forever in the background (async task).
@@ -176,25 +232,43 @@ Key pieces:
 
 Supported commands (current):
 
-- Movement: `n/s/e/w/u/d` and `north/south/east/west/up/down`
-- Look: `look` / `l`
-- Chat: `say <message>`
+- **Movement:** `n/s/e/w/u/d` and `north/south/east/west/up/down`
+- **Look:** `look` / `l`
+- **Chat:** `say <message>`
+- **Stats:** `stats` / `sheet` / `status` - View character sheet
+- **Effects:** `effects` / `status` - View active buffs/debuffs
+- **Emotes:** `smile`, `nod`, `laugh`, `cringe`, `smirk`, `frown`, `wink`, `lookaround`
+- **Time:** `time` - View current in-game time with area context
+- **Debug/Admin:** 
+    - `heal <player>`, `hurt <player>` - Modify player health
+    - `bless <player>` - Apply +5 AC buff for 30 seconds
+    - `poison <player>` - Apply DoT (5 damage every 3s for 15s)
+    - `testtimer [seconds]` - Test time event system
+- **Keyword substitution:** `self` → auto-replaced with player name
 
 Event model (current):
 
 - Internally, engine uses events as `dict`s with fields like:
-  - `type`: `"message"` (for now)
+  - `type`: `"message"` or `"stat_update"`
   - `scope`: `"player"`, `"room"`, or `"all"` (internal routing only)
   - `player_id`: target player (for player-scoped events)
   - `room_id`: source/target room (for room-scoped events)
-  - `text`: message text
+  - `text`: message text (for message events)
+  - `payload`: structured data (for stat_update events)
   - `exclude`: list of player IDs to exclude from room/all broadcasts
 
 - `_dispatch_events`:
   - Uses `scope` and `exclude` to decide which player queues to push to.
   - Strips internal fields (`scope`, `exclude`) before events are sent to clients.
-  - The client sees a simpler object:
+  - The client sees:
     - `{"type": "message", "player_id": "...", "text": "..."}`
+    - `{"type": "stat_update", "player_id": "...", "payload": {...}}`
+
+**Persistence:**
+- `WorldEngine` has `save_player_stats()` method to sync in-memory stats to database
+- Called automatically on player disconnect
+- Extensible for periodic auto-saves (Phase 2) or event-triggered saves
+- Persisted fields: `current_health`, `current_energy`, `level`, `experience`, `current_room_id`
 
 ---
 
@@ -268,7 +342,9 @@ Future events (planned, not implemented yet):
     - DB stores persistent data: rooms, players, etc.
     - On startup, data is loaded into `World`.
     - The `WorldEngine` mutates this in-memory state.
-    - Persistence back to DB can be periodic or event-driven (future work).
+    - Persistence back to DB can be periodic or event-driven.
+    - **Phase 1 implemented:** Stats saved to DB on player disconnect via `save_player_stats()`.
+    - **Phase 2 planned:** Periodic auto-saves via tick system.
 
 - **Event-driven, serial command processing**:
     - Single WorldEngine instance per process.
@@ -282,15 +358,20 @@ Future events (planned, not implemented yet):
 
 Rough phases (see detailed roadmap in `roadmap.md`):
 
-#### 1. Hardening:
+#### 0. Hardening:
 - Better logging, error handling, and protocol documentation.
-#### 2. Stats & progression:
-- Extend Player with stats, HP/MP, level, XP.
-- Introduce stat_update events and a stats command.
-#### 3. Time system & time-based effects:
-- Add a global time loop in WorldEngine.
-- Support duration-based effects (buffs/debuffs, DoT/HoT, regen).
-#### 4. Items & inventory:
+#### 1. Stats & progression: ✅ **COMPLETE**
+- ✅ Extend Player with stats, HP/MP, level, XP.
+- ✅ Introduce stat_update events and a stats command.
+- ✅ Persistence layer: save player stats on disconnect.
+#### 2. Time system & time-based effects: ✅ **COMPLETE**
+- ✅ Event-driven time system (not traditional ticks)
+- ✅ TimeEvent priority queue with async processing
+- ✅ Effect system: buffs/debuffs, DoT/HoT
+- ✅ WorldTime and WorldArea with independent time scales
+- ✅ Time advancement and continuous time calculation
+- ✅ Commands: bless, poison, effects, time, testtimer
+#### 3. Items & inventory:
 - ItemTemplate + ItemInstance in DB.
 - WorldItem, inventory and equipment on players.
 - Commands: get, drop, equip, remove.

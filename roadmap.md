@@ -30,61 +30,64 @@ Before adding big systems, make the core loop solid.
 
 ### Backend model changes
 
-- Extend Player model:
-    - Base stats: str, dex, int, vit, etc.
-    - Derived stats: hp, max_hp, mp, max_mp, level, xp.
-    - Class / archetype as a simple string/enum.
-- World model:
-    - Add those fields to WorldPlayer.
-    - Add a payload section in events for stat updates.
+- ✅ Extend Player model:
+    - ✅ Base stats: str, dex, int, vit, etc.
+    - ✅ Derived stats: hp, max_hp, mp, max_mp, level, xp.
+    - ✅ Class / archetype as a simple string/enum.
+- ✅ World model:
+    - ✅ Add those fields to WorldPlayer.
+    - ✅ Add a payload section in events for stat updates.
 
 ### Engine changes
 
-- New commands:
-    - stats/sheet: prints current stats.
-- Event types:
-    - stat_update events:
+- ✅ New commands:
+    - ✅ stats/sheet: prints current stats.
+- ✅ Event types:
+    - ✅ stat_update events:
         - {"type": "stat_update", "payload": {"hp": 10, "max_hp": 20, "level": 3}}
-- Persistence policy:
-    - Decide when you sync WorldPlayer → DB:
-        - on disconnect,
-        - periodically (every N ticks),
-        - or on key events (level up, death, etc.).
+- ✅ Persistence policy:
+    - ✅ Implemented: sync WorldPlayer → DB on disconnect
+    - 🔜 Future: periodically (can now use time event system from Phase 2)
+    - 🔜 Future: on key events (level up, death, etc.).
 
 
 
-## Phase 2 – Time & tick system (for effects/debuffs)
+## Phase 2 – Time & tick system (for effects/debuffs) ✅ **COMPLETE**
 
 **Goals**: Server time becomes first-class; you can have timed buffs/debuffs, regen, DoTs, etc.
 
-### Backend model
+**Note**: The original design called for traditional "ticks" but we implemented an event-driven architecture instead.
 
-- Add a global “tick” concept to WorldEngine:
-    - e.g. 10 ticks/second or 1 tick/second
-- Status effect representation:
-    - On WorldPlayer: list of effects (effects: dict[id, EffectState]).
-    - An EffectState might include:
-        - name, duration_ticks, interval_ticks, type (buff/debuff/dot/hot), magnitude.
+### Phase 2a – Core Time System ✅
+- Event-driven time system (not traditional ticks)
+- TimeEvent dataclass with priority queue
+- Async _time_loop() processes events at precise Unix timestamps
+- schedule_event() and cancel_event() methods
+- Supports one-shot and recurring events
+- Dynamic sleep until next event
+- testtimer command
 
-### Engine changes
+### Phase 2b – Effect System ✅
+- Effect dataclass with effect_id, name, effect_type (buff/debuff/dot/hot)
+- stat_modifiers: Dict[str, int]
+- duration, applied_at tracking
+- interval, magnitude for periodic effects
+- WorldPlayer active_effects: Dict[str, Effect]
+- apply_effect(), remove_effect(), get_effective_stat() methods
+- Commands: bless, poison, effects/status
+- Stat integration with effective vs base values
 
-- Split game_loop into:
-    - command_loop (what you have now),
-    - tick_loop (periodic tasks).
-- Each tick:
-    - Decrement effect durations.
-    - Apply periodic effects (DoT/HoT, regen).
-- Emit events when:
-    - an effect expires,
-    - HP changes,
-    - a major state change happens.
+### Phase 2c – World Time System ✅
+- WorldTime dataclass tracking day/hour/minute
+- advance() and get_current_time() methods
+- WorldArea system with independent area_time
+- time_scale attribute for different time speeds
+- Environmental properties
+- Time advancement every 30 seconds
+- time command with area context
+- Sample areas (Ethereal Nexus 4x, Temporal Rift 2x)
 
-### Commands
-
-- effects/status: list current effects on the player.
-
-
-## Phase 3 – Items & inventory
+## Phase 3 - Items & inventory
 
 **Goals**: Physical objects in the world, inventory management, equipment.
 
@@ -124,7 +127,7 @@ Before adding big systems, make the core loop solid.
 
 
 
-## Phase 4 – Enemies & combat
+## Phase 4 - Enemies & combat
 
 **Goals**: Basic PvE combat loop with NPCs in rooms.
 
@@ -168,7 +171,7 @@ Before adding big systems, make the core loop solid.
 - Stat updates:
     - HP/MP changes via stat_update.
 
-## Phase 5 – World structure, triggers, and scripting
+## Phase 5 - World structure, triggers, and scripting
 
 **Goal**: Richer world behavior without hardcoding everything in Python.
 
@@ -195,7 +198,7 @@ Before adding big systems, make the core loop solid.
         - emit messages/events,
         - apply effects / teleport players.
 
-## Phase 6 – Persistence & scaling
+## Phase 6 - Persistence & scaling
 
 **Goals**: Don’t lose progress on restart. Support more players in the future.
 
@@ -217,7 +220,7 @@ Before adding big systems, make the core loop solid.
     - vanish immediately,
     - AI autoplay, etc.
 
-## Phase 7 – Accounts, auth, and security
+## Phase 7 - Accounts, auth, and security
 
 **Goals**: Move from “just a player_id” to real accounts.
 
@@ -231,7 +234,7 @@ Before adding big systems, make the core loop solid.
 - Permissions:
     - Basic GM/Admin roles for in-game commands.
 
-## Phase 8 – Admin & content tools
+## Phase 8 - Admin & content tools
 
 **Goals**: Operate and extend the game without editing code.
 
@@ -245,7 +248,7 @@ Before adding big systems, make the core loop solid.
 - Monitoring:
     - Simple dashboards: current players, CPU load, command volume.
 
-## Phase 9 – Niceties & polish
+## Phase 9 - Niceties & polish
 
 - Rate limiting & abuse protection (spam commands, chat).
     - Localization hooks in text output.
