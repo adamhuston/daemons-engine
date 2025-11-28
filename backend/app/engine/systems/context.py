@@ -44,6 +44,9 @@ class GameContext:
         # Player event listeners (player_id -> queue of outgoing events)
         self._listeners: Dict["PlayerId", asyncio.Queue[Event]] = {}
         
+        # Engine reference (set by WorldEngine during initialization)
+        self.engine: Any = None  # WorldEngine
+        
         # System references (set by WorldEngine during initialization)
         self.time_manager: Any = None  # TimeEventManager
         self.combat_system: Any = None  # CombatSystem (future)
