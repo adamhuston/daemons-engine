@@ -20,6 +20,10 @@ class Room(Base):
     west_id:  Mapped[str | None] = mapped_column(String, ForeignKey("rooms.id"), nullable=True)
     up_id:    Mapped[str | None] = mapped_column(String, ForeignKey("rooms.id"), nullable=True)
     down_id:  Mapped[str | None] = mapped_column(String, ForeignKey("rooms.id"), nullable=True)
+    
+    # Movement effects
+    on_enter_effect: Mapped[str | None] = mapped_column(String, nullable=True)
+    on_exit_effect: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class Player(Base):
@@ -28,4 +32,4 @@ class Player(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True)
     current_room_id: Mapped[str] = mapped_column(String, ForeignKey("rooms.id"))
-    data: Mapped[dict] = mapped_column(JSON, default=dict)  # stats, flags, etc.
+    data: Mapped[dict] = mapped_column(JSON, default=dict)  # stats, flags, movement effects, etc.

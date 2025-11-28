@@ -30,6 +30,8 @@ async def load_world(session: AsyncSession) -> World:
             name=r.name,
             description=r.description,
             exits=exits,
+            on_enter_effect=r.on_enter_effect,
+            on_exit_effect=r.on_exit_effect,
         )
 
     # ----- Load players -----
@@ -43,6 +45,7 @@ async def load_world(session: AsyncSession) -> World:
             id=p.id,
             name=p.name,
             room_id=p.current_room_id,
+            on_move_effect=p.data.get("on_move_effect"),
         )
 
     # ----- Place players into rooms -----

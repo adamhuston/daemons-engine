@@ -37,6 +37,28 @@ class WorldEngine:
         """
         q: asyncio.Queue[Event] = asyncio.Queue()
         self._listeners[player_id] = q
+        
+        # Check if player is coming out of stasis
+        if player_id in self.world.players:
+            player = self.world.players[player_id]
+            was_in_stasis = not player.is_connected
+            player.is_connected = True
+            
+            # Broadcast awakening message if coming out of stasis
+            if was_in_stasis:
+                room = self.world.rooms.get(player.room_id)
+                if room and len(room.players) > 1:
+                    awaken_msg = (
+                        f"The prismatic light around {player.name} shatters like glass. "
+                        f"They gasp and return to awareness, freed from stasis."
+                    )
+                    event = self._msg_to_room(
+                        room.id,
+                        awaken_msg,
+                        exclude={player_id}
+                    )
+                    await self._dispatch_events([event])
+        
         return q
 
     def unregister_player(self, player_id: PlayerId) -> None:
@@ -44,6 +66,30 @@ class WorldEngine:
         Called when a player's WebSocket disconnects.
         """
         self._listeners.pop(player_id, None)
+    
+    async def player_disconnect(self, player_id: PlayerId) -> None:
+        """
+        Handle a player disconnect by putting them in stasis and broadcasting a message.
+        Should be called before unregister_player.
+        """
+        if player_id in self.world.players:
+            player = self.world.players[player_id]
+            player.is_connected = False  # Put in stasis
+            
+            room = self.world.rooms.get(player.room_id)
+            
+            if room and len(room.players) > 1:
+                # Create stasis event for others in the room
+                stasis_msg = (
+                    f"A bright flash of light engulfs {player.name}. "
+                    f"Their form flickers and freezes, suddenly suspended in a prismatic stasis."
+                )
+                event = self._msg_to_room(
+                    room.id,
+                    stasis_msg,
+                    exclude={player_id}
+                )
+                await self._dispatch_events([event])
 
     # ---------- Command submission / main loop ----------
 
@@ -62,7 +108,9 @@ class WorldEngine:
         """
         while True:
             player_id, command = await self._command_queue.get()
+            print(f"WorldEngine: got command from {player_id}: {command!r}")
             events = self.handle_command(player_id, command)
+            print(f"WorldEngine: generated: {events!r}")
             await self._dispatch_events(events)
 
     # ---------- Command handling ----------
@@ -218,11 +266,62 @@ class WorldEngine:
         new_room.players.add(player_id)
         player.room_id = new_room_id
 
-        # Private message to the moving player
+        # Build movement message with effects
+        description_lines = [f"You move {direction}."]
+        
+        # Trigger exit effect from old room
+        if current_room.on_exit_effect:
+            description_lines.append(current_room.on_exit_effect)
+        
+        # Trigger player movement effect
+        if player.on_move_effect:
+            description_lines.append(player.on_move_effect)
+        
+        # Show new room
+        description_lines.extend([
+            "",
+            new_room.name,
+            new_room.description
+        ])
+        
+        # Trigger enter effect for new room
+        if new_room.on_enter_effect:
+            description_lines.append("")
+            description_lines.append(new_room.on_enter_effect)
+        
+        # Add exits to the room description
+        if new_room.exits:
+            exits = list(new_room.exits.keys())
+            description_lines.append("")
+            description_lines.append(f"Exits: {', '.join(exits)}")
+        
+        # List other players in the new room
+        others = [
+            world.players[pid].name
+            for pid in new_room.players
+            if pid != player_id and world.players[pid].is_connected
+        ]
+        stasis_players = [
+            world.players[pid].name
+            for pid in new_room.players
+            if pid != player_id and not world.players[pid].is_connected
+        ]
+        
+        if others:
+            description_lines.append("")
+            description_lines.append("Others here:")
+            for name in others:
+                description_lines.append(f" - {name}")
+        
+        if stasis_players:
+            description_lines.append("")
+            for name in stasis_players:
+                description_lines.append(f"(In Stasis) The form of {name} is here, flickering in the prismatic state of stasis.")
+        
         events.append(
             self._msg_to_player(
                 player_id,
-                f"You move {direction}.\n{new_room.name}\n{new_room.description}",
+                "\n".join(description_lines),
             )
         )
 
@@ -273,17 +372,34 @@ class WorldEngine:
 
         lines: list[str] = [room.name, room.description]
 
+        # List available exits
+        if room.exits:
+            exits = list(room.exits.keys())
+            lines.append("")
+            lines.append(f"Exits: {', '.join(exits)}")
+
         # List other players in the same room
         others = [
             world.players[pid].name
             for pid in room.players
-            if pid != player_id
+            if pid != player_id and world.players[pid].is_connected
         ]
+        stasis_players = [
+            world.players[pid].name
+            for pid in room.players
+            if pid != player_id and not world.players[pid].is_connected
+        ]
+        
         if others:
             lines.append("")
             lines.append("Others here:")
             for name in others:
                 lines.append(f" - {name}")
+        
+        if stasis_players:
+            lines.append("")
+            for name in stasis_players:
+                lines.append(f"(In Stasis) The form of {name} is here, flickering in the prismatic state of stasis.")
 
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
@@ -331,60 +447,62 @@ class WorldEngine:
 
     # ---------- Event dispatch ----------
 
-async def _dispatch_events(self, events: List[Event]) -> None:
-    for ev in events:
-        scope = ev.get("scope", "player")
+    async def _dispatch_events(self, events: List[Event]) -> None:
+        for ev in events:
+            print(f"WorldEngine: dispatching event: {ev!r}")
 
-        if scope == "player":
-            target = ev.get("player_id")
-            if not target:
-                continue
-            q = self._listeners.get(target)
-            if q is None:
-                continue
+            scope = ev.get("scope", "player")
 
-            # Strip engine-internal keys before sending
-            wire_event = {
-                k: v
-                for k, v in ev.items()
-                if k not in ("scope", "exclude")
-            }
-            await q.put(wire_event)
-
-        elif scope == "room":
-            room_id = ev.get("room_id")
-            if not room_id:
-                continue
-            room = self.world.rooms.get(room_id)
-            if room is None:
-                continue
-
-            exclude = set(ev.get("exclude", []))
-
-            for pid in room.players:
-                if pid in exclude:
+            if scope == "player":
+                target = ev.get("player_id")
+                if not target:
                     continue
-                q = self._listeners.get(pid)
+                q = self._listeners.get(target)
                 if q is None:
                     continue
 
+                # Strip engine-internal keys before sending, but keep player_id
                 wire_event = {
                     k: v
                     for k, v in ev.items()
                     if k not in ("scope", "exclude")
                 }
-                wire_event["player_id"] = pid
                 await q.put(wire_event)
 
-        elif scope == "all":
-            exclude = set(ev.get("exclude", []))
-            for pid, q in self._listeners.items():
-                if pid in exclude:
+            elif scope == "room":
+                room_id = ev.get("room_id")
+                if not room_id:
                     continue
-                wire_event = {
-                    k: v
-                    for k, v in ev.items()
-                    if k not in ("scope", "exclude")
-                }
-                wire_event["player_id"] = pid
-                await q.put(wire_event)
+                room = self.world.rooms.get(room_id)
+                if room is None:
+                    continue
+
+                exclude = set(ev.get("exclude", []))
+
+                for pid in room.players:
+                    if pid in exclude:
+                        continue
+                    q = self._listeners.get(pid)
+                    if q is None:
+                        continue
+
+                    wire_event = {
+                        k: v
+                        for k, v in ev.items()
+                        if k not in ("scope", "exclude")
+                    }
+                    wire_event["player_id"] = pid
+                    await q.put(wire_event)
+
+            elif scope == "all":
+                exclude = set(ev.get("exclude", []))
+                for pid, q in self._listeners.items():
+                    if pid in exclude:
+                        continue
+                    wire_event = {
+                        k: v
+                        for k, v in ev.items()
+                        if k not in ("scope", "exclude")
+                    }
+                    wire_event["player_id"] = pid
+                    await q.put(wire_event)

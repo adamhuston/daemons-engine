@@ -16,6 +16,10 @@ class WorldPlayer:
     name: str
     room_id: RoomId
     inventory: list[str] = field(default_factory=list)
+    # Movement effects - flavor text triggered by player movement
+    on_move_effect: str | None = None  # e.g., "You glide gracefully"
+    # Connection state - whether player is actively connected
+    is_connected: bool = False
 
 
 @dataclass
@@ -26,6 +30,9 @@ class WorldRoom:
     description: str
     exits: Dict[Direction, RoomId] = field(default_factory=dict)
     players: Set[PlayerId] = field(default_factory=set)
+    # Movement effects - flavor text triggered when entering/leaving
+    on_enter_effect: str | None = None  # e.g., "Mist swirls as you enter"
+    on_exit_effect: str | None = None   # e.g., "Clouds part around you as you leave"
 
 
 @dataclass

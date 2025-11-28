@@ -3,6 +3,7 @@ import asyncio
 import contextlib
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import (
@@ -24,19 +25,16 @@ from .engine.engine import WorldEngine
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
 
-
-# ---------- Startup / Shutdown ----------
-
-@app.on_event("startup")
-async def on_startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """
     - Create tables (dev-time; later use migrations).
     - Seed a tiny world if the DB is empty.
     - Load the world into memory.
     - Start a single WorldEngine instance in the background.
     """
+    # Startup
     # 1) Create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -50,6 +48,11 @@ async def on_startup() -> None:
     # 3) Load world into memory
     async with AsyncSession(engine) as session:
         world = await load_world(session)
+    
+    logger.info("Loaded world: %d rooms, %d players", len(world.rooms), len(world.players))
+    if len(world.rooms) > 0:
+        sample_rooms = list(world.rooms.keys())[:5]
+        logger.info("Sample room IDs: %s", sample_rooms)
 
     # 4) Create engine and start game loop
     engine_instance = WorldEngine(world)
@@ -62,12 +65,10 @@ async def on_startup() -> None:
         len(world.players),
     )
 
+    yield
 
-@app.on_event("shutdown")
-async def on_shutdown() -> None:
-    """
-    Cancel the background engine loop gracefully on application shutdown.
-    """
+    # Shutdown
+    # Cancel the background engine loop gracefully on application shutdown
     engine_task: Optional[asyncio.Task] = getattr(app.state, "engine_task", None)
     if engine_task is not None:
         engine_task.cancel()
@@ -77,38 +78,81 @@ async def on_shutdown() -> None:
     logger.info("World engine stopped")
 
 
+app = FastAPI(lifespan=lifespan)
+
+
 async def seed_world(session: AsyncSession) -> None:
     """
-    Dev-only seeding of a tiny test world: two rooms and one player.
+    Dev-only seeding: 3x3x3 cube of rooms (27 rooms total).
     """
-    start_id = "start"
-    hall_id = "hall"
+    rooms = []
+    
+    # Create 3x3x3 grid of rooms
+    # Coordinates: x (east/west), y (north/south), z (up/down)
+    for x in range(3):
+        for y in range(3):
+            for z in range(3):
+                room_id = f"room_{x}_{y}_{z}"
+                
+                # Create descriptive names based on position
+                x_desc = ["western", "central", "eastern"][x]
+                y_desc = ["southern", "central", "northern"][y]
+                z_desc = ["lower", "central", "upper"][z]
+                
+                name = f"An Ethereal Cloud Chamber"
+                
+                if x == 1 and y == 1 and z == 1:
+                    description = "At the center of the luminous ethereal cloud. Bright, disorienting swirls of sparkling vapor surrounds you in all directions."    
+                else:
+                    article = "A" if z_desc in ("lower", "central") else "An"
+                    description = f"{article} {z_desc} pocket in the {y_desc} {x_desc} region of the clouds."
+                
+                # Calculate adjacent room IDs
+                north_id = f"room_{x}_{y+1}_{z}" if y < 2 else None
+                south_id = f"room_{x}_{y-1}_{z}" if y > 0 else None
+                east_id = f"room_{x+1}_{y}_{z}" if x < 2 else None
+                west_id = f"room_{x-1}_{y}_{z}" if x > 0 else None
+                up_id = f"room_{x}_{y}_{z+1}" if z < 2 else None
+                down_id = f"room_{x}_{y}_{z-1}" if z > 0 else None
+                
+                room = Room(
+                    id=room_id,
+                    name=name,
+                    description=description,
+                    north_id=north_id,
+                    south_id=south_id,
+                    east_id=east_id,
+                    west_id=west_id,
+                    up_id=up_id,
+                    down_id=down_id,
+                    on_exit_effect="The ethereal clouds part and swirl around you as you pass.",
+                )
+                rooms.append(room)
+    
+    session.add_all(rooms)
 
-    start_room = Room(
-        id=start_id,
-        name="Starting Room",
-        description="A small stone chamber with a flickering torch.",
-        north_id=hall_id,
-    )
-    hall = Room(
-        id=hall_id,
-        name="Hallway",
-        description="A long, dark hallway stretching into shadow.",
-        south_id=start_id,
-    )
-
-    session.add_all([start_room, hall])
-
-    player = Player(
-        id=str(uuid.uuid4()),
+    # Start players in the center of the grid (1, 1, 1)
+    start_room_id = "room_1_1_1"
+    
+    player1_id = str(uuid.uuid4())
+    player2_id = str(uuid.uuid4())
+    
+    player1 = Player(
+        id=player1_id,
         name="test_player",
-        current_room_id=start_id,
+        current_room_id=start_room_id,
         data={},
     )
-    session.add(player)
+    player2 = Player(
+        id=player2_id,
+        name="test_player_2",
+        current_room_id=start_room_id,
+        data={},
+    )
+    session.add_all([player1, player2])
 
     await session.commit()
-    logger.info("Seeded test player id=%s", player.id)
+    logger.info("Seeded 27 rooms in 3x3x3 grid and 2 test players: %s, %s", player1_id, player2_id)
 
 
 def get_world_engine() -> WorldEngine:
@@ -155,16 +199,22 @@ async def game_ws(
     This is single-process, multi-player: one WorldEngine shared by all connections.
     """
     await websocket.accept()
-
+    logger.info("WebSocket connection attempt for player %s", player_id)
     # Ensure engine exists
     try:
         engine = get_world_engine()
+        if engine is None:
+            logger.error("World engine not initialized")
+            await websocket.close(code=1011, reason="Engine is None. World engine not ready")
+            return
     except RuntimeError:
-        await websocket.close(code=1011, reason="World engine not ready")
+        logger.error("World engine not initialized")
+        await websocket.close(code=1011, reason="Runtime Error: World engine not ready")
         return
 
     # Basic validation: ensure this player exists in the in-memory world
     if player_id not in engine.world.players:
+        logger.info("WS connection rejected for unknown player %s", player_id)
         await websocket.close(code=1008, reason="Unknown player")
         return
 
@@ -186,6 +236,8 @@ async def game_ws(
             with contextlib.suppress(asyncio.CancelledError):
                 await task
     finally:
+        # Broadcast disconnect message to other players
+        await engine.player_disconnect(player_id)
         engine.unregister_player(player_id)
         logger.info("Player %s disconnected", player_id)
 
@@ -201,6 +253,7 @@ async def _ws_receiver(
     try:
         while True:
             data = await websocket.receive_json()
+            logger.info("Received WS message from player %s: %s", player_id, data)
             msg_type = data.get("type")
             if msg_type == "command":
                 text = data.get("text", "")
@@ -210,6 +263,7 @@ async def _ws_receiver(
                 logger.debug("Ignoring unknown WS message type: %s", msg_type)
     except WebSocketDisconnect:
         # Normal disconnect; let game_ws handle cleanup
+        logger.info("WebSocketDisconnect for player %s", player_id)
         pass
     except Exception as exc:
         logger.exception("Error in _ws_receiver for player %s: %s", player_id, exc)
