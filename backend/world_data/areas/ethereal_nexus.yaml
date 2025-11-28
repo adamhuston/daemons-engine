@@ -1,0 +1,37 @@
+# The Ethereal Nexus - A mystical convergence point where time flows 4x faster
+
+id: area_ethereal_nexus
+name: The Ethereal Nexus
+description: A mystical convergence point where realities blur and time flows strangely.
+
+# Time system
+time_scale: 4.0  # Time passes 4x faster than normal
+starting_day: 1
+starting_hour: 6  # Dawn
+starting_minute: 0
+
+# Environmental properties
+biome: ethereal
+climate: mild
+ambient_lighting: prismatic
+weather_profile: stable
+
+# Gameplay properties
+danger_level: 3
+magic_intensity: extreme
+
+# Atmospheric details
+ambient_sound: A gentle humming resonates through the air.
+
+# Time phase flavor text
+time_phases:
+  dawn: Prismatic light filters through the mist as ethereal dawn breaks across the nexus.
+  morning: The ethereal mists glow with soft, radiant light.
+  afternoon: Shimmering energy pulses through the air, bathing everything in otherworldly luminescence.
+  dusk: The mists darken to deep purples and blues as the nexus transitions to twilight.
+  evening: Ghostly stars begin to emerge in the ethereal void above.
+  night: The nexus glows with bioluminescent energy, casting an eerie but beautiful light.
+
+# Entry points (room IDs where players can enter this area)
+entry_points:
+  - room_1_1_1

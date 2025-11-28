@@ -184,11 +184,11 @@ class WorldTime:
         return f"{current_hour:02d}:{current_minute:02d}"
     
     def format_full(self, time_scale: float = 1.0) -> str:
-        """Format full time with day and phase."""
+        """Format full time with phase (without day number)."""
         current_day, current_hour, current_minute = self.get_current_time(time_scale)
         phase = self.get_time_of_day(time_scale)
         emoji = self.get_time_emoji(time_scale)
-        return f"{emoji} Day {current_day}, {current_hour:02d}:{current_minute:02d} ({phase})"
+        return f"{emoji} {current_hour:02d}:{current_minute:02d} ({phase})"
 
 
 # Default time phase flavor text
@@ -204,36 +204,23 @@ DEFAULT_TIME_PHASES = {
 
 @dataclass
 class WorldArea:
-    """
-    Represents a geographical area containing multiple rooms.
-    
-    Areas provide environmental context, atmosphere, and can have
-    different time progression rates and phase descriptions.
-    Each area tracks its own independent time.
-    """
+    """Represents a geographic area containing multiple rooms."""
     id: AreaId
     name: str
-    biome: str  # "forest", "desert", "urban", "underground", "ethereal", etc.
-    
-    # Time characteristics - each area has its own clock!
-    area_time: WorldTime = field(default_factory=WorldTime)  # Independent time for this area
-    time_scale: float = 1.0  # Multiplier for time passage (1.0 = normal, 2.0 = double speed, 0.5 = half speed)
-    time_phases: Dict[str, str] = field(default_factory=lambda: DEFAULT_TIME_PHASES.copy())
-    # Custom phase descriptions override defaults for unique atmosphere
-    
-    # Spatial organization
-    entry_points: Set[RoomId] = field(default_factory=set)  # Rooms that serve as entrances
-    room_ids: Set[RoomId] = field(default_factory=set)  # All rooms in this area
-    neighbor_areas: Set[AreaId] = field(default_factory=set)  # Adjacent areas
-    
-    # Environmental characteristics
-    climate: str = "temperate"  # "tropical", "arctic", "arid", "temperate", etc.
-    ambient_lighting: str = "natural"  # "natural", "dim", "bright", "darkness", "magical"
-    weather_profile: str = "clear"  # "clear", "rainy", "stormy", "foggy", "snowy", etc.
-    
-    # Optional flavor
-    description: str = ""  # Area overview/lore
-    ambient_sound: str = ""  # e.g., "The rustling of leaves fills the air"
+    description: str
+    area_time: WorldTime
+    time_scale: float = 1.0
+    biome: str = "ethereal"
+    climate: str = "temperate"
+    ambient_lighting: str = "normal"
+    weather_profile: str = "clear"
+    danger_level: int = 1  # ADD THIS
+    magic_intensity: str = "normal"  # ADD THIS
+    ambient_sound: str | None = None
+    time_phases: dict[str, str] = field(default_factory=lambda: DEFAULT_TIME_PHASES.copy())
+    entry_points: set[RoomId] = field(default_factory=set)
+    room_ids: set[RoomId] = field(default_factory=set)
+    neighbor_areas: set[AreaId] = field(default_factory=set)
 
 
 @dataclass

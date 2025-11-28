@@ -135,6 +135,7 @@ async def seed_world(session: AsyncSession) -> None:
                     up_id=up_id,
                     down_id=down_id,
                     on_exit_effect="The ethereal clouds part and swirl around you as you pass.",
+                    area_id="area_ethereal_nexus",  # Assign all rooms to Ethereal Nexus
                 )
                 rooms.append(room)
     

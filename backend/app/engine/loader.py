@@ -2,8 +2,8 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Room, Player
-from .world import World, WorldRoom, WorldPlayer, WorldArea, RoomId, PlayerId, AreaId
+from ..models import Room, Player, Area
+from .world import World, WorldRoom, WorldPlayer, WorldArea, WorldTime, RoomId, PlayerId, AreaId, DEFAULT_TIME_PHASES
 
 
 async def load_world(session: AsyncSession) -> World:
@@ -67,70 +67,47 @@ async def load_world(session: AsyncSession) -> World:
         if room:
             room.players.add(player.id)
 
-    # ----- Create sample areas (hardcoded for now, will be DB-driven later) -----
+    # ----- Load areas from database -----
+    area_result = await session.execute(select(Area))
+    area_models = area_result.scalars().all()
+
     areas: dict[AreaId, WorldArea] = {}
-    
-    # Example: Ethereal Nexus area (normal time)
-    ethereal_nexus = WorldArea(
-        id="area_ethereal_nexus",
-        name="The Ethereal Nexus",
-        biome="ethereal",
-        time_scale=4,  # 4x time
-        time_phases={
-            "dawn": "Prismatic light filters through the mist as ethereal dawn breaks across the nexus.",
-            "morning": "The ethereal mists glow with soft, radiant light.",
-            "afternoon": "Shimmering energy pulses through the air, bathing everything in otherworldly luminescence.",
-            "dusk": "The mists darken to deep purples and blues as the nexus transitions to twilight.",
-            "evening": "Ghostly stars begin to emerge in the ethereal void above.",
-            "night": "The nexus glows with bioluminescent energy, casting an eerie but beautiful light."
-        },
-        climate="ethereal",
-        ambient_lighting="magical",
-        weather_profile="clear",
-        description="A mystical convergence point where realities blur and time flows strangely.",
-        ambient_sound="Soft whispers and distant chimes echo through the mist."
-    )
-    areas[ethereal_nexus.id] = ethereal_nexus
-    
-    # Example: Temporal Rift area (accelerated time for testing)
-    temporal_rift = WorldArea(
-        id="area_temporal_rift",
-        name="The Temporal Rift",
-        biome="ethereal",
-        time_scale=2.0,  # Time passes twice as fast!
-        time_phases={
-            "dawn": "Time fractures as dawn breaks, hours flowing like minutes through the rift.",
-            "morning": "The morning sun races across the sky at an unnatural pace.",
-            "afternoon": "Shadows shift and dance as time accelerates through the rift.",
-            "dusk": "Sunset arrives in a blur of color, time rushing forward.",
-            "evening": "Stars streak across the sky as evening passes in moments.",
-            "night": "The night cycles rapidly, moonlight flickering like a strobe."
-        },
-        climate="ethereal",
-        ambient_lighting="distorted",
-        weather_profile="temporal_storm",
-        description="A tear in the fabric of time where hours pass like minutes.",
-        ambient_sound="The ticking of a thousand unsynchronized clocks fills the air."
-    )
-    areas[temporal_rift.id] = temporal_rift
-    
-    # Assign rooms to areas
+
+    for a in area_models:
+        # Create WorldTime for this area
+        area_time = WorldTime(
+            day=a.starting_day,
+            hour=a.starting_hour,
+            minute=a.starting_minute,
+        )
+        
+        # Get time phases, fall back to defaults if not specified
+        time_phases = a.time_phases if a.time_phases else DEFAULT_TIME_PHASES
+        
+        # Get entry points
+        entry_points = set(a.entry_points) if a.entry_points else set()
+        
+        areas[a.id] = WorldArea(
+            id=a.id,
+            name=a.name,
+            description=a.description,
+            area_time=area_time,
+            time_scale=a.time_scale,
+            biome=a.biome,
+            climate=a.climate,
+            ambient_lighting=a.ambient_lighting,
+            weather_profile=a.weather_profile,
+            danger_level=a.danger_level,
+            magic_intensity=a.magic_intensity,
+            ambient_sound=a.ambient_sound,
+            time_phases=time_phases,
+            entry_points=entry_points,
+        )
+
+    # ----- Link rooms to areas -----
     for room in rooms.values():
-        if room.room_type == "ethereal":
-            room.area_id = ethereal_nexus.id
-            ethereal_nexus.room_ids.add(room.id)
-        elif room.room_type == "forsaken":
-            # Assign forsaken rooms to temporal rift for testing
-            room.area_id = temporal_rift.id
-            temporal_rift.room_ids.add(room.id)
-    
-    # Set entry points
-    ethereal_rooms = [r for r in rooms.values() if r.area_id == ethereal_nexus.id]
-    if ethereal_rooms:
-        ethereal_nexus.entry_points.add(ethereal_rooms[0].id)
-    
-    rift_rooms = [r for r in rooms.values() if r.area_id == temporal_rift.id]
-    if rift_rooms:
-        temporal_rift.entry_points.add(rift_rooms[0].id)
+        if room.area_id and room.area_id in areas:
+            area = areas[room.area_id]
+            area.room_ids.add(room.id)
 
     return World(rooms=rooms, players=players, areas=areas)

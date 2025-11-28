@@ -1,6 +1,6 @@
 # backend/app/models.py
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, ForeignKey, JSON, Integer, MetaData
+from sqlalchemy import String, ForeignKey, JSON, Integer, Float, Text, MetaData
 
 
 # Naming convention for constraints (required for batch migrations)
@@ -24,6 +24,9 @@ class Room(Base):
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str] = mapped_column(String)
     room_type: Mapped[str] = mapped_column(String, nullable=False, server_default="ethereal")
+    
+    # Link to area (nullable - rooms can exist without areas)
+    area_id: Mapped[str | None] = mapped_column(String, ForeignKey("areas.id"), nullable=True)
 
     north_id: Mapped[str | None] = mapped_column(String, ForeignKey("rooms.id"), nullable=True)
     south_id: Mapped[str | None] = mapped_column(String, ForeignKey("rooms.id"), nullable=True)
@@ -34,7 +37,7 @@ class Room(Base):
     
     # Movement effects
     on_enter_effect: Mapped[str | None] = mapped_column(String, nullable=True)
-    on_exit_effect: Mapped[str | None] = mapped_column(String, ForeignKey("rooms.id"), nullable=True)
+    on_exit_effect: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class Player(Base):
@@ -64,3 +67,41 @@ class Player(Base):
 
     # Misc data (flags, temporary effects, etc.)
     data: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class Area(Base):
+    """
+    Defines a cohesive region of the world with shared properties.
+    Areas have independent time systems and environmental characteristics.
+    """
+    __tablename__ = "areas"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # Time system
+    time_scale: Mapped[float] = mapped_column(Float, nullable=False, server_default="1.0")
+    starting_day: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    starting_hour: Mapped[int] = mapped_column(Integer, nullable=False, server_default="6")
+    starting_minute: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    
+    # Environmental properties
+    biome: Mapped[str] = mapped_column(String, nullable=False, server_default="ethereal")
+    climate: Mapped[str] = mapped_column(String, nullable=False, server_default="mild")
+    ambient_lighting: Mapped[str] = mapped_column(String, nullable=False, server_default="normal")
+    weather_profile: Mapped[str] = mapped_column(String, nullable=False, server_default="clear")
+    
+    # Gameplay properties
+    danger_level: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    magic_intensity: Mapped[str] = mapped_column(String, nullable=False, server_default="low")
+    
+    # Atmospheric details
+    ambient_sound: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    # Time phase flavor text (stored as JSON)
+    # Format: {"dawn": "text", "morning": "text", ...}
+    time_phases: Mapped[dict] = mapped_column(JSON, default=dict)
+    
+    # Entry points (stored as JSON array of room IDs)
+    entry_points: Mapped[list] = mapped_column(JSON, default=list)
