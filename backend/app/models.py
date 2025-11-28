@@ -142,6 +142,12 @@ class ItemTemplate(Base):
     is_consumable: Mapped[bool] = mapped_column(Integer, nullable=False, server_default="0")
     consume_effect: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # Effect applied on consumption
     
+    # Weapon combat stats (only used when item_type="weapon")
+    damage_min: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    damage_max: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    attack_speed: Mapped[float] = mapped_column(Float, nullable=False, server_default="2.0")  # seconds per swing
+    damage_type: Mapped[str] = mapped_column(String, nullable=False, server_default="physical")  # physical, magic, fire, etc.
+    
     # Flavor and metadata
     flavor_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     rarity: Mapped[str] = mapped_column(String, nullable=False, server_default="common")  # "common", "uncommon", "rare", "epic", "legendary"
@@ -190,3 +196,64 @@ class PlayerInventory(Base):
     # Current usage (denormalized for quick checks)
     current_weight: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
     current_slots: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+
+class NpcTemplate(Base):
+    """Static NPC definition - blueprint for all instances of this NPC type."""
+    __tablename__ = "npc_templates"
+    
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # e.g., "npc_goblin_warrior"
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # NPC categorization
+    npc_type: Mapped[str] = mapped_column(String, nullable=False, server_default="hostile")  # "hostile", "neutral", "friendly", "merchant"
+    
+    # Base stats (combat-ready for Phase 4.5)
+    level: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    max_health: Mapped[int] = mapped_column(Integer, nullable=False, server_default="50")
+    armor_class: Mapped[int] = mapped_column(Integer, nullable=False, server_default="10")
+    
+    # Primary attributes
+    strength: Mapped[int] = mapped_column(Integer, nullable=False, server_default="10")
+    dexterity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="10")
+    intelligence: Mapped[int] = mapped_column(Integer, nullable=False, server_default="10")
+    
+    # Combat properties (for Phase 4.5)
+    attack_damage_min: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    attack_damage_max: Mapped[int] = mapped_column(Integer, nullable=False, server_default="5")
+    attack_speed: Mapped[float] = mapped_column(Float, nullable=False, server_default="3.0")  # seconds between attacks
+    experience_reward: Mapped[int] = mapped_column(Integer, nullable=False, server_default="10")
+    
+    # AI behavior flags (JSON: {"wanders": true, "flees_at_health_percent": 20, "aggro_on_sight": true})
+    behavior: Mapped[dict] = mapped_column(JSON, default=dict)
+    
+    # Loot table (JSON array for Phase 4.5: [{"template_id": "...", "chance": 0.5, "quantity": [1, 3]}])
+    loot_table: Mapped[list] = mapped_column(JSON, default=list)
+    
+    # Flavor and metadata
+    idle_messages: Mapped[list] = mapped_column(JSON, default=list)  # Random messages NPC says when idle
+    keywords: Mapped[list] = mapped_column(JSON, default=list)  # For targeting: ["goblin", "warrior"]
+
+
+class NpcInstance(Base):
+    """Dynamic NPC instance - a specific NPC in the world."""
+    __tablename__ = "npc_instances"
+    
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # UUID
+    template_id: Mapped[str] = mapped_column(String, ForeignKey("npc_templates.id"), nullable=False)
+    
+    # Location
+    room_id: Mapped[str] = mapped_column(String, ForeignKey("rooms.id"), nullable=False)
+    spawn_room_id: Mapped[str] = mapped_column(String, ForeignKey("rooms.id"), nullable=False)  # Where to respawn
+    
+    # Instance state
+    current_health: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_alive: Mapped[bool] = mapped_column(Integer, nullable=False, server_default="1")  # SQLite uses 0/1
+    
+    # Respawn tracking
+    respawn_time: Mapped[int] = mapped_column(Integer, nullable=False, server_default="300")  # seconds
+    last_killed_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # Unix timestamp
+    
+    # Instance-specific overrides (JSON: custom name, modified stats, etc.)
+    instance_data: Mapped[dict] = mapped_column(JSON, default=dict)

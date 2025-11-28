@@ -5,7 +5,17 @@ import time
 import uuid
 from typing import Dict, List, Any, Callable, Awaitable
 
-from .world import World, WorldRoom, Direction, PlayerId, RoomId, AreaId, get_room_emoji, TimeEvent, Effect
+from .world import (
+    World, WorldRoom, Direction, PlayerId, RoomId, AreaId, get_room_emoji, 
+    TimeEvent, Effect, EntityType, EntityId, WorldEntity, WorldPlayer, WorldNpc,
+    Targetable, TargetableType, WorldItem, ItemId,
+    CombatPhase, CombatState, CombatResult, WeaponStats,
+    get_xp_for_next_level, LEVEL_UP_STAT_GAINS
+)
+from .behaviors import (
+    BehaviorContext, BehaviorResult, get_behavior_instances
+)
+from .systems import GameContext, TimeEventManager
 
 
 Event = dict[str, Any]
@@ -20,6 +30,10 @@ class WorldEngine:
     - Produces events destined for players via per-player queues.
     - Supports per-player messages and room broadcasts.
     - Persists player stats to database on disconnect (and optionally periodically).
+    
+    Uses modular systems for specific domains:
+    - GameContext: Shared state and cross-system communication
+    - TimeEventManager: Scheduled events and timers
     """
 
     def __init__(
@@ -33,33 +47,34 @@ class WorldEngine:
         # Queue of (player_id, command_text)
         self._command_queue: asyncio.Queue[tuple[PlayerId, str]] = asyncio.Queue()
 
-        # player_id -> queue of outgoing events (dicts)
-        self._listeners: Dict[PlayerId, asyncio.Queue[Event]] = {}
-        
         # Command history (for ! repeat command)
         self._last_commands: Dict[PlayerId, str] = {}
         
-        # Time event system (Phase 2)
-        self._time_events: List[TimeEvent] = []  # Min-heap priority queue
-        self._time_loop_task: asyncio.Task | None = None
-        self._event_ids: Dict[str, TimeEvent] = {}  # For cancellation lookup
+        # Initialize game context and systems
+        self.ctx = GameContext(world)
+        self.time_manager = TimeEventManager(self.ctx)
+        self.ctx.time_manager = self.time_manager
+        
+        # Backward compatibility: reference listeners from context
+        self._listeners = self.ctx._listeners
 
-    # ---------- Time event system (Phase 2) ----------
+    # ---------- Time event system (delegates to TimeEventManager) ----------
 
     async def start_time_system(self) -> None:
         """
         Start the time event processing loop.
         Should be called once during engine startup.
         """
-        if self._time_loop_task is not None:
-            print("[TimeSystem] Already running")
-            return
-        
-        self._time_loop_task = asyncio.create_task(self._time_loop())
-        print("[TimeSystem] Started")
+        await self.time_manager.start()
         
         # Schedule world time advancement (every 30 seconds = 1 game hour)
         self._schedule_time_advancement()
+        
+        # Schedule NPC housekeeping tick (respawns, etc.) - every 30 seconds
+        self._schedule_npc_housekeeping_tick()
+        
+        # Initialize per-NPC behavior timers
+        self._init_npc_behaviors()
     
     def _schedule_time_advancement(self) -> None:
         """
@@ -98,64 +113,307 @@ class WorldEngine:
             event_id="world_time_tick"
         )
     
-    async def stop_time_system(self) -> None:
+    def _schedule_npc_housekeeping_tick(self) -> None:
         """
-        Stop the time event processing loop.
-        Should be called during engine shutdown.
+        Schedule recurring NPC housekeeping tick (every 30 seconds).
+        Handles: respawn checks, cleanup, area-wide NPC events.
+        Individual NPC behaviors (idle, wander) use per-NPC timers.
         """
-        if self._time_loop_task is None:
+        async def npc_housekeeping_tick():
+            """Process housekeeping for all NPCs."""
+            current_time = time.time()
+            
+            # Check for NPC respawns
+            for npc_id, npc in list(self.world.npcs.items()):
+                if npc.is_alive():
+                    continue
+                
+                # Check if respawn time has elapsed
+                if npc.last_killed_at and current_time - npc.last_killed_at >= npc.respawn_time:
+                    # Respawn the NPC
+                    template = self.world.npc_templates.get(npc.template_id)
+                    if template:
+                        npc.current_health = template.max_health
+                        npc.last_killed_at = None
+                        npc.room_id = npc.spawn_room_id
+                        npc.target_id = None
+                        
+                        # Add back to room
+                        spawn_room = self.world.rooms.get(npc.spawn_room_id)
+                        if spawn_room:
+                            spawn_room.entities.add(npc_id)
+                            
+                            # Announce respawn
+                            npc_name = npc.instance_data.get("name_override", npc.name)
+                            await self._dispatch_events([
+                                self._msg_to_room(
+                                    spawn_room.id,
+                                    f"{npc_name} appears.",
+                                )
+                            ])
+                            
+                            # Start behavior timers for respawned NPC
+                            self._schedule_npc_idle(npc_id)
+                            self._schedule_npc_wander(npc_id)
+            
+            # Reschedule housekeeping
+            self._schedule_npc_housekeeping_tick()
+        
+        # Housekeeping every 30 seconds
+        self.schedule_event(
+            delay_seconds=30.0,
+            callback=npc_housekeeping_tick,
+            event_id="npc_housekeeping_tick"
+        )
+    
+    def _init_npc_behaviors(self) -> None:
+        """
+        Initialize per-NPC behavior timers for all living NPCs.
+        Called once on engine startup after world is loaded.
+        """
+        for npc_id, npc in self.world.npcs.items():
+            if npc.is_alive():
+                self._schedule_npc_idle(npc_id)
+                self._schedule_npc_wander(npc_id)
+    
+    def _schedule_npc_idle(self, npc_id: str) -> None:
+        """
+        Schedule the next idle behavior check for a specific NPC.
+        Uses behavior scripts to determine idle messages.
+        """
+        import random
+        
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
             return
         
-        self._time_loop_task.cancel()
-        try:
-            await self._time_loop_task
-        except asyncio.CancelledError:
-            pass
+        template = self.world.npc_templates.get(npc.template_id)
+        if not template:
+            return
         
-        self._time_loop_task = None
-        print("[TimeSystem] Stopped")
+        # Get idle timing from resolved behavior config
+        config = template.resolved_behavior
+        if not config.get("idle_enabled", True):
+            return
+        
+        async def npc_idle_callback():
+            """Run idle behavior hooks, then reschedule."""
+            npc = self.world.npcs.get(npc_id)
+            if not npc or not npc.is_alive():
+                return
+            
+            # Run the on_idle_tick hook for all behaviors
+            await self._run_behavior_hook(npc_id, "on_idle_tick")
+            
+            # Reschedule next idle check
+            self._schedule_npc_idle(npc_id)
+        
+        # Cancel any existing idle timer for this NPC
+        if npc.idle_event_id:
+            self.cancel_event(npc.idle_event_id)
+        
+        # Get timing from config (with defaults)
+        min_delay = config.get("idle_interval_min", 15.0)
+        max_delay = config.get("idle_interval_max", 45.0)
+        delay = random.uniform(min_delay, max_delay)
+        
+        event_id = f"npc_idle_{npc_id}_{time.time()}"
+        npc.idle_event_id = event_id
+        
+        self.schedule_event(
+            delay_seconds=delay,
+            callback=npc_idle_callback,
+            event_id=event_id
+        )
     
-    async def _time_loop(self) -> None:
+    def _schedule_npc_wander(self, npc_id: str) -> None:
         """
-        Core time event processing loop.
-        
-        Continuously checks for due events and executes them.
-        Sleeps dynamically based on next event time to minimize CPU usage.
+        Schedule the next wander behavior check for a specific NPC.
+        Uses behavior scripts to determine movement.
         """
-        print("[TimeSystem] Loop started")
+        import random
         
-        while True:
-            now = time.time()
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
+            return
+        
+        template = self.world.npc_templates.get(npc.template_id)
+        if not template:
+            return
+        
+        # Get wander timing from resolved behavior config
+        config = template.resolved_behavior
+        wander_enabled = config.get("wander_enabled", False)
+        
+        if not wander_enabled:
+            print(f"[NPC] {npc.name} wander NOT enabled (config={config})")
+            return
+        
+        print(f"[NPC] Scheduling wander for {npc.name} (behaviors={template.behaviors})")
+        
+        async def npc_wander_callback():
+            """Run wander behavior hooks, then reschedule."""
+            npc = self.world.npcs.get(npc_id)
+            if not npc or not npc.is_alive():
+                return
             
-            # Execute all due events
-            while self._time_events and self._time_events[0].execute_at <= now:
-                event = heapq.heappop(self._time_events)
-                
-                # Remove from ID lookup
-                self._event_ids.pop(event.event_id, None)
-                
-                try:
-                    await event.callback()
-                    print(f"[TimeSystem] Executed event {event.event_id}")
-                except Exception as e:
-                    print(f"[TimeSystem] Error executing event {event.event_id}: {e}")
-                
-                # Reschedule if recurring
-                if event.recurring and event.interval > 0:
-                    event.execute_at = now + event.interval
-                    heapq.heappush(self._time_events, event)
-                    self._event_ids[event.event_id] = event
-                    print(f"[TimeSystem] Rescheduled recurring event {event.event_id} for {event.interval}s")
+            # Run the on_wander_tick hook for all behaviors
+            result = await self._run_behavior_hook(npc_id, "on_wander_tick")
+            if result and result.handled:
+                print(f"[NPC] {npc.name} wander tick handled: move_to={result.move_to}")
             
-            # Calculate sleep duration until next event
-            if self._time_events:
-                next_event_time = self._time_events[0].execute_at
-                sleep_duration = min(1.0, max(0.01, next_event_time - time.time()))
-            else:
-                # No events scheduled, check every second
-                sleep_duration = 1.0
+            # Reschedule next wander check
+            self._schedule_npc_wander(npc_id)
+        
+        # Cancel any existing wander timer for this NPC
+        if npc.wander_event_id:
+            self.cancel_event(npc.wander_event_id)
+        
+        # Get timing from config (with defaults)
+        min_delay = config.get("wander_interval_min", 30.0)
+        max_delay = config.get("wander_interval_max", 90.0)
+        delay = random.uniform(min_delay, max_delay)
+        
+        event_id = f"npc_wander_{npc_id}_{time.time()}"
+        npc.wander_event_id = event_id
+        
+        self.schedule_event(
+            delay_seconds=delay,
+            callback=npc_wander_callback,
+            event_id=event_id
+        )
+    
+    def _cancel_npc_timers(self, npc_id: str) -> None:
+        """
+        Cancel all behavior timers for an NPC (called on death/despawn).
+        """
+        npc = self.world.npcs.get(npc_id)
+        if not npc:
+            return
+        
+        if npc.idle_event_id:
+            self.cancel_event(npc.idle_event_id)
+            npc.idle_event_id = None
+        
+        if npc.wander_event_id:
+            self.cancel_event(npc.wander_event_id)
+            npc.wander_event_id = None
+    
+    def _get_npc_behavior_context(self, npc_id: str) -> BehaviorContext | None:
+        """
+        Create a BehaviorContext for the given NPC.
+        Returns None if NPC doesn't exist or is dead.
+        """
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
+            return None
+        
+        template = self.world.npc_templates.get(npc.template_id)
+        if not template:
+            return None
+        
+        return BehaviorContext(
+            npc=npc,
+            world=self.world,
+            template=template,
+            config=template.resolved_behavior,
+            broadcast=lambda room_id, msg: None  # We handle messages via BehaviorResult
+        )
+    
+    async def _run_behavior_hook(
+        self, 
+        npc_id: str, 
+        hook_name: str, 
+        *args, 
+        **kwargs
+    ) -> BehaviorResult | None:
+        """
+        Run a specific behavior hook for an NPC.
+        
+        Executes all behaviors in priority order. Stops if a behavior returns
+        handled=True (for most hooks).
+        
+        Returns the first result with handled=True, or the last result.
+        """
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
+            return None
+        
+        template = self.world.npc_templates.get(npc.template_id)
+        if not template:
+            return None
+        
+        ctx = self._get_npc_behavior_context(npc_id)
+        if not ctx:
+            return None
+        
+        # Get behavior instances for this NPC
+        behaviors = get_behavior_instances(template.behaviors)
+        print(f"[Behavior] Running {hook_name} for {npc.name} with {len(behaviors)} behaviors: {[b.name for b in behaviors]}")
+        
+        last_result: BehaviorResult | None = None
+        for behavior in behaviors:
+            hook = getattr(behavior, hook_name, None)
+            if hook is None:
+                continue
             
-            await asyncio.sleep(sleep_duration)
+            try:
+                result = await hook(ctx, *args, **kwargs)
+                if result and result.handled:
+                    # Process the result
+                    await self._process_behavior_result(npc_id, result)
+                    return result
+                last_result = result
+            except Exception as e:
+                print(f"[Behavior] Error in {behavior.name}.{hook_name}: {e}")
+        
+        return last_result
+    
+    async def _process_behavior_result(self, npc_id: str, result: BehaviorResult) -> None:
+        """
+        Process a BehaviorResult - handle movement, messages, attacks, etc.
+        """
+        npc = self.world.npcs.get(npc_id)
+        if not npc:
+            return
+        
+        events: list[Event] = []
+        
+        # Handle messages
+        if result.message:
+            events.append(self._msg_to_room(npc.room_id, result.message))
+        
+        # Handle movement
+        if result.move_to:
+            old_room = self.world.rooms.get(npc.room_id)
+            new_room = self.world.rooms.get(result.move_to)
+            
+            if old_room and new_room:
+                # Update room tracking
+                old_room.entities.discard(npc_id)
+                npc.room_id = result.move_to
+                new_room.entities.add(npc_id)
+                
+                # Announce arrival if we have a direction
+                if result.move_direction:
+                    opposite = {
+                        "north": "south", "south": "north",
+                        "east": "west", "west": "east",
+                        "up": "down", "down": "up"
+                    }
+                    from_dir = opposite.get(result.move_direction, "somewhere")
+                    events.append(self._msg_to_room(
+                        result.move_to, 
+                        f"{npc.name} arrives from the {from_dir}."
+                    ))
+        
+        # Dispatch all events
+        if events:
+            await self._dispatch_events(events)
+    
+    async def stop_time_system(self) -> None:
+        """Stop the time event processing loop. Delegates to TimeEventManager."""
+        await self.time_manager.stop()
     
     def schedule_event(
         self,
@@ -164,57 +422,199 @@ class WorldEngine:
         event_id: str | None = None,
         recurring: bool = False,
     ) -> str:
-        """
-        Schedule a time event to execute after a delay.
-        
-        Args:
-            delay_seconds: How long to wait before executing
-            callback: Async function to call when event fires
-            event_id: Optional unique ID (auto-generated if None)
-            recurring: If True, reschedule with same delay after execution
-        
-        Returns:
-            The event_id (for cancellation)
-        """
-        if event_id is None:
-            event_id = str(uuid.uuid4())
-        
-        execute_at = time.time() + delay_seconds
-        event = TimeEvent(
-            execute_at=execute_at,
-            callback=callback,
-            event_id=event_id,
-            recurring=recurring,
-            interval=delay_seconds if recurring else 0.0,
-        )
-        
-        heapq.heappush(self._time_events, event)
-        self._event_ids[event_id] = event
-        
-        print(f"[TimeSystem] Scheduled event {event_id} for {delay_seconds}s (recurring={recurring})")
-        return event_id
+        """Schedule a time event. Delegates to TimeEventManager."""
+        return self.time_manager.schedule(delay_seconds, callback, event_id, recurring)
     
     def cancel_event(self, event_id: str) -> bool:
-        """
-        Cancel a scheduled time event.
+        """Cancel a scheduled time event. Delegates to TimeEventManager."""
+        return self.time_manager.cancel(event_id)
+
+    # ---------- Unified Entity System Helpers ----------
+
+    def _get_players_in_room(self, room_id: RoomId) -> List[WorldPlayer]:
+        """Get all players in a room (from unified entities set)."""
+        room = self.world.rooms.get(room_id)
+        if not room:
+            return []
         
-        Args:
-            event_id: The ID of the event to cancel
+        players = []
+        for entity_id in room.entities:
+            if entity_id in self.world.players:
+                players.append(self.world.players[entity_id])
+        return players
+    
+    def _get_npcs_in_room(self, room_id: RoomId) -> List[WorldNpc]:
+        """Get all NPCs in a room (from unified entities set)."""
+        room = self.world.rooms.get(room_id)
+        if not room:
+            return []
+        
+        npcs = []
+        for entity_id in room.entities:
+            if entity_id in self.world.npcs:
+                npcs.append(self.world.npcs[entity_id])
+        return npcs
+    
+    def _get_player_ids_in_room(self, room_id: RoomId) -> set[PlayerId]:
+        """Get IDs of all players in a room."""
+        room = self.world.rooms.get(room_id)
+        if not room:
+            return set()
+        return {eid for eid in room.entities if eid in self.world.players}
+    
+    def _find_entity_in_room(
+        self, 
+        room_id: RoomId, 
+        search_term: str,
+        include_players: bool = True,
+        include_npcs: bool = True,
+    ) -> tuple[EntityId | None, EntityType | None]:
+        """
+        Find an entity in a room by name or keyword.
         
         Returns:
-            True if event was found and cancelled, False otherwise
+            Tuple of (entity_id, entity_type) or (None, None) if not found.
         """
-        event = self._event_ids.pop(event_id, None)
-        if event is None:
-            return False
+        room = self.world.rooms.get(room_id)
+        if not room:
+            return None, None
         
-        # Mark as non-recurring so it won't reschedule
-        event.recurring = False
+        search_lower = search_term.lower()
         
-        # We can't efficiently remove from heap, but it will be skipped
-        # when popped since it's no longer in _event_ids
-        print(f"[TimeSystem] Cancelled event {event_id}")
-        return True
+        for entity_id in room.entities:
+            # Check players
+            if include_players and entity_id in self.world.players:
+                player = self.world.players[entity_id]
+                if player.name.lower() == search_lower or search_lower in player.name.lower():
+                    return entity_id, EntityType.PLAYER
+            
+            # Check NPCs
+            if include_npcs and entity_id in self.world.npcs:
+                npc = self.world.npcs[entity_id]
+                template = self.world.npc_templates.get(npc.template_id)
+                if not template or not npc.is_alive():
+                    continue
+                
+                # Check instance name override
+                npc_name = npc.instance_data.get("name_override", npc.name)
+                
+                # Exact or partial match on name
+                if npc_name.lower() == search_lower or search_lower in npc_name.lower():
+                    return entity_id, EntityType.NPC
+                
+                # Keyword match
+                for keyword in template.keywords:
+                    if search_lower == keyword.lower() or search_lower in keyword.lower():
+                        return entity_id, EntityType.NPC
+        
+        return None, None
+    
+    def _find_targetable_in_room(
+        self, 
+        room_id: RoomId, 
+        search_term: str,
+        include_players: bool = True,
+        include_npcs: bool = True,
+        include_items: bool = True,
+    ) -> tuple[Targetable | None, TargetableType | None]:
+        """
+        Find any targetable object in a room by name or keyword.
+        
+        Searches through entities (players, NPCs) and items in priority order.
+        This provides a unified targeting interface for commands.
+        
+        Args:
+            room_id: The room to search in
+            search_term: Name or keyword to search for
+            include_players: Whether to search players
+            include_npcs: Whether to search NPCs
+            include_items: Whether to search items
+        
+        Returns:
+            Tuple of (targetable_object, targetable_type) or (None, None) if not found.
+        """
+        room = self.world.rooms.get(room_id)
+        if not room:
+            return None, None
+        
+        search_lower = search_term.lower()
+        
+        # Search entities first (players and NPCs)
+        for entity_id in room.entities:
+            # Check players
+            if include_players and entity_id in self.world.players:
+                player = self.world.players[entity_id]
+                if player.matches_keyword(search_term):
+                    return player, TargetableType.PLAYER
+            
+            # Check NPCs
+            if include_npcs and entity_id in self.world.npcs:
+                npc = self.world.npcs[entity_id]
+                if not npc.is_alive():
+                    continue
+                if npc.matches_keyword(search_term):
+                    return npc, TargetableType.NPC
+        
+        # Search items in the room
+        if include_items:
+            for item_id in room.items:
+                item = self.world.items.get(item_id)
+                if item and item.matches_keyword(search_term):
+                    return item, TargetableType.ITEM
+        
+        return None, None
+    
+    def _find_item_in_room(
+        self, 
+        room_id: RoomId, 
+        search_term: str,
+    ) -> WorldItem | None:
+        """
+        Find an item in a room by name or keyword.
+        
+        Args:
+            room_id: The room to search in
+            search_term: Name or keyword to search for
+        
+        Returns:
+            The matching WorldItem or None if not found.
+        """
+        room = self.world.rooms.get(room_id)
+        if not room:
+            return None
+        
+        for item_id in room.items:
+            item = self.world.items.get(item_id)
+            if item and item.matches_keyword(search_term):
+                return item
+        
+        return None
+    
+    def _find_item_in_inventory(
+        self, 
+        player_id: PlayerId, 
+        search_term: str,
+    ) -> WorldItem | None:
+        """
+        Find an item in a player's inventory by name or keyword.
+        
+        Args:
+            player_id: The player whose inventory to search
+            search_term: Name or keyword to search for
+        
+        Returns:
+            The matching WorldItem or None if not found.
+        """
+        player = self.world.players.get(player_id)
+        if not player:
+            return None
+        
+        for item_id in player.inventory_items:
+            item = self.world.items.get(item_id)
+            if item and item.matches_keyword(search_term):
+                return item
+        
+        return None
 
     # ---------- Player connection management ----------
 
@@ -257,7 +657,8 @@ class WorldEngine:
                 await self._dispatch_events([self_event])
                 
                 # Broadcast to others in the room
-                if room and len(room.players) > 1:
+                room_player_ids = self._get_player_ids_in_room(room.id) if room else set()
+                if room and len(room_player_ids) > 1:
                     awaken_msg = (
                         f"The prismatic light around {player.name} shatters like glass. "
                         f"They gasp and return to awareness, freed from stasis."
@@ -359,8 +760,9 @@ class WorldEngine:
             player.is_connected = False  # Put in stasis
             
             room = self.world.rooms.get(player.room_id)
+            room_player_ids = self._get_player_ids_in_room(room.id) if room else set()
             
-            if room and len(room.players) > 1:
+            if room and len(room_player_ids) > 1:
                 # Create stasis event for others in the room
                 stasis_msg = (
                     f"A bright flash of light engulfs {player.name}. "
@@ -453,11 +855,11 @@ class WorldEngine:
 
         # Look
         if cmd in {"look", "l"} or cmd.startswith("look ") or cmd.startswith("l "):
-            # Check if looking at specific item
+            # Check if looking at specific thing
             parts = raw.split(maxsplit=1)
             if len(parts) > 1:
-                item_name = parts[1]
-                return self._look_at_item(player_id, item_name)
+                target_name = parts[1]
+                return self._look_at_target(player_id, target_name)
             else:
                 return self._look(player_id)
 
@@ -615,6 +1017,20 @@ class WorldEngine:
             
             return [self._msg_to_player(player_id, "Give what to whom? Usage: give <item> <player>")]
 
+        # ===== Combat Commands =====
+        if cmd.startswith(("attack ", "kill ", "fight ", "hit ")) or cmd in {"attack", "kill", "fight", "hit"}:
+            parts = raw.split(maxsplit=1)
+            if len(parts) < 2:
+                return [self._msg_to_player(player_id, "Attack whom?")]
+            target_name = parts[1].strip()
+            return self._attack(player_id, target_name)
+        
+        if cmd in {"stop", "disengage", "flee"}:
+            return self._stop_combat(player_id, flee=(cmd == "flee"))
+        
+        if cmd == "combat" or cmd == "cs":
+            return self._show_combat_status(player_id)
+
         # Default
         return [
             self._msg_to_player(
@@ -624,6 +1040,20 @@ class WorldEngine:
         ]
 
     # ---------- Helper: event constructors ----------
+
+    def _get_equipped_weapon_name(self, entity_id: EntityId) -> str:
+        """Get the name of the equipped weapon for an entity, or 'fists' if unarmed."""
+        entity = self.world.players.get(entity_id) or self.world.npcs.get(entity_id)
+        if not entity:
+            return "fists"
+        
+        if "weapon" in entity.equipped_items:
+            weapon_template_id = entity.equipped_items["weapon"]
+            weapon_template = self.world.item_templates.get(weapon_template_id)
+            if weapon_template:
+                return weapon_template.name
+        
+        return "fists"
 
     def _msg_to_player(
         self,
@@ -708,43 +1138,82 @@ class WorldEngine:
 
     # ---------- Concrete command handlers ----------
 
-    def _format_room_occupants(
+    def _format_room_entities(
         self,
         room: WorldRoom,
         exclude_player_id: PlayerId,
     ) -> list[str]:
         """
-        Format the list of other players in a room (both connected and in stasis).
+        Format the list of all entities in a room (players and NPCs).
         Returns a list of formatted strings to append to room description.
         """
         lines: list[str] = []
         world = self.world
         
-        # List connected players
-        others = [
-            world.players[pid].name
-            for pid in room.players
-            if pid != exclude_player_id and world.players[pid].is_connected
-        ]
+        # Get all entities from the room
+        players_connected = []
+        players_stasis = []
+        npcs_by_type: dict[str, list[str]] = {
+            "hostile": [],
+            "neutral": [],
+            "friendly": [],
+            "merchant": [],
+        }
         
-        # List players in stasis
-        stasis_players = [
-            world.players[pid].name
-            for pid in room.players
-            if pid != exclude_player_id and not world.players[pid].is_connected
-        ]
+        for entity_id in room.entities:
+            # Check if it's a player
+            if entity_id in world.players:
+                player = world.players[entity_id]
+                if entity_id == exclude_player_id:
+                    continue
+                if player.is_connected:
+                    players_connected.append(player.name)
+                else:
+                    players_stasis.append(player.name)
+            
+            # Check if it's an NPC
+            elif entity_id in world.npcs:
+                npc = world.npcs[entity_id]
+                if not npc.is_alive():
+                    continue
+                template = world.npc_templates.get(npc.template_id)
+                if not template:
+                    continue
+                npc_name = npc.instance_data.get("name_override", npc.name)
+                npc_type = template.npc_type
+                if npc_type in npcs_by_type:
+                    npcs_by_type[npc_type].append(npc_name)
         
-        if others:
+        # Format connected players
+        if players_connected:
             lines.append("")
-            for name in others:
+            for name in players_connected:
                 lines.append(f"{name} is here.")
         
-        if stasis_players:
+        # Format players in stasis
+        if players_stasis:
             lines.append("")
-            for name in stasis_players:
+            for name in players_stasis:
                 lines.append(f"(Stasis) The flickering form of {name} is here, suspended in prismatic stasis.")
         
+        # Format NPCs (no disposition indicator in room listing)
+        any_npcs = any(npcs for npcs in npcs_by_type.values())
+        if any_npcs:
+            lines.append("")
+            for npc_type, npc_names in npcs_by_type.items():
+                for name in npc_names:
+                    lines.append(f"{name} is here.")
+        
         return lines
+    
+    # Keep old name as alias for compatibility during refactoring
+    def _format_room_occupants(
+        self,
+        room: WorldRoom,
+        exclude_player_id: PlayerId,
+    ) -> list[str]:
+        """Deprecated: Use _format_room_entities instead."""
+        return self._format_room_entities(room, exclude_player_id)
 
     def _move_player(self, player_id: PlayerId, direction: Direction) -> List[Event]:
         events: List[Event] = []
@@ -786,9 +1255,18 @@ class WorldEngine:
 
         old_room_id = current_room.id
 
-        # Update occupancy
-        current_room.players.discard(player_id)
-        new_room.players.add(player_id)
+        # Cancel combat if player is in combat (you can't fight and run)
+        if player.combat.is_in_combat():
+            if player.combat.swing_event_id:
+                self.cancel_event(player.combat.swing_event_id)
+            player.combat.clear_combat()
+            events.append(
+                self._msg_to_player(player_id, "You disengage from combat.")
+            )
+
+        # Update occupancy (unified entity tracking)
+        current_room.entities.discard(player_id)
+        new_room.entities.add(player_id)
         player.room_id = new_room_id
 
         # Build movement message with effects
@@ -845,8 +1323,8 @@ class WorldEngine:
         )
 
         # Broadcast to players still in the old room (they see you leave)
-        # current_room.players now contains only *other* players
-        if current_room.players:
+        old_room_players = self._get_player_ids_in_room(old_room_id)
+        if old_room_players:
             events.append(
                 self._msg_to_room(
                     old_room_id,
@@ -855,8 +1333,8 @@ class WorldEngine:
             )
 
         # Broadcast to players in the new room (they see you enter)
-        # new_room.players includes the moving player -> exclude them
-        if len(new_room.players) > 1:
+        new_room_players = self._get_player_ids_in_room(new_room_id)
+        if len(new_room_players) > 1:  # More than just the moving player
             events.append(
                 self._msg_to_room(
                     new_room_id,
@@ -864,6 +1342,9 @@ class WorldEngine:
                     exclude={player_id},
                 )
             )
+
+        # Trigger on_player_enter for NPCs in the new room (aggressive NPCs attack)
+        asyncio.create_task(self._trigger_npc_player_enter(new_room_id, player_id))
 
         return events
 
@@ -892,8 +1373,8 @@ class WorldEngine:
         room_emoji = get_room_emoji(room.room_type)
         lines: list[str] = [f"**{room_emoji} {room.name}**", room.description]
 
-        # List other players in the same room
-        lines.extend(self._format_room_occupants(room, player_id))
+        # List all entities (players and NPCs) in the same room
+        lines.extend(self._format_room_entities(room, player_id))
 
         # Show items in room (Phase 3)
         if room.items:
@@ -1043,6 +1524,318 @@ class WorldEngine:
         
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
+    def _find_npc_in_room(self, room_id: RoomId, search_term: str) -> str | None:
+        """
+        Find an NPC in a room by name or keyword.
+        Returns the NPC ID if found, None otherwise.
+        
+        Note: This is a convenience wrapper around _find_entity_in_room.
+        """
+        entity_id, entity_type = self._find_entity_in_room(
+            room_id, search_term, 
+            include_players=False, 
+            include_npcs=True
+        )
+        return entity_id if entity_type == EntityType.NPC else None
+
+    def _look_at_target(self, player_id: PlayerId, target_name: str) -> List[Event]:
+        """
+        Examine any targetable object (player, NPC, or item) using unified targeting.
+        
+        Uses the Targetable protocol to find and describe targets uniformly.
+        """
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        room = world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are nowhere. (Room not found)")]
+        
+        # Use unified targeting to find the target
+        target, target_type = self._find_targetable_in_room(
+            room.id, target_name,
+            include_players=True,
+            include_npcs=True,
+            include_items=True
+        )
+        
+        # Also check player's inventory for items
+        if not target:
+            inv_item = self._find_item_in_inventory(player_id, target_name)
+            if inv_item:
+                target = inv_item
+                target_type = TargetableType.ITEM
+        
+        if not target:
+            return [self._msg_to_player(player_id, f"You don't see '{target_name}' here.")]
+        
+        # Dispatch to appropriate detailed look method based on type
+        if target_type == TargetableType.PLAYER:
+            return self._look_at_player(player_id, target)
+        elif target_type == TargetableType.NPC:
+            return self._look_at_npc_detail(player_id, target)
+        elif target_type == TargetableType.ITEM:
+            return self._look_at_item_detail(player_id, target)
+        
+        return [self._msg_to_player(player_id, f"You don't see '{target_name}' here.")]
+    
+    def _look_at_player(self, player_id: PlayerId, target: WorldPlayer) -> List[Event]:
+        """Examine another player in detail."""
+        lines = [f"**{target.name}**"]
+        lines.append(f"A level {target.level} {target.character_class}.")
+        
+        # Show health status (descriptive, not exact numbers)
+        health_percent = (target.current_health / target.max_health) * 100
+        if health_percent >= 100:
+            health_status = "appears uninjured"
+        elif health_percent >= 75:
+            health_status = "has minor injuries"
+        elif health_percent >= 50:
+            health_status = "is moderately wounded"
+        elif health_percent >= 25:
+            health_status = "is heavily wounded"
+        else:
+            health_status = "is near death"
+        
+        lines.append(f"Condition: {target.name} {health_status}.")
+        
+        # Show connection status
+        if not target.is_connected:
+            lines.append("")
+            lines.append("*They appear to be in a trance-like stasis.*")
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+    
+    def _look_at_npc_detail(self, player_id: PlayerId, npc: WorldNpc) -> List[Event]:
+        """Examine an NPC in detail (internal implementation)."""
+        world = self.world
+        template = world.npc_templates.get(npc.template_id)
+        
+        if not template:
+            return [self._msg_to_player(player_id, f"You see {npc.name}, but something seems off...")]
+        
+        # Use instance name override if available
+        display_name = npc.instance_data.get("name_override", template.name)
+        
+        # Build detailed description
+        lines = [f"**{display_name}**"]
+        lines.append(template.description)
+        
+        # Show type indicator
+        lines.append("")
+        type_indicators = {
+            "hostile": "🔴 Hostile",
+            "neutral": "🟡 Neutral",
+            "friendly": "🟢 Friendly",
+            "merchant": "🛒 Merchant",
+        }
+        type_str = type_indicators.get(template.npc_type, template.npc_type.title())
+        lines.append(f"Disposition: {type_str}")
+        
+        # Show level
+        lines.append(f"Level: {template.level}")
+        
+        # Show health status (descriptive, not exact numbers)
+        health_percent = (npc.current_health / template.max_health) * 100
+        if health_percent >= 100:
+            health_status = "appears uninjured"
+        elif health_percent >= 75:
+            health_status = "has minor injuries"
+        elif health_percent >= 50:
+            health_status = "is moderately wounded"
+        elif health_percent >= 25:
+            health_status = "is heavily wounded"
+        else:
+            health_status = "is near death"
+        
+        lines.append(f"Condition: {display_name} {health_status}.")
+        
+        # Show instance-specific data like guard messages
+        if "guard_message" in npc.instance_data:
+            lines.append("")
+            lines.append(npc.instance_data["guard_message"])
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+    
+    def _look_at_item_detail(self, player_id: PlayerId, item: WorldItem) -> List[Event]:
+        """Examine an item in detail (internal implementation)."""
+        world = self.world
+        template = world.item_templates.get(item.template_id)
+        
+        if not template:
+            return [self._msg_to_player(player_id, f"You see {item.name}, but something seems off...")]
+        
+        # Build detailed description
+        lines = [f"**{template.name}**"]
+        lines.append(template.description)
+        
+        # Add flavor text if available
+        if template.flavor_text:
+            lines.append("")
+            lines.append(template.flavor_text)
+        
+        # Show item properties
+        lines.append("")
+        properties = []
+        
+        # Item type and rarity
+        type_str = template.item_type.title()
+        if template.item_subtype:
+            type_str += f" ({template.item_subtype})"
+        if template.rarity != "common":
+            type_str += f" - {template.rarity.title()}"
+        properties.append(f"Type: {type_str}")
+        
+        # Weight
+        total_weight = template.weight * item.quantity
+        if item.quantity > 1:
+            properties.append(f"Weight: {total_weight:.1f} kg ({template.weight:.1f} kg each)")
+        else:
+            properties.append(f"Weight: {total_weight:.1f} kg")
+        
+        # Durability
+        if template.has_durability and item.current_durability is not None:
+            properties.append(f"Durability: {item.current_durability}/{template.max_durability}")
+        
+        # Equipment slot
+        if template.equipment_slot:
+            slot_name = template.equipment_slot.replace("_", " ").title()
+            properties.append(f"Equipment Slot: {slot_name}")
+        
+        # Stat modifiers
+        if template.stat_modifiers:
+            stat_strs = []
+            for stat, value in template.stat_modifiers.items():
+                sign = "+" if value >= 0 else ""
+                stat_display = stat.replace("_", " ").title()
+                stat_strs.append(f"{sign}{value} {stat_display}")
+            properties.append(f"Effects: {', '.join(stat_strs)}")
+        
+        # Value
+        if template.value > 0:
+            total_value = template.value * item.quantity
+            if item.quantity > 1:
+                properties.append(f"Value: {total_value} gold ({template.value} each)")
+            else:
+                properties.append(f"Value: {total_value} gold")
+        
+        # Stackable info
+        if template.max_stack_size > 1:
+            properties.append(f"Quantity: {item.quantity}/{template.max_stack_size}")
+        elif item.quantity > 1:
+            properties.append(f"Quantity: {item.quantity}")
+        
+        lines.extend(f"  {prop}" for prop in properties)
+        
+        # Show equipped status
+        if item.is_equipped():
+            lines.append("")
+            lines.append("  [Currently Equipped]")
+        
+        # Container contents
+        if template.is_container:
+            lines.append("")
+            container_items = []
+            
+            # Find all items in this container
+            for other_item_id, other_item in world.items.items():
+                if other_item.container_id == item.id:
+                    other_template = world.item_templates[other_item.template_id]
+                    quantity_str = f" x{other_item.quantity}" if other_item.quantity > 1 else ""
+                    container_items.append(f"  {other_template.name}{quantity_str}")
+            
+            if container_items:
+                lines.append(f"**Contents of {template.name}:**")
+                lines.extend(container_items)
+                
+                # Show container capacity if available
+                if template.container_capacity:
+                    if template.container_type == "weight_based":
+                        # Calculate current weight in container
+                        container_weight = 0.0
+                        for other_item_id, other_item in world.items.items():
+                            if other_item.container_id == item.id:
+                                other_template = world.item_templates[other_item.template_id]
+                                container_weight += other_template.weight * other_item.quantity
+                        lines.append(f"  Weight: {container_weight:.1f}/{template.container_capacity:.1f} kg")
+                    else:
+                        # Slot-based container
+                        item_count = len(container_items)
+                        lines.append(f"  Slots: {item_count}/{template.container_capacity}")
+            else:
+                lines.append(f"**{template.name} is empty.**")
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    def _look_at_npc(self, player_id: PlayerId, npc_name: str) -> List[Event] | None:
+        """
+        Examine an NPC in detail.
+        Returns None if no NPC found (so caller can try looking at items).
+        """
+        world = self.world
+        
+        if player_id not in world.players:
+            return None
+        
+        player = world.players[player_id]
+        room = world.rooms.get(player.room_id)
+        if not room:
+            return None
+        
+        # Find NPC in current room
+        npc_id = self._find_npc_in_room(room.id, npc_name)
+        if not npc_id:
+            return None  # No NPC found, let caller try items
+        
+        npc = world.npcs[npc_id]
+        template = world.npc_templates[npc.template_id]
+        
+        # Use instance name override if available
+        display_name = npc.instance_data.get("name_override", template.name)
+        
+        # Build detailed description
+        lines = [f"**{display_name}**"]
+        lines.append(template.description)
+        
+        # Show type indicator
+        lines.append("")
+        type_indicators = {
+            "hostile": "🔴 Hostile",
+            "neutral": "🟡 Neutral",
+            "friendly": "🟢 Friendly",
+            "merchant": "🛒 Merchant",
+        }
+        type_str = type_indicators.get(template.npc_type, template.npc_type.title())
+        lines.append(f"Disposition: {type_str}")
+        
+        # Show level
+        lines.append(f"Level: {template.level}")
+        
+        # Show health status (descriptive, not exact numbers)
+        health_percent = (npc.current_health / template.max_health) * 100
+        if health_percent >= 100:
+            health_status = "appears uninjured"
+        elif health_percent >= 75:
+            health_status = "has minor injuries"
+        elif health_percent >= 50:
+            health_status = "is moderately wounded"
+        elif health_percent >= 25:
+            health_status = "is heavily wounded"
+        else:
+            health_status = "is near death"
+        
+        lines.append(f"Condition: {display_name} {health_status}.")
+        
+        # Show instance-specific data like guard messages
+        if "guard_message" in npc.instance_data:
+            lines.append("")
+            lines.append(npc.instance_data["guard_message"])
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+
     def _show_stats(self, player_id: PlayerId) -> List[Event]:
         """
         Display player's current stats.
@@ -1122,7 +1915,8 @@ class WorldEngine:
         events.append(self._msg_to_player(player_id, f'You say: "{text}"'))
 
         # Broadcast to everyone else in the room
-        if room.players:
+        room_player_ids = self._get_player_ids_in_room(room.id)
+        if room_player_ids:
             events.append(
                 self._msg_to_room(
                     room.id,
@@ -1178,7 +1972,8 @@ class WorldEngine:
         events.append(self._msg_to_player(player_id, first_person))
 
         # Broadcast to everyone else in the room
-        if len(room.players) > 1:
+        room_player_ids = self._get_player_ids_in_room(room.id)
+        if len(room_player_ids) > 1:
             events.append(
                 self._msg_to_room(
                     room.id,
@@ -1191,131 +1986,877 @@ class WorldEngine:
 
     def _heal(self, player_id: PlayerId, target_name: str) -> List[Event]:
         """
-        Heal a player by name (admin/debug command).
+        Heal an entity by name (admin/debug command).
+        Uses Targetable protocol for unified player/NPC targeting.
         """
         world = self.world
         events: List[Event] = []
-
-        # Find target player by name
-        target_player = None
-        target_id = None
-        for pid, p in world.players.items():
-            if p.name.lower() == target_name.lower():
-                target_player = p
-                target_id = pid
-                break
         
-        if not target_player:
-            return [self._msg_to_player(player_id, f"Player '{target_name}' not found.")]
+        player = world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        room = world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are nowhere. (Room not found)")]
+
+        # Use unified targeting to find target entity
+        target, target_type = self._find_targetable_in_room(
+            room.id, target_name,
+            include_players=True,
+            include_npcs=True,
+            include_items=False
+        )
+        
+        if not target or target_type == TargetableType.ITEM:
+            return [self._msg_to_player(player_id, f"'{target_name}' not found.")]
+        
+        # Get entity reference
+        entity: WorldEntity
+        if target_type == TargetableType.PLAYER:
+            entity = world.players[target.id]
+        else:
+            entity = world.npcs[target.id]
         
         # Heal for 20 HP (or up to max)
         heal_amount = 20
-        old_health = target_player.current_health
-        target_player.current_health = min(target_player.current_health + heal_amount, target_player.max_health)
-        actual_heal = target_player.current_health - old_health
+        old_health = entity.current_health
+        entity.current_health = min(entity.current_health + heal_amount, entity.max_health)
+        actual_heal = entity.current_health - old_health
         
-        # Send stat_update to target
-        events.append(self._stat_update_to_player(
-            target_id,
-            {
-                "current_health": target_player.current_health,
-                "max_health": target_player.max_health,
-            }
-        ))
-        
-        # Send message to target
-        events.append(self._msg_to_player(
-            target_id,
-            f"*A warm glow surrounds you.* You are healed for {actual_heal} HP."
-        ))
+        # Send stat_update to target (only for players)
+        if target_type == TargetableType.PLAYER:
+            events.append(self._stat_update_to_player(
+                target.id,
+                {
+                    "current_health": entity.current_health,
+                    "max_health": entity.max_health,
+                }
+            ))
+            
+            # Send message to target player
+            events.append(self._msg_to_player(
+                target.id,
+                f"*A warm glow surrounds you.* You are healed for {actual_heal} HP."
+            ))
         
         # Send confirmation to healer
-        if player_id != target_id:
+        if target_type == TargetableType.PLAYER and player_id != target.id:
             events.append(self._msg_to_player(
                 player_id,
-                f"You heal {target_player.name} for {actual_heal} HP."
+                f"You heal {entity.name} for {actual_heal} HP."
+            ))
+        elif target_type == TargetableType.NPC:
+            events.append(self._msg_to_player(
+                player_id,
+                f"You heal {entity.name} for {actual_heal} HP."
             ))
         
         # Broadcast to others in the room
-        player = world.players.get(player_id)
-        room = world.rooms.get(target_player.room_id) if target_player else None
-        if room and len(room.players) > 1:
-            healer_name = player.name if player else "Someone"
-            if player_id == target_id:
-                room_msg = f"*A warm glow surrounds {target_player.name}.*"
+        room_player_ids = self._get_player_ids_in_room(room.id)
+        if len(room_player_ids) > 1:
+            healer_name = player.name
+            exclude_set = {player_id}
+            if target_type == TargetableType.PLAYER:
+                exclude_set.add(target.id)
+            
+            if target_type == TargetableType.PLAYER and player_id == target.id:
+                room_msg = f"*A warm glow surrounds {entity.name}.*"
             else:
-                room_msg = f"*{healer_name} channels healing energy into {target_player.name}.*"
-            events.append(self._msg_to_room(
-                room.id,
-                room_msg,
-                exclude={player_id, target_id}
-            ))
+                room_msg = f"*{healer_name} channels healing energy into {entity.name}.*"
+            events.append(self._msg_to_room(room.id, room_msg, exclude=exclude_set))
         
         return events
 
     def _hurt(self, player_id: PlayerId, target_name: str) -> List[Event]:
         """
-        Hurt a player by name (admin/debug command).
+        Hurt an entity by name (admin/debug command).
+        Uses Targetable protocol for unified player/NPC targeting.
         """
         world = self.world
         events: List[Event] = []
-
-        # Find target player by name
-        target_player = None
-        target_id = None
-        for pid, p in world.players.items():
-            if p.name.lower() == target_name.lower():
-                target_player = p
-                target_id = pid
-                break
         
-        if not target_player:
-            return [self._msg_to_player(player_id, f"Player '{target_name}' not found.")]
+        player = world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        room = world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are nowhere. (Room not found)")]
+
+        # Use unified targeting to find target entity
+        target, target_type = self._find_targetable_in_room(
+            room.id, target_name,
+            include_players=True,
+            include_npcs=True,
+            include_items=False
+        )
+        
+        if not target or target_type == TargetableType.ITEM:
+            return [self._msg_to_player(player_id, f"'{target_name}' not found.")]
+        
+        # Get entity reference
+        entity: WorldEntity
+        if target_type == TargetableType.PLAYER:
+            entity = world.players[target.id]
+        else:
+            entity = world.npcs[target.id]
         
         # Damage for 15 HP (but not below 1)
         damage_amount = 15
-        old_health = target_player.current_health
-        target_player.current_health = max(target_player.current_health - damage_amount, 1)
-        actual_damage = old_health - target_player.current_health
+        old_health = entity.current_health
+        entity.current_health = max(entity.current_health - damage_amount, 1)
+        actual_damage = old_health - entity.current_health
         
-        # Send stat_update to target
-        events.append(self._stat_update_to_player(
-            target_id,
-            {
-                "current_health": target_player.current_health,
-                "max_health": target_player.max_health,
-            }
-        ))
-        
-        # Send message to target
-        events.append(self._msg_to_player(
-            target_id,
-            f"*A dark force strikes you!* You take {actual_damage} damage."
-        ))
+        # Send stat_update to target (only for players)
+        if target_type == TargetableType.PLAYER:
+            events.append(self._stat_update_to_player(
+                target.id,
+                {
+                    "current_health": entity.current_health,
+                    "max_health": entity.max_health,
+                }
+            ))
+            
+            # Send message to target player
+            events.append(self._msg_to_player(
+                target.id,
+                f"*A dark force strikes you!* You take {actual_damage} damage."
+            ))
         
         # Send confirmation to attacker
-        if player_id != target_id:
+        if target_type == TargetableType.PLAYER and player_id != target.id:
             events.append(self._msg_to_player(
                 player_id,
-                f"You hurt {target_player.name} for {actual_damage} damage."
+                f"You hurt {entity.name} for {actual_damage} damage."
+            ))
+        elif target_type == TargetableType.NPC:
+            events.append(self._msg_to_player(
+                player_id,
+                f"You hurt {entity.name} for {actual_damage} damage."
             ))
         
         # Broadcast to others in the room
-        player = world.players.get(player_id)
-        room = world.rooms.get(target_player.room_id) if target_player else None
-        if room and len(room.players) > 1:
-            attacker_name = player.name if player else "Someone"
-            if player_id == target_id:
-                room_msg = f"*Dark energy lashes at {target_player.name}!*"
+        room_player_ids = self._get_player_ids_in_room(room.id)
+        if len(room_player_ids) > 1:
+            attacker_name = player.name
+            exclude_set = {player_id}
+            if target_type == TargetableType.PLAYER:
+                exclude_set.add(target.id)
+            
+            if target_type == TargetableType.PLAYER and player_id == target.id:
+                room_msg = f"*Dark energy lashes at {entity.name}!*"
             else:
-                room_msg = f"*{attacker_name} strikes {target_player.name} with dark energy!*"
+                room_msg = f"*{attacker_name} strikes {entity.name} with dark energy!*"
+            events.append(self._msg_to_room(room.id, room_msg, exclude=exclude_set))
+        
+        return events
+
+    # =========================================================================
+    # Real-Time Combat System
+    # =========================================================================
+    
+    def _attack(self, player_id: PlayerId, target_name: str) -> List[Event]:
+        """
+        Initiate an attack against a target.
+        Starts the swing timer based on weapon speed.
+        """
+        import random
+        
+        world = self.world
+        events: List[Event] = []
+        
+        player = world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        if not player.is_alive():
+            return [self._msg_to_player(player_id, "You can't attack while dead.")]
+        
+        room = world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are nowhere.")]
+        
+        # Check if already in combat with this target
+        if player.combat.is_in_combat():
+            current_target = player.combat.target_id
+            if current_target:
+                current_target_entity = world.players.get(current_target) or world.npcs.get(current_target)
+                if current_target_entity:
+                    return [self._msg_to_player(
+                        player_id, 
+                        f"You're already attacking {current_target_entity.name}! Use 'stop' to disengage first."
+                    )]
+        
+        # Find target
+        target, target_type = self._find_targetable_in_room(
+            room.id, target_name,
+            include_players=True,
+            include_npcs=True,
+            include_items=False
+        )
+        
+        if not target or target_type == TargetableType.ITEM:
+            return [self._msg_to_player(player_id, f"'{target_name}' not found.")]
+        
+        # Can't attack yourself
+        if target.id == player_id:
+            return [self._msg_to_player(player_id, "You can't attack yourself!")]
+        
+        # Get target entity
+        target_entity: WorldEntity
+        if target_type == TargetableType.PLAYER:
+            target_entity = world.players[target.id]
+        else:
+            target_entity = world.npcs[target.id]
+        
+        # Check if target is alive
+        if not target_entity.is_alive():
+            return [self._msg_to_player(player_id, f"{target_entity.name} is already dead.")]
+        
+        # Start the attack (pass item_templates for equipped weapon lookup)
+        player.start_attack(target.id, world.item_templates)
+        
+        # Schedule the swing completion
+        weapon = player.combat.current_weapon
+        self._schedule_swing_completion(player_id, target.id, weapon)
+        
+        # Generate attack message - get weapon name from equipped weapon
+        swing_time = weapon.swing_speed
+        weapon_name = self._get_equipped_weapon_name(player_id)
+        
+        events.append(self._msg_to_player(
+            player_id,
+            f"You begin attacking {target_entity.name} with your {weapon_name}... ({swing_time:.1f}s)"
+        ))
+        
+        # Notify target
+        if target_type == TargetableType.PLAYER:
+            events.append(self._msg_to_player(
+                target.id,
+                f"⚔️ {player.name} attacks you!"
+            ))
+        
+        # Broadcast to room
+        events.append(self._msg_to_room(
+            room.id,
+            f"⚔️ {player.name} attacks {target_entity.name}!",
+            exclude={player_id, target.id}
+        ))
+        
+        # Trigger on_combat_start for NPC targets
+        if target_type == TargetableType.NPC:
+            # Add threat from player
+            target_entity.combat.add_threat(player_id, 100.0)
+            # Schedule NPC reaction
+            asyncio.create_task(self._trigger_npc_combat_start(target.id, player_id))
+        
+        return events
+    
+    def _schedule_swing_completion(
+        self, 
+        attacker_id: EntityId, 
+        target_id: EntityId,
+        weapon: WeaponStats
+    ) -> None:
+        """Schedule the completion of a swing (when damage is applied)."""
+        import random
+        
+        async def swing_complete_callback():
+            """Called when swing timer completes - apply damage and continue."""
+            attacker = self.world.players.get(attacker_id) or self.world.npcs.get(attacker_id)
+            target = self.world.players.get(target_id) or self.world.npcs.get(target_id)
+            
+            if not attacker or not target:
+                return
+            
+            if not attacker.is_alive():
+                attacker.combat.clear_combat()
+                return
+            
+            # Check if attacker moved or target moved/died
+            if attacker.room_id != target.room_id:
+                attacker.combat.clear_combat()
+                if attacker_id in self.world.players:
+                    await self._dispatch_events([
+                        self._msg_to_player(attacker_id, "Your target is no longer here.")
+                    ])
+                return
+            
+            if not target.is_alive():
+                attacker.combat.clear_combat()
+                if attacker_id in self.world.players:
+                    await self._dispatch_events([
+                        self._msg_to_player(attacker_id, f"{target.name} is already dead!")
+                    ])
+                return
+            
+            # Transition from WINDUP to SWING
+            if attacker.combat.phase == CombatPhase.WINDUP:
+                attacker.combat.start_phase(CombatPhase.SWING, weapon.swing_time)
+                # Schedule damage application
+                self._schedule_damage_application(attacker_id, target_id, weapon)
+        
+        # Schedule windup completion
+        event_id = f"combat_windup_{attacker_id}_{time.time()}"
+        attacker = self.world.players.get(attacker_id) or self.world.npcs.get(attacker_id)
+        if attacker:
+            attacker.combat.swing_event_id = event_id
+        
+        self.schedule_event(
+            delay_seconds=weapon.windup_time,
+            callback=swing_complete_callback,
+            event_id=event_id
+        )
+    
+    def _schedule_damage_application(
+        self,
+        attacker_id: EntityId,
+        target_id: EntityId,
+        weapon: WeaponStats
+    ) -> None:
+        """Schedule the actual damage application after swing commits."""
+        import random
+        
+        async def damage_callback():
+            """Apply damage and handle combat continuation."""
+            attacker = self.world.players.get(attacker_id) or self.world.npcs.get(attacker_id)
+            target = self.world.players.get(target_id) or self.world.npcs.get(target_id)
+            
+            if not attacker or not target or not attacker.is_alive():
+                if attacker:
+                    attacker.combat.clear_combat()
+                return
+            
+            # Check target still valid
+            if attacker.room_id != target.room_id or not target.is_alive():
+                attacker.combat.clear_combat()
+                return
+            
+            # Calculate damage
+            damage = random.randint(weapon.damage_min, weapon.damage_max)
+            
+            # Apply strength modifier
+            str_bonus = (attacker.get_effective_strength() - 10) // 2
+            damage = max(1, damage + str_bonus)
+            
+            # Apply target's armor
+            armor_reduction = target.get_effective_armor_class() // 5
+            damage = max(1, damage - armor_reduction)
+            
+            # Check for critical hit (10% base chance)
+            is_crit = random.random() < 0.10
+            if is_crit:
+                damage = int(damage * 1.5)
+            
+            # Apply damage
+            old_health = target.current_health
+            target.current_health = max(0, target.current_health - damage)
+            
+            # Build result
+            result = CombatResult(
+                success=True,
+                damage_dealt=damage,
+                damage_type=weapon.damage_type,
+                was_critical=is_crit,
+                attacker_id=attacker_id,
+                defender_id=target_id
+            )
+            
+            # Generate messages and events
+            events: List[Event] = []
+            
+            crit_text = " **CRITICAL!**" if is_crit else ""
+            
+            # Message to attacker
+            if attacker_id in self.world.players:
+                events.append(self._msg_to_player(
+                    attacker_id,
+                    f"You hit {target.name} for {damage} damage!{crit_text}"
+                ))
+            
+            # Message to target
+            if target_id in self.world.players:
+                events.append(self._msg_to_player(
+                    target_id,
+                    f"💥 {attacker.name} hits you for {damage} damage!{crit_text}"
+                ))
+                events.append(self._stat_update_to_player(
+                    target_id,
+                    {"current_health": target.current_health, "max_health": target.max_health}
+                ))
+            
+            # Room broadcast
+            room = self.world.rooms.get(attacker.room_id)
+            if room:
+                events.append(self._msg_to_room(
+                    room.id,
+                    f"{attacker.name} hits {target.name}!{crit_text}",
+                    exclude={attacker_id, target_id}
+                ))
+            
+            # Check for death
+            if not target.is_alive():
+                events.extend(await self._handle_death(target_id, attacker_id))
+                attacker.combat.clear_combat()
+            else:
+                # Trigger on_damaged for NPC targets
+                if target_id in self.world.npcs:
+                    asyncio.create_task(
+                        self._trigger_npc_damaged(target_id, attacker_id, damage)
+                    )
+                
+                # Continue auto-attack if enabled
+                if attacker.combat.auto_attack and attacker.is_alive():
+                    attacker.combat.start_phase(CombatPhase.RECOVERY, 0.5)
+                    self._schedule_next_swing(attacker_id, target_id, weapon)
+                else:
+                    attacker.combat.clear_combat()
+            
+            await self._dispatch_events(events)
+        
+        # Schedule damage
+        event_id = f"combat_damage_{attacker_id}_{time.time()}"
+        self.schedule_event(
+            delay_seconds=weapon.swing_time,
+            callback=damage_callback,
+            event_id=event_id
+        )
+    
+    def _schedule_next_swing(
+        self,
+        attacker_id: EntityId,
+        target_id: EntityId,
+        weapon: WeaponStats
+    ) -> None:
+        """Schedule the next swing in auto-attack sequence."""
+        
+        async def next_swing_callback():
+            """Start the next attack in the sequence."""
+            attacker = self.world.players.get(attacker_id) or self.world.npcs.get(attacker_id)
+            target = self.world.players.get(target_id) or self.world.npcs.get(target_id)
+            
+            if not attacker or not attacker.is_alive():
+                return
+            
+            if not target or not target.is_alive() or attacker.room_id != target.room_id:
+                attacker.combat.clear_combat()
+                if attacker_id in self.world.players:
+                    await self._dispatch_events([
+                        self._msg_to_player(attacker_id, "Combat ended.")
+                    ])
+                return
+            
+            # Start next swing
+            attacker.start_attack(target_id)
+            self._schedule_swing_completion(attacker_id, target_id, weapon)
+        
+        # Short recovery before next swing
+        self.schedule_event(
+            delay_seconds=0.5,
+            callback=next_swing_callback,
+            event_id=f"combat_recovery_{attacker_id}_{time.time()}"
+        )
+    
+    def _roll_and_drop_loot(self, drop_table: list, room_id: RoomId, npc_name: str) -> List[Event]:
+        """
+        Roll loot from a drop table and create items in the room.
+        
+        Args:
+            drop_table: List of {"template_id": str, "chance": float, "quantity": int|[min,max]}
+            room_id: Room to drop items into
+            npc_name: Name of the NPC for broadcast messages
+        
+        Returns:
+            List of events for loot drop messages
+        """
+        import random
+        
+        events: List[Event] = []
+        room = self.world.rooms.get(room_id)
+        if not room:
+            return events
+        
+        for drop in drop_table:
+            template_id = drop.get("template_id")
+            chance = drop.get("chance", 1.0)
+            quantity_spec = drop.get("quantity", 1)
+            
+            # Roll for drop chance
+            if random.random() > chance:
+                continue
+            
+            # Determine quantity
+            if isinstance(quantity_spec, list) and len(quantity_spec) == 2:
+                quantity = random.randint(quantity_spec[0], quantity_spec[1])
+            else:
+                quantity = int(quantity_spec)
+            
+            if quantity <= 0:
+                continue
+            
+            # Get template
+            template = self.world.item_templates.get(template_id)
+            if not template:
+                continue
+            
+            # Create item instance
+            item_id = f"loot_{uuid.uuid4().hex[:12]}"
+            item = WorldItem(
+                id=item_id,
+                template_id=template_id,
+                name=template.name,
+                keywords=list(template.keywords),
+                room_id=room_id,
+                quantity=quantity,
+                current_durability=template.max_durability if template.has_durability else None,
+                _description=template.description,
+            )
+            
+            # Add to world and room
+            self.world.items[item_id] = item
+            room.items.add(item_id)
+            
+            # Broadcast drop message
+            quantity_str = f" x{quantity}" if quantity > 1 else ""
             events.append(self._msg_to_room(
-                room.id,
-                room_msg,
-                exclude={player_id, target_id}
+                room_id,
+                f"💎 {npc_name} drops {template.name}{quantity_str}."
             ))
         
         return events
+    
+    async def _handle_death(self, victim_id: EntityId, killer_id: EntityId) -> List[Event]:
+        """Handle entity death - generate messages and trigger effects."""
+        events: List[Event] = []
+        
+        victim = self.world.players.get(victim_id) or self.world.npcs.get(victim_id)
+        killer = self.world.players.get(killer_id) or self.world.npcs.get(killer_id)
+        
+        if not victim:
+            return events
+        
+        victim_name = victim.name
+        killer_name = killer.name if killer else "unknown forces"
+        
+        # Death message to room
+        room = self.world.rooms.get(victim.room_id)
+        if room:
+            events.append(self._msg_to_room(
+                room.id,
+                f"💀 {victim_name} has been slain by {killer_name}!"
+            ))
+        
+        # If victim was an NPC, trigger respawn timer
+        if victim_id in self.world.npcs:
+            npc = self.world.npcs[victim_id]
+            
+            # Remove from room
+            if room:
+                room.entities.discard(victim_id)
+            
+            # Cancel behavior timers
+            self._cancel_npc_timers(victim_id)
+            
+            # Record death time for respawn
+            npc.last_killed_at = time.time()
+            
+            # Get template for loot and XP
+            template = self.world.npc_templates.get(npc.template_id)
+            
+            # Drop loot to room floor
+            if template and template.drop_table and room:
+                loot_events = self._roll_and_drop_loot(template.drop_table, room.id, victim_name)
+                events.extend(loot_events)
+            
+            # Award XP to killer if it's a player
+            if killer_id in self.world.players and template:
+                xp_reward = template.experience_reward
+                killer_player = self.world.players[killer_id]
+                killer_player.experience += xp_reward
+                events.append(self._msg_to_player(
+                    killer_id,
+                    f"✨ You gain {xp_reward} experience!"
+                ))
+                
+                # Check for level-up
+                level_ups = killer_player.check_level_up()
+                for level_data in level_ups:
+                    new_level = level_data["new_level"]
+                    gains = level_data["stat_gains"]
+                    
+                    # Build stat gain message
+                    gain_parts = []
+                    if gains.get("max_health"):
+                        gain_parts.append(f"+{gains['max_health']} HP")
+                    if gains.get("max_energy"):
+                        gain_parts.append(f"+{gains['max_energy']} Energy")
+                    if gains.get("strength"):
+                        gain_parts.append(f"+{gains['strength']} STR")
+                    if gains.get("dexterity"):
+                        gain_parts.append(f"+{gains['dexterity']} DEX")
+                    if gains.get("intelligence"):
+                        gain_parts.append(f"+{gains['intelligence']} INT")
+                    if gains.get("vitality"):
+                        gain_parts.append(f"+{gains['vitality']} VIT")
+                    
+                    gains_str = ", ".join(gain_parts)
+                    events.append(self._msg_to_player(
+                        killer_id,
+                        f"🎉 **LEVEL UP!** You reached level {new_level}! ({gains_str})"
+                    ))
+        
+        # If victim was a player, handle death state
+        if victim_id in self.world.players:
+            events.append(self._msg_to_player(
+                victim_id,
+                "☠️ You have been slain! (Use 'respawn' to return)"
+            ))
+        
+        return events
+    
+    def _stop_combat(self, player_id: PlayerId, flee: bool = False) -> List[Event]:
+        """Stop attacking / disengage from combat."""
+        import random as flee_random
+        
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        if not player.combat.is_in_combat():
+            return [self._msg_to_player(player_id, "You're not in combat.")]
+        
+        target_id = player.combat.target_id
+        target = None
+        if target_id:
+            target = self.world.players.get(target_id) or self.world.npcs.get(target_id)
+        
+        events: List[Event] = []
+        
+        if flee:
+            # Flee uses a dex check that becomes easier at low health
+            # DC = 15 - (10 * missing_health_percent)
+            # At full health: DC 15, at 50% health: DC 10, at 0% health: DC 5
+            health_percent = player.current_health / player.max_health if player.max_health > 0 else 1.0
+            missing_percent = 1.0 - health_percent
+            flee_dc = max(5, 15 - int(10 * missing_percent))
+            
+            roll = flee_random.randint(1, 20)
+            dex_mod = (player.get_effective_dexterity() - 10) // 2
+            total = roll + dex_mod
+            
+            if total >= flee_dc:
+                # Flee successful - find a random exit and move
+                room = self.world.rooms.get(player.room_id)
+                if room and room.exits:
+                    direction = flee_random.choice(list(room.exits.keys()))
+                    exit_target = room.exits[direction]
+                    
+                    # Cancel scheduled combat events
+                    if player.combat.swing_event_id:
+                        self.cancel_event(player.combat.swing_event_id)
+                    
+                    # Clear combat state
+                    player.combat.clear_combat()
+                    
+                    # Remove player from old room
+                    room.entities.discard(player_id)
+                    
+                    # Move player to new room
+                    new_room = self.world.rooms.get(exit_target)
+                    if new_room:
+                        player.room_id = new_room.id
+                        new_room.entities.add(player_id)
+                        
+                        events.append(self._msg_to_room(
+                            room.id,
+                            f"🏃 {player.name} flees {direction}!"
+                        ))
+                        events.append(self._msg_to_player(
+                            player_id,
+                            f"🏃 You flee {direction}! (Roll: {roll} + {dex_mod} DEX = {total} vs DC {flee_dc})"
+                        ))
+                        
+                        # Show new room
+                        events.extend(self._look(player_id))
+                    else:
+                        # Exit leads nowhere - shouldn't happen
+                        events.append(self._msg_to_player(player_id, "You try to flee but the exit leads nowhere!"))
+                else:
+                    # No exits - can't flee
+                    events.append(self._msg_to_player(player_id, "There's nowhere to flee!"))
+            else:
+                # Flee failed - stay in combat
+                events.append(self._msg_to_player(
+                    player_id,
+                    f"😰 You fail to escape! (Roll: {roll} + {dex_mod} DEX = {total} vs DC {flee_dc})"
+                ))
+                # Don't clear combat state on failed flee
+        else:
+            # Cancel scheduled combat events
+            if player.combat.swing_event_id:
+                self.cancel_event(player.combat.swing_event_id)
+            
+            # Clear combat state
+            player.combat.clear_combat()
+            
+            if target:
+                events.append(self._msg_to_player(
+                    player_id, 
+                    f"You stop attacking {target.name}."
+                ))
+            else:
+                events.append(self._msg_to_player(player_id, "You disengage from combat."))
+        
+        return events
+    
+    def _show_combat_status(self, player_id: PlayerId) -> List[Event]:
+        """Show current combat status."""
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        combat = player.combat
+        
+        if not combat.is_in_combat():
+            return [self._msg_to_player(player_id, "You are not in combat.")]
+        
+        target = None
+        if combat.target_id:
+            target = self.world.players.get(combat.target_id) or self.world.npcs.get(combat.target_id)
+        
+        target_name = target.name if target else "unknown"
+        target_health = ""
+        if target:
+            health_pct = (target.current_health / target.max_health) * 100
+            target_health = f" ({health_pct:.0f}% health)"
+        
+        phase_name = combat.phase.value
+        progress = combat.get_phase_progress() * 100
+        remaining = combat.get_phase_remaining()
+        
+        weapon = combat.current_weapon
+        
+        lines = [
+            f"⚔️ **Combat Status**",
+            f"Target: {target_name}{target_health}",
+            f"Phase: {phase_name} ({progress:.0f}% - {remaining:.1f}s remaining)",
+            f"Weapon: {weapon.damage_min}-{weapon.damage_max} damage, {weapon.swing_speed:.1f}s speed",
+            f"Auto-attack: {'ON' if combat.auto_attack else 'OFF'}"
+        ]
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+    
+    async def _trigger_npc_player_enter(self, room_id: str, player_id: str) -> None:
+        """Trigger on_player_enter for all NPCs in a room when a player enters."""
+        room = self.world.rooms.get(room_id)
+        if not room:
+            return
+        
+        for entity_id in list(room.entities):
+            if entity_id not in self.world.npcs:
+                continue
+            
+            npc = self.world.npcs[entity_id]
+            if not npc.is_alive():
+                continue
+            
+            result = await self._run_behavior_hook(entity_id, "on_player_enter", player_id)
+            
+            # Handle attack_target (aggressive NPCs)
+            if result and result.attack_target:
+                if not npc.combat.is_in_combat():
+                    npc.combat.add_threat(player_id, 100.0)
+                    npc.start_attack(result.attack_target, self.world.item_templates)
+                    weapon = npc.get_weapon_stats(self.world.item_templates)
+                    self._schedule_swing_completion(entity_id, result.attack_target, weapon)
+                    
+                    # Announce the attack
+                    if result.message:
+                        await self._dispatch_events([
+                            self._msg_to_room(room_id, result.message)
+                        ])
+    
+    async def _trigger_npc_combat_start(self, npc_id: str, attacker_id: str) -> None:
+        """Trigger on_combat_start behavior hooks for an NPC."""
+        result = await self._run_behavior_hook(npc_id, "on_combat_start", attacker_id)
+        
+        # If NPC behavior wants to retaliate, start their attack
+        if result and result.attack_target:
+            npc = self.world.npcs.get(npc_id)
+            if npc and npc.is_alive() and not npc.combat.is_in_combat():
+                npc.start_attack(result.attack_target, self.world.item_templates)
+                weapon = npc.get_weapon_stats(self.world.item_templates)
+                self._schedule_swing_completion(npc_id, result.attack_target, weapon)
+    
+    async def _trigger_npc_damaged(self, npc_id: str, attacker_id: str, damage: int) -> None:
+        """Trigger on_damaged behavior hooks for an NPC."""
+        result = await self._run_behavior_hook(npc_id, "on_damaged", attacker_id, damage)
+        
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
+            return
+        
+        # Handle flee result
+        if result and result.flee and result.move_to:
+            # NPC flees - cancel combat and move
+            npc.combat.clear_combat()
+            old_room = self.world.rooms.get(npc.room_id)
+            new_room = self.world.rooms.get(result.move_to)
+            
+            if old_room and new_room:
+                old_room.entities.discard(npc_id)
+                npc.room_id = result.move_to
+                new_room.entities.add(npc_id)
+        
+        # Handle call for help
+        if result and result.call_for_help:
+            # Alert nearby allies
+            await self._npc_call_for_help(npc_id, attacker_id)
+        
+        # Handle retaliation
+        if result and result.attack_target and not npc.combat.is_in_combat():
+            npc.start_attack(result.attack_target, self.world.item_templates)
+            weapon = npc.get_weapon_stats(self.world.item_templates)
+            self._schedule_swing_completion(npc_id, result.attack_target, weapon)
+    
+    async def _npc_call_for_help(self, caller_id: str, enemy_id: str) -> None:
+        """Have nearby NPCs of same type join combat."""
+        caller = self.world.npcs.get(caller_id)
+        if not caller:
+            return
+        
+        room = self.world.rooms.get(caller.room_id)
+        if not room:
+            return
+        
+        caller_template = self.world.npc_templates.get(caller.template_id)
+        
+        # Find allies in the same room
+        for entity_id in list(room.entities):
+            if entity_id == caller_id or entity_id not in self.world.npcs:
+                continue
+            
+            ally = self.world.npcs[entity_id]
+            if not ally.is_alive() or ally.combat.is_in_combat():
+                continue
+            
+            # Check if same faction/type (simplified - same template type)
+            ally_template = self.world.npc_templates.get(ally.template_id)
+            if ally_template and caller_template:
+                if ally_template.npc_type == caller_template.npc_type:
+                    # Ally joins the fight
+                    ally.combat.add_threat(enemy_id, 50.0)
+                    ally.start_attack(enemy_id, self.world.item_templates)
+                    weapon = ally.get_weapon_stats(self.world.item_templates)
+                    self._schedule_swing_completion(entity_id, enemy_id, weapon)
+                    
+                    await self._dispatch_events([
+                        self._msg_to_room(
+                            room.id,
+                            f"{ally.name} joins the fight!"
+                        )
+                    ])
 
     def _test_timer(self, player_id: PlayerId, delay: float) -> List[Event]:
         """
@@ -1361,22 +2902,37 @@ class WorldEngine:
 
     def _bless(self, player_id: PlayerId, target_name: str) -> List[Event]:
         """
-        Apply a temporary armor class buff to a player (Phase 2b example).
+        Apply a temporary armor class buff to an entity (Phase 2b example).
+        Uses Targetable protocol for unified player/NPC targeting.
         """
         world = self.world
         events: List[Event] = []
-
-        # Find target player by name
-        target_player = None
-        target_id = None
-        for pid, p in world.players.items():
-            if p.name.lower() == target_name.lower():
-                target_player = p
-                target_id = pid
-                break
         
-        if not target_player:
-            return [self._msg_to_player(player_id, f"Player '{target_name}' not found.")]
+        player = world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        room = world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are nowhere. (Room not found)")]
+
+        # Use unified targeting to find target entity
+        target, target_type = self._find_targetable_in_room(
+            room.id, target_name,
+            include_players=True,
+            include_npcs=True,
+            include_items=False
+        )
+        
+        if not target or target_type == TargetableType.ITEM:
+            return [self._msg_to_player(player_id, f"'{target_name}' not found.")]
+        
+        # Get entity reference
+        entity: WorldEntity
+        if target_type == TargetableType.PLAYER:
+            entity = world.players[target.id]
+        else:
+            entity = world.npcs[target.id]
         
         # Create blessing effect
         effect_id = str(uuid.uuid4())
@@ -1388,84 +2944,105 @@ class WorldEngine:
             duration=30.0,  # 30 seconds
         )
         
-        # Apply effect to player
-        target_player.apply_effect(effect)
+        # Apply effect to entity
+        entity.apply_effect(effect)
         
         # Schedule effect expiration
         async def expiration_callback():
-            removed_effect = target_player.remove_effect(effect_id)
+            removed_effect = entity.remove_effect(effect_id)
             if removed_effect:
-                # Send expiration message
-                expire_event = self._msg_to_player(
-                    target_id,
-                    "✨ The divine blessing fades away."
-                )
-                await self._dispatch_events([expire_event])
-                
-                # Send stat update with recalculated AC
-                stat_event = self._stat_update_to_player(
-                    target_id,
-                    {"armor_class": target_player.get_effective_armor_class()}
-                )
-                await self._dispatch_events([stat_event])
+                if target_type == TargetableType.PLAYER:
+                    # Send expiration message to player
+                    expire_event = self._msg_to_player(
+                        target.id,
+                        "✨ The divine blessing fades away."
+                    )
+                    await self._dispatch_events([expire_event])
+                    
+                    # Send stat update with recalculated AC
+                    stat_event = self._stat_update_to_player(
+                        target.id,
+                        {"armor_class": entity.get_effective_armor_class()}
+                    )
+                    await self._dispatch_events([stat_event])
         
         expiration_event_id = self.schedule_event(effect.duration, expiration_callback)
         effect.expiration_event_id = expiration_event_id
         
-        # Send stat update with new AC
-        events.append(self._stat_update_to_player(
-            target_id,
-            {"armor_class": target_player.get_effective_armor_class()}
-        ))
-        
-        # Send message to target
-        events.append(self._msg_to_player(
-            target_id,
-            "✨ *Divine light surrounds you!* You feel blessed. (+5 Armor Class for 30 seconds)"
-        ))
+        # Send stat update with new AC (only for players)
+        if target_type == TargetableType.PLAYER:
+            events.append(self._stat_update_to_player(
+                target.id,
+                {"armor_class": entity.get_effective_armor_class()}
+            ))
+            
+            # Send message to target player
+            events.append(self._msg_to_player(
+                target.id,
+                "✨ *Divine light surrounds you!* You feel blessed. (+5 Armor Class for 30 seconds)"
+            ))
         
         # Send confirmation to caster
-        if player_id != target_id:
+        if target_type == TargetableType.PLAYER and player_id != target.id:
             events.append(self._msg_to_player(
                 player_id,
-                f"You bless {target_player.name} with divine protection."
+                f"You bless {entity.name} with divine protection."
+            ))
+        elif target_type == TargetableType.NPC:
+            events.append(self._msg_to_player(
+                player_id,
+                f"You bless {entity.name} with divine protection."
             ))
         
         # Broadcast to others in the room
-        player = world.players.get(player_id)
-        room = world.rooms.get(target_player.room_id) if target_player else None
-        if room and len(room.players) > 1:
-            caster_name = player.name if player else "Someone"
-            if player_id == target_id:
-                room_msg = f"✨ *Divine light surrounds {target_player.name}!*"
+        room_player_ids = self._get_player_ids_in_room(room.id)
+        if len(room_player_ids) > 1:
+            caster_name = player.name
+            exclude_set = {player_id}
+            if target_type == TargetableType.PLAYER:
+                exclude_set.add(target.id)
+            
+            if target_type == TargetableType.PLAYER and player_id == target.id:
+                room_msg = f"✨ *Divine light surrounds {entity.name}!*"
             else:
-                room_msg = f"✨ *{caster_name} blesses {target_player.name} with divine light!*"
-            events.append(self._msg_to_room(
-                room.id,
-                room_msg,
-                exclude={player_id, target_id}
-            ))
+                room_msg = f"✨ *{caster_name} blesses {entity.name} with divine light!*"
+            events.append(self._msg_to_room(room.id, room_msg, exclude=exclude_set))
         
         return events
 
     def _poison(self, player_id: PlayerId, target_name: str) -> List[Event]:
         """
-        Apply a damage over time (DoT) poison effect to a player (Phase 2b example).
+        Apply a damage over time (DoT) poison effect to an entity (Phase 2b example).
+        Uses Targetable protocol for unified player/NPC targeting.
         """
         world = self.world
         events: List[Event] = []
-
-        # Find target player by name
-        target_player = None
-        target_id = None
-        for pid, p in world.players.items():
-            if p.name.lower() == target_name.lower():
-                target_player = p
-                target_id = pid
-                break
         
-        if not target_player:
-            return [self._msg_to_player(player_id, f"Player '{target_name}' not found.")]
+        player = world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        room = world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are nowhere. (Room not found)")]
+
+        # Use unified targeting to find target entity
+        target, target_type = self._find_targetable_in_room(
+            room.id, target_name,
+            include_players=True,
+            include_npcs=True,
+            include_items=False
+        )
+        
+        if not target or target_type == TargetableType.ITEM:
+            return [self._msg_to_player(player_id, f"'{target_name}' not found.")]
+        
+        # Get entity reference
+        entity: WorldEntity
+        if target_type == TargetableType.PLAYER:
+            entity = world.players[target.id]
+        else:
+            entity = world.npcs[target.id]
         
         # Create poison effect
         effect_id = str(uuid.uuid4())
@@ -1478,36 +3055,37 @@ class WorldEngine:
             magnitude=5,    # 5 damage per tick
         )
         
-        # Apply effect to player
-        target_player.apply_effect(effect)
+        # Apply effect to entity
+        entity.apply_effect(effect)
         
         # Periodic damage callback
         async def poison_tick():
             # Check if effect still active
-            if effect_id not in target_player.active_effects:
+            if effect_id not in entity.active_effects:
                 return
             
             # Apply damage
-            old_health = target_player.current_health
-            target_player.current_health = max(target_player.current_health - effect.magnitude, 1)
-            actual_damage = old_health - target_player.current_health
+            old_health = entity.current_health
+            entity.current_health = max(entity.current_health - effect.magnitude, 1)
+            actual_damage = old_health - entity.current_health
             
-            # Send damage message
-            damage_event = self._msg_to_player(
-                target_id,
-                f"🤢 *The poison burns through your veins!* You take {actual_damage} poison damage."
-            )
-            await self._dispatch_events([damage_event])
-            
-            # Send stat update
-            stat_event = self._stat_update_to_player(
-                target_id,
-                {
-                    "current_health": target_player.current_health,
-                    "max_health": target_player.max_health,
-                }
-            )
-            await self._dispatch_events([stat_event])
+            if target_type == TargetableType.PLAYER:
+                # Send damage message to player
+                damage_event = self._msg_to_player(
+                    target.id,
+                    f"🤢 *The poison burns through your veins!* You take {actual_damage} poison damage."
+                )
+                await self._dispatch_events([damage_event])
+                
+                # Send stat update
+                stat_event = self._stat_update_to_player(
+                    target.id,
+                    {
+                        "current_health": entity.current_health,
+                        "max_health": entity.max_health,
+                    }
+                )
+                await self._dispatch_events([stat_event])
         
         # Schedule periodic damage (recurring)
         periodic_event_id = self.schedule_event(
@@ -1524,11 +3102,11 @@ class WorldEngine:
                 self.cancel_event(effect.periodic_event_id)
             
             # Remove effect
-            removed_effect = target_player.remove_effect(effect_id)
-            if removed_effect:
-                # Send expiration message
+            removed_effect = entity.remove_effect(effect_id)
+            if removed_effect and target_type == TargetableType.PLAYER:
+                # Send expiration message to player
                 expire_event = self._msg_to_player(
-                    target_id,
+                    target.id,
                     "🧪 The poison has run its course."
                 )
                 await self._dispatch_events([expire_event])
@@ -1536,33 +3114,38 @@ class WorldEngine:
         expiration_event_id = self.schedule_event(effect.duration, expiration_callback)
         effect.expiration_event_id = expiration_event_id
         
-        # Send message to target
-        events.append(self._msg_to_player(
-            target_id,
-            "🤢 *Vile toxins course through your body!* You are poisoned. (5 damage every 3 seconds for 15 seconds)"
-        ))
+        # Send message to target (only for players)
+        if target_type == TargetableType.PLAYER:
+            events.append(self._msg_to_player(
+                target.id,
+                "🤢 *Vile toxins course through your body!* You are poisoned. (5 damage every 3 seconds for 15 seconds)"
+            ))
         
         # Send confirmation to poisoner
-        if player_id != target_id:
+        if target_type == TargetableType.PLAYER and player_id != target.id:
             events.append(self._msg_to_player(
                 player_id,
-                f"You poison {target_player.name} with toxic energy."
+                f"You poison {entity.name} with toxic energy."
+            ))
+        elif target_type == TargetableType.NPC:
+            events.append(self._msg_to_player(
+                player_id,
+                f"You poison {entity.name} with toxic energy."
             ))
         
         # Broadcast to others in the room
-        player = world.players.get(player_id)
-        room = world.rooms.get(target_player.room_id) if target_player else None
-        if room and len(room.players) > 1:
-            poisoner_name = player.name if player else "Someone"
-            if player_id == target_id:
-                room_msg = f"🤢 *Vile toxins course through {target_player.name}!*"
+        room_player_ids = self._get_player_ids_in_room(room.id)
+        if len(room_player_ids) > 1:
+            poisoner_name = player.name
+            exclude_set = {player_id}
+            if target_type == TargetableType.PLAYER:
+                exclude_set.add(target.id)
+            
+            if target_type == TargetableType.PLAYER and player_id == target.id:
+                room_msg = f"🤢 *Vile toxins course through {entity.name}!*"
             else:
-                room_msg = f"🤢 *{poisoner_name} poisons {target_player.name} with toxic energy!*"
-            events.append(self._msg_to_room(
-                room.id,
-                room_msg,
-                exclude={player_id, target_id}
-            ))
+                room_msg = f"🤢 *{poisoner_name} poisons {entity.name} with toxic energy!*"
+            events.append(self._msg_to_room(room.id, room_msg, exclude=exclude_set))
         
         return events
 
@@ -1694,8 +3277,11 @@ class WorldEngine:
                     continue
 
                 exclude = set(ev.get("exclude", []))
+                
+                # Get player IDs from unified entity set
+                player_ids = self._get_player_ids_in_room(room_id)
 
-                for pid in room.players:
+                for pid in player_ids:
                     if pid in exclude:
                         continue
                     q = self._listeners.get(pid)
@@ -2217,7 +3803,7 @@ class WorldEngine:
                 ])
 
     def _give(self, player_id: PlayerId, item_name: str, target_name: str) -> List[Event]:
-        """Give an item from your inventory to another player."""
+        """Give an item from your inventory to another entity (player or NPC)."""
         from .inventory import find_item_by_name, add_item_to_inventory, InventoryFullError, calculate_inventory_weight
         
         world = self.world
@@ -2241,52 +3827,91 @@ class WorldEngine:
         if item.is_equipped():
             return [self._msg_to_player(player_id, f"Unequip {template.name} first.")]
         
-        # Find target player in the same room
-        target_id = None
-        target_name_lower = target_name.lower()
+        # Use unified targeting to find the target entity (player or NPC)
+        target, target_type = self._find_targetable_in_room(
+            room.id, target_name,
+            include_players=True,
+            include_npcs=True,
+            include_items=False  # Can't give items to items
+        )
         
-        for other_id in room.players:
-            if other_id == player_id:
-                continue
-            other_player = world.players[other_id]
-            if other_player.name.lower() == target_name_lower or other_player.name.lower().startswith(target_name_lower):
-                target_id = other_id
-                break
-        
-        if not target_id:
+        if not target:
             return [self._msg_to_player(player_id, f"You don't see '{target_name}' here.")]
         
-        target = world.players[target_id]
+        # Don't give to self
+        if target_type == TargetableType.PLAYER and target.id == player_id:
+            return [self._msg_to_player(player_id, "You can't give items to yourself.")]
         
-        # Check if target is connected
-        if not target.is_connected:
-            return [self._msg_to_player(player_id, f"{target.name} is in stasis and cannot receive items.")]
-        
-        # Remove from giver's inventory
-        player.inventory_items.remove(found_item_id)
-        item.player_id = None
-        
-        # Update giver's inventory metadata
-        if player.inventory_meta:
-            player.inventory_meta.current_weight = calculate_inventory_weight(world, player_id)
-            player.inventory_meta.current_slots = len(player.inventory_items)
-        
-        # Try to add to target's inventory
-        try:
-            add_item_to_inventory(world, target_id, found_item_id)
+        # Handle giving to a player
+        if target_type == TargetableType.PLAYER:
+            target_player = world.players[target.id]
             
-            return [
-                self._msg_to_player(player_id, f"You give {template.name} to {target.name}."),
-                self._msg_to_player(target_id, f"{player.name} gives you {template.name}."),
-                self._msg_to_room(room.id, f"{player.name} gives {template.name} to {target.name}.", exclude={player_id, target_id})
-            ]
+            # Check if target is connected
+            if not target_player.is_connected:
+                return [self._msg_to_player(player_id, f"{target_player.name} is in stasis and cannot receive items.")]
             
-        except InventoryFullError as e:
-            # Revert: give item back to giver
-            item.player_id = player_id
-            player.inventory_items.add(found_item_id)
+            # Remove from giver's inventory
+            player.inventory_items.remove(found_item_id)
+            item.player_id = None
+            
+            # Update giver's inventory metadata
             if player.inventory_meta:
                 player.inventory_meta.current_weight = calculate_inventory_weight(world, player_id)
                 player.inventory_meta.current_slots = len(player.inventory_items)
             
-            return [self._msg_to_player(player_id, f"{target.name}'s inventory is full.")]
+            # Try to add to target's inventory
+            try:
+                add_item_to_inventory(world, target.id, found_item_id)
+                
+                return [
+                    self._msg_to_player(player_id, f"You give {template.name} to {target_player.name}."),
+                    self._msg_to_player(target.id, f"{player.name} gives you {template.name}."),
+                    self._msg_to_room(room.id, f"{player.name} gives {template.name} to {target_player.name}.", exclude={player_id, target.id})
+                ]
+                
+            except InventoryFullError as e:
+                # Revert: give item back to giver
+                item.player_id = player_id
+                player.inventory_items.add(found_item_id)
+                if player.inventory_meta:
+                    player.inventory_meta.current_weight = calculate_inventory_weight(world, player_id)
+                    player.inventory_meta.current_slots = len(player.inventory_items)
+                
+                return [self._msg_to_player(player_id, f"{target_player.name}'s inventory is full.")]
+        
+        # Handle giving to an NPC
+        elif target_type == TargetableType.NPC:
+            npc = world.npcs[target.id]
+            npc_template = world.npc_templates.get(npc.template_id)
+            display_name = npc.instance_data.get("name_override", npc.name) if npc.instance_data else npc.name
+            
+            # Remove from giver's inventory  
+            player.inventory_items.remove(found_item_id)
+            item.player_id = None
+            
+            # Update giver's inventory metadata
+            if player.inventory_meta:
+                player.inventory_meta.current_weight = calculate_inventory_weight(world, player_id)
+                player.inventory_meta.current_slots = len(player.inventory_items)
+            
+            # Add to NPC's inventory (NPCs have unlimited inventory for now)
+            npc.inventory_items.add(found_item_id)
+            
+            # Generate NPC response based on type
+            npc_response = ""
+            if npc_template:
+                if npc_template.npc_type == "merchant":
+                    npc_response = f'\n{display_name} says "Hmm, interesting. I\'ll take a look at this."'
+                elif npc_template.npc_type == "friendly":
+                    npc_response = f'\n{display_name} accepts your gift graciously.'
+                elif npc_template.npc_type == "hostile":
+                    npc_response = f'\n{display_name} snatches the item from your hand.'
+                else:
+                    npc_response = f'\n{display_name} takes the item.'
+            
+            return [
+                self._msg_to_player(player_id, f"You give {template.name} to {display_name}.{npc_response}"),
+                self._msg_to_room(room.id, f"{player.name} gives {template.name} to {display_name}.", exclude={player_id})
+            ]
+        
+        return [self._msg_to_player(player_id, f"You can't give items to that.")]

@@ -161,49 +161,106 @@ Before adding big systems, make the core loop solid.
 
 
 
-## Phase 4 - Enemies & combat
+## Phase 4 - NPCs & Combat System  **COMPLETE**
 
-**Goals**: Basic PvE combat loop with NPCs in rooms.
+**Goals**: NPCs in rooms with real-time combat and AI behaviors.
 
-### Backend model
+### Backend Model ✅
 
 - DB:
-    - NpcTemplate with stats, behavior flags, loot tables.
-    - NpcInstance
+    - ✅ NpcTemplate with stats, behavior flags, loot tables, attack stats
+    - ✅ NpcInstance for spawned NPCs
 - World:
-    - WorldNpc similar to WorldPlayer but with AI flags.
-    - Attach NPCs to rooms.
+    - ✅ WorldEntity unified base class for players and NPCs
+    - ✅ WorldNpc extends WorldEntity with NPC-specific fields
+    - ✅ EntityType enum (PLAYER, NPC)
+    - ✅ Targetable protocol for unified command targeting
+    - ✅ NPCs attached to rooms via entities set
 
-### Engine changes
+### Real-Time Combat System ✅
 
-- Combat system:
-    - Turn/round model:
-        - simplest first: "immediate" attacks with a short cooldown.
-        - next: per-tick initiative / action queue.
-    - Damage formula and hit resolution:
-        - based on attacker stats + weapon + defender stats/armor.
-- States:
-    - HP reduction, death state, respawn timers.
-- Commands:
-    - attack <target>, flee, maybe kill <target> alias.
+- Architecture:
+    - ✅ Real-time combat (not turn-based) with weapon swing timers
+    - ✅ CombatState dataclass tracking phase, target, timing
+    - ✅ CombatPhase enum: IDLE → WINDUP → SWING → RECOVERY
+    - ✅ WeaponStats: damage_min/max, swing_speed, damage_type
+    - ✅ Auto-attack continues until target dies or combat cancelled
 
-### AI (Phase 4.1):
+- Combat Flow:
+    - ✅ `attack <target>` / `kill <target>` - Start attacking
+    - ✅ `stop` - Disengage from combat
+    - ✅ Movement cancels combat automatically
+    - ✅ Swing timer based on weapon speed
+    - ✅ Damage calculation with strength modifier and armor reduction
+    - ✅ Critical hit system (10% chance, 1.5x damage)
 
-- Each tick, NPCs:
-    - choose targets,
-    - move,
-    - cast, etc. (simple rule-based first).
-- Loot:
-    - On NPC death:
-        - drop items to room,
-        - or auto-assign to killer.
-- Events
-    - Per-player:
-        - Damage/heal messages.
-    - Room:
-        - Combat broadcasts ("Orc swings at Alice.", "Alice kills the orc.").
+- Death & Rewards:
+    - ✅ HP tracking and death detection
+    - ✅ Death messages broadcast to room
+    - ✅ XP rewards for killing NPCs
+    - ⏳ Respawn timers (structure exists, needs activation)
+    - ⏳ Loot drops (drop table structure exists)
+
+### Weapon & Equipment System ✅
+
+- ItemTemplate weapon stats:
+    - ✅ damage_min, damage_max, attack_speed, damage_type
+    - ✅ Migration adds columns to item_templates
+    - ✅ YAML weapon files updated with combat stats
+- Equipment integration:
+    - ✅ `get_weapon_stats(item_templates)` checks equipped weapon
+    - ✅ Falls back to unarmed (base) stats if no weapon
+    - ✅ Both players AND NPCs benefit from equipped weapons
+
+### Behavior Script System ✅
+
+- Modular architecture:
+    - ✅ `backend/app/engine/behaviors/` package
+    - ✅ Dynamic loading from directory (mod-friendly)
+    - ✅ `@behavior` decorator for registration
+    - ✅ BehaviorScript base class with async hooks
+
+- Available hooks:
+    - ✅ on_spawn, on_death
+    - ✅ on_idle_tick, on_wander_tick
+    - ✅ on_player_enter, on_player_leave
+    - ✅ on_combat_start, on_damaged, on_combat_tick
+    - ✅ on_talked_to, on_given_item
+
+- Built-in behaviors:
+    - ✅ Wandering: wanders_rarely, wanders_sometimes, wanders_frequently, wanders_nowhere
+    - ✅ Combat: aggressive (attacks on sight), defensive (retaliates), pacifist
+    - ✅ Flee: cowardly, cautious, brave, fearless
+    - ✅ Social: calls_for_help, loner
+    - ✅ Idle: talkative, chatty, quiet, silent
+    - ✅ Roles: merchant, guard, patrol
+
+- NPC AI:
+    - ✅ Per-NPC timers (idle_event_id, wander_event_id)
+    - ✅ Behaviors resolved from YAML tags at load time
+    - ✅ Priority system for behavior execution
+    - ✅ BehaviorResult controls movement, attacks, messages
+
+### Events ✅
+
+- Combat broadcasts:
+    - ✅ "⚔️ Alice attacks Goblin!"
+    - ✅ "Alice hits Goblin for 5 damage! **CRITICAL!**"
+    - ✅ "💀 Goblin has been slain by Alice!"
 - Stat updates:
-    - HP/MP changes via stat_update.
+    - ✅ HP changes via stat_update events
+- NPC reactions:
+    - ✅ Aggressive NPCs attack when players enter room
+    - ✅ NPCs call for help (allies join fight)
+    - ✅ NPCs can flee when damaged
+
+### YAML Content ✅
+
+- NPC templates: goblin_scout, skeleton_warrior, ethereal_wisp, wandering_merchant
+- NPC spawns configured per-area
+- Behavior tags in YAML: `behaviors: [wanders_sometimes, aggressive, cowardly]`
+
+
 
 ## Phase 5 - World structure, triggers, and scripting
 

@@ -1,6 +1,6 @@
 # Dungeon Crawler – Architecture & Goals
 
-_Last updated: 2025-11-27_
+_Last updated: 2025-11-28_
 
 This document is the high-level specification and context for the dungeon crawler project.  
 It is written to be friendly to both humans and LLMs reading the repository.
@@ -108,7 +108,7 @@ The `WorldEngine` instance is stored in `app.state` (or a global), and all WS co
   - `room_type` - Type category with emoji indicators (forest, urban, underground, etc.)
   - Exit fields: `north_id`, `south_id`, `east_id`, `west_id`, `up_id`, `down_id`.
   - Self-referential `ForeignKey` to `rooms.id`.
-  - Movement effects: `on_enter_effect`, `on_exit_effect` (future hook)
+  - Movement effects: `on_enter_effect`, `on_exit_effect`
 - `Player` model:
   - `id` (UUID string)
   - `name`
@@ -124,6 +124,29 @@ The `WorldEngine` instance is stored in `app.state` (or a global), and all WS co
     - `armor_class` (default: 10)
     - `max_energy`, `current_energy` (default: 50)
   - `data` JSON field for misc data (flags, temporary effects, etc.)
+- `ItemTemplate` model:
+  - `id`, `name`, `description`
+  - `item_type`, `item_subtype`, `equipment_slot`
+  - `stat_modifiers` (JSON) - Stat bonuses when equipped
+  - **Weapon stats:** `damage_min`, `damage_max`, `attack_speed`, `damage_type`
+  - `weight`, `max_stack_size`, `has_durability`, `max_durability`
+  - `is_container`, `container_capacity`, `is_consumable`, `consume_effect`
+  - `rarity`, `value`, `flags`, `keywords`
+- `ItemInstance` model:
+  - `id`, `template_id` (FK to ItemTemplate)
+  - Location: `room_id`, `player_id`, or `container_id`
+  - `quantity`, `current_durability`, `equipped_slot`
+- `NpcTemplate` model:
+  - `id`, `name`, `description`
+  - `npc_type` (hostile, neutral, friendly, merchant)
+  - Stats: `level`, `max_health`, `armor_class`, `strength`, `dexterity`, `intelligence`
+  - Combat: `attack_damage_min`, `attack_damage_max`, `attack_speed`, `experience_reward`
+  - `behaviors` (JSON) - List of behavior tags
+  - `drop_table` (JSON), `idle_messages`, `keywords`
+- `NpcInstance` model:
+  - `id`, `template_id` (FK to NpcTemplate)
+  - `room_id`, `spawn_room_id`, `respawn_time`
+  - `instance_data` (JSON) for overrides
 
 ### 3.3 In-memory world model
 
@@ -371,23 +394,27 @@ Rough phases (see detailed roadmap in `roadmap.md`):
 - ✅ WorldTime and WorldArea with independent time scales
 - ✅ Time advancement and continuous time calculation
 - ✅ Commands: bless, poison, effects, time, testtimer
-#### 3. Items & inventory:
-- ItemTemplate + ItemInstance in DB.
-- WorldItem, inventory and equipment on players.
-- Commands: get, drop, equip, remove.
-#### 5. Enemies & combat:
-- NPC templates, NPCs in rooms.
-- Basic combat loop, damage resolution, death/respawn.
-#### 6. World scripting & triggers:
+#### 3. Items & inventory: ✅ **COMPLETE**
+- ✅ ItemTemplate + ItemInstance in DB
+- ✅ WorldItem, inventory and equipment on players
+- ✅ Commands: get, drop, equip, unequip, give, use, put, inventory
+- ✅ Weapon stats on items (damage_min, damage_max, attack_speed)
+#### 4. NPCs & combat: ✅ **COMPLETE**
+- ✅ NPC templates and instances
+- ✅ Real-time combat with swing timers
+- ✅ Modular behavior script system
+- ✅ Commands: attack, kill, stop, flee
+- ✅ NPCs can equip weapons and get stat benefits
+#### 5. World scripting & triggers:
 - Room triggers (on enter, on command, on timer).
 - Simple rule-based scripting or DSL for richer interactions.
-#### 7. Persistence & scaling:
+#### 6. Persistence & scaling:
 - Regular state sync from World → DB.
 - Optionally run WorldEngine as a separate process and use a queue/bus.
-#### 8. Accounts & auth:
+#### 7. Accounts & auth:
 - Users & characters.
 - Token-based auth for WebSocket connections.
-#### 9. Admin and content tools:
+#### 8. Admin and content tools:
 - HTTP APIs and/or in-game commands to edit world content and inspect state.
 
 ## 6. Client Notes (for future UIs)

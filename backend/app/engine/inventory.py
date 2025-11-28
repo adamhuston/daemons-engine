@@ -213,88 +213,49 @@ def _remove_equipment_stats(world: World, player_id: PlayerId, item_id: ItemId) 
     player.remove_effect(f"equipment_{item_id}")
 
 
-def _matches_item_name(template: 'ItemTemplate', search_term: str, exact: bool = False) -> bool:
-    """
-    Check if a template matches a search term.
-    Checks the item name and all keywords.
-    
-    Args:
-        template: Item template to check
-        search_term: Search term (already lowercased)
-        exact: If True, require exact match; if False, allow startswith match
-    
-    Returns:
-        True if the template matches the search term
-    """
-    # Check main name
-    name_lower = template.name.lower()
-    if exact:
-        if name_lower == search_term:
-            return True
-    else:
-        if name_lower.startswith(search_term):
-            return True
-    
-    # Check keywords
-    for keyword in template.keywords:
-        keyword_lower = keyword.lower()
-        if exact:
-            if keyword_lower == search_term:
-                return True
-        else:
-            if keyword_lower.startswith(search_term):
-                return True
-    
-    return False
-
-
 def find_item_by_name(world: World, player_id: PlayerId, item_name: str, location: str = "inventory") -> Optional[ItemId]:
     """
     Find an item by name or keyword in player inventory or equipped items.
-    Supports partial matching - finds first item whose name/keyword starts with the search string.
+    Uses WorldItem.matches_keyword() for consistent targeting behavior.
+    Prioritizes exact matches over partial matches.
     
     Args:
         world: Game world
         player_id: Player ID
-        item_name: Name or keyword to search for (case insensitive, partial match)
+        item_name: Name or keyword to search for (case insensitive)
         location: "inventory", "equipped", or "both"
     
     Returns:
         Item ID if found, None otherwise
     """
     player = world.players[player_id]
-    item_name_lower = item_name.lower()
     
     # First try exact match in inventory
     if location in ("inventory", "both"):
         for item_id in player.inventory_items:
             item = world.items[item_id]
-            template = world.item_templates[item.template_id]
-            if _matches_item_name(template, item_name_lower, exact=True):
+            if item.matches_keyword(item_name, match_mode="exact"):
                 return item_id
     
     # First try exact match in equipped items
     if location in ("equipped", "both"):
         for item_id in player.equipped_items.values():
             item = world.items[item_id]
-            template = world.item_templates[item.template_id]
-            if _matches_item_name(template, item_name_lower, exact=True):
+            if item.matches_keyword(item_name, match_mode="exact"):
                 return item_id
     
-    # If no exact match, try partial match in inventory
+    # If no exact match, try startswith match in inventory
     if location in ("inventory", "both"):
         for item_id in player.inventory_items:
             item = world.items[item_id]
-            template = world.item_templates[item.template_id]
-            if _matches_item_name(template, item_name_lower, exact=False):
+            if item.matches_keyword(item_name, match_mode="startswith"):
                 return item_id
     
-    # If no exact match, try partial match in equipped items
+    # If no exact match, try startswith match in equipped items
     if location in ("equipped", "both"):
         for item_id in player.equipped_items.values():
             item = world.items[item_id]
-            template = world.item_templates[item.template_id]
-            if _matches_item_name(template, item_name_lower, exact=False):
+            if item.matches_keyword(item_name, match_mode="startswith"):
                 return item_id
     
     return None
@@ -303,31 +264,29 @@ def find_item_by_name(world: World, player_id: PlayerId, item_name: str, locatio
 def find_item_in_room(world: World, room_id: str, item_name: str) -> Optional[ItemId]:
     """
     Find an item by name or keyword in a room.
-    Supports partial matching - finds first item whose name/keyword starts with the search string.
+    Uses WorldItem.matches_keyword() for consistent targeting behavior.
+    Prioritizes exact matches over partial matches.
     
     Args:
         world: Game world
         room_id: Room ID
-        item_name: Name or keyword to search for (case insensitive, partial match)
+        item_name: Name or keyword to search for (case insensitive)
     
     Returns:
         Item ID if found, None otherwise
     """
     room = world.rooms[room_id]
-    item_name_lower = item_name.lower()
     
     # First try exact match
     for item_id in room.items:
         item = world.items[item_id]
-        template = world.item_templates[item.template_id]
-        if _matches_item_name(template, item_name_lower, exact=True):
+        if item.matches_keyword(item_name, match_mode="exact"):
             return item_id
     
-    # If no exact match, try partial match (starts with)
+    # If no exact match, try startswith match
     for item_id in room.items:
         item = world.items[item_id]
-        template = world.item_templates[item.template_id]
-        if _matches_item_name(template, item_name_lower, exact=False):
+        if item.matches_keyword(item_name, match_mode="startswith"):
             return item_id
     
     return None
