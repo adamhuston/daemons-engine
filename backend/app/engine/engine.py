@@ -240,6 +240,10 @@ class WorldEngine:
             })
             await self._dispatch_events([stat_event])
             
+            # Send initial room description
+            look_events = self._look(player_id)
+            await self._dispatch_events(look_events)
+            
             # Broadcast awakening message if coming out of stasis
             if was_in_stasis:
                 room = self.world.rooms.get(player.room_id)
@@ -275,7 +279,7 @@ class WorldEngine:
     
     async def save_player_stats(self, player_id: PlayerId) -> None:
         """
-        Persist current WorldPlayer stats to the database.
+        Persist current WorldPlayer stats and inventory to the database.
         
         This is called on disconnect, and can also be called periodically
         (once tick system is implemented in Phase 2) or on key events.
@@ -289,11 +293,11 @@ class WorldEngine:
         
         # Import here to avoid circular dependency
         from sqlalchemy import select, update
-        from ..models import Player as DBPlayer
+        from ..models import Player as DBPlayer, PlayerInventory as DBPlayerInventory, ItemInstance as DBItemInstance
         
         async with self._db_session_factory() as session:
             # Update player stats in database
-            stmt = (
+            player_stmt = (
                 update(DBPlayer)
                 .where(DBPlayer.id == player_id)
                 .values(
@@ -304,9 +308,43 @@ class WorldEngine:
                     current_room_id=player.room_id,
                 )
             )
-            await session.execute(stmt)
+            await session.execute(player_stmt)
+            
+            # Update player inventory metadata (Phase 3)
+            if player.inventory_meta:
+                inventory_stmt = (
+                    update(DBPlayerInventory)
+                    .where(DBPlayerInventory.player_id == player_id)
+                    .values(
+                        max_weight=player.inventory_meta.max_weight,
+                        max_slots=player.inventory_meta.max_slots,
+                        current_weight=player.inventory_meta.current_weight,
+                        current_slots=player.inventory_meta.current_slots,
+                    )
+                )
+                await session.execute(inventory_stmt)
+            
+            # Update all items owned by this player (Phase 3)
+            for item_id in player.inventory_items:
+                if item_id in self.world.items:
+                    item = self.world.items[item_id]
+                    item_stmt = (
+                        update(DBItemInstance)
+                        .where(DBItemInstance.id == item_id)
+                        .values(
+                            player_id=player_id,
+                            room_id=None,
+                            container_id=item.container_id,
+                            quantity=item.quantity,
+                            current_durability=item.current_durability,
+                            equipped_slot=item.equipped_slot,
+                            instance_data=item.instance_data,
+                        )
+                    )
+                    await session.execute(item_stmt)
+            
             await session.commit()
-            print(f"[Persistence] Saved stats for player {player.name} (ID: {player_id})")
+            print(f"[Persistence] Saved stats and inventory for player {player.name} (ID: {player_id})")
     
     async def player_disconnect(self, player_id: PlayerId) -> None:
         """
@@ -414,8 +452,14 @@ class WorldEngine:
             return self._move_player(player_id, direction)
 
         # Look
-        if cmd in {"look", "l"}:
-            return self._look(player_id)
+        if cmd in {"look", "l"} or cmd.startswith("look ") or cmd.startswith("l "):
+            # Check if looking at specific item
+            parts = raw.split(maxsplit=1)
+            if len(parts) > 1:
+                item_name = parts[1]
+                return self._look_at_item(player_id, item_name)
+            else:
+                return self._look(player_id)
 
         # Stats
         if cmd in {"stats", "sheet", "status"}:
@@ -483,6 +527,94 @@ class WorldEngine:
         if cmd == "time":
             return self._time(player_id)
 
+        # Inventory system commands (Phase 3)
+        if cmd in {"inventory", "inv", "i"}:
+            return self._inventory(player_id)
+        
+        if cmd.startswith(("get ", "take ", "pickup ")) or cmd in {"get", "take", "pickup"}:
+            parts = raw.split(maxsplit=1)
+            if len(parts) < 2:
+                return [self._msg_to_player(player_id, "Get what?")]
+            item_arg = parts[1].strip()
+            
+            # Check for "get <item> from <container>" syntax
+            from_match = None
+            for separator in [" from ", " out of ", " out "]:
+                if separator in item_arg.lower():
+                    idx = item_arg.lower().find(separator)
+                    item_name = item_arg[:idx].strip()
+                    container_name = item_arg[idx + len(separator):].strip()
+                    return self._get_from_container(player_id, item_name, container_name)
+            
+            # Regular get from room
+            return self._get(player_id, item_arg)
+        
+        if cmd.startswith(("put ", "place ", "store ")) or cmd in {"put", "place", "store"}:
+            parts = raw.split(maxsplit=1)
+            if len(parts) < 2:
+                return [self._msg_to_player(player_id, "Put what where? Usage: put <item> in <container>")]
+            item_arg = parts[1].strip()
+            
+            # Parse "put <item> in <container>" syntax
+            for separator in [" in ", " into ", " inside "]:
+                if separator in item_arg.lower():
+                    idx = item_arg.lower().find(separator)
+                    item_name = item_arg[:idx].strip()
+                    container_name = item_arg[idx + len(separator):].strip()
+                    return self._put_in_container(player_id, item_name, container_name)
+            
+            return [self._msg_to_player(player_id, "Put what where? Usage: put <item> in <container>")]
+        
+        if cmd.startswith("drop"):
+            parts = raw.split(maxsplit=1)
+            if len(parts) < 2:
+                return [self._msg_to_player(player_id, "Drop what?")]
+            item_name = parts[1].strip()
+            return self._drop(player_id, item_name)
+        
+        if cmd.startswith(("equip ", "wear ", "wield ")) or cmd in {"equip", "wear", "wield"}:
+            parts = raw.split(maxsplit=1)
+            if len(parts) < 2:
+                return [self._msg_to_player(player_id, "Equip what?")]
+            item_name = parts[1].strip()
+            return self._equip(player_id, item_name)
+        
+        if cmd.startswith(("unequip ", "remove ")) or cmd in {"unequip", "remove"}:
+            parts = raw.split(maxsplit=1)
+            if len(parts) < 2:
+                return [self._msg_to_player(player_id, "Unequip what?")]
+            item_name = parts[1].strip()
+            return self._unequip(player_id, item_name)
+        
+        if cmd.startswith(("use ", "consume ", "drink ")) or cmd in {"use", "consume", "drink"}:
+            parts = raw.split(maxsplit=1)
+            if len(parts) < 2:
+                return [self._msg_to_player(player_id, "Use what?")]
+            item_name = parts[1].strip()
+            return self._use(player_id, item_name)
+        
+        if cmd.startswith("give ") or cmd == "give":
+            parts = raw.split(maxsplit=1)
+            if len(parts) < 2:
+                return [self._msg_to_player(player_id, "Give what to whom? Usage: give <item> <player>")]
+            item_arg = parts[1].strip()
+            
+            # Parse "give <item> to <player>" or "give <item> <player>" syntax
+            for separator in [" to "]:
+                if separator in item_arg.lower():
+                    idx = item_arg.lower().find(separator)
+                    item_name = item_arg[:idx].strip()
+                    target_name = item_arg[idx + len(separator):].strip()
+                    return self._give(player_id, item_name, target_name)
+            
+            # Try splitting on last word as player name
+            words = item_arg.rsplit(maxsplit=1)
+            if len(words) == 2:
+                item_name, target_name = words
+                return self._give(player_id, item_name.strip(), target_name.strip())
+            
+            return [self._msg_to_player(player_id, "Give what to whom? Usage: give <item> <player>")]
+
         # Default
         return [
             self._msg_to_player(
@@ -528,6 +660,28 @@ class WorldEngine:
             "payload": stats,
         }
         return ev
+    
+    def _emit_stat_update(self, player_id: PlayerId) -> List[Event]:
+        """Helper function to emit stat update for a player."""
+        if player_id not in self.world.players:
+            return []
+        
+        player = self.world.players[player_id]
+        
+        # Calculate current effective stats
+        effective_ac = player.get_effective_armor_class()
+        
+        payload = {
+            "health": player.current_health,
+            "max_health": player.max_health,
+            "energy": player.current_energy,
+            "max_energy": player.max_energy,
+            "armor_class": effective_ac,
+            "level": player.level,
+            "experience": player.experience,
+        }
+        
+        return [self._stat_update_to_player(player_id, payload)]
 
     def _msg_to_room(
         self,
@@ -664,6 +818,19 @@ class WorldEngine:
         # List other players in the new room
         description_lines.extend(self._format_room_occupants(new_room, player_id))
         
+        # Show items in new room (Phase 3)
+        if new_room.items:
+            items_here = []
+            for item_id in new_room.items:
+                item = self.world.items[item_id]
+                template = self.world.item_templates[item.template_id]
+                quantity_str = f" x{item.quantity}" if item.quantity > 1 else ""
+                items_here.append(f"  {template.name}{quantity_str}")
+            
+            description_lines.append("")
+            description_lines.append("Items here:")
+            description_lines.extend(items_here)
+        
         # Add exits to the room description
         if new_room.exits:
             exits = list(new_room.exits.keys())
@@ -728,12 +895,152 @@ class WorldEngine:
         # List other players in the same room
         lines.extend(self._format_room_occupants(room, player_id))
 
+        # Show items in room (Phase 3)
+        if room.items:
+            items_here = []
+            for item_id in room.items:
+                item = world.items[item_id]
+                template = world.item_templates[item.template_id]
+                quantity_str = f" x{item.quantity}" if item.quantity > 1 else ""
+                items_here.append(f"  {template.name}{quantity_str}")
+            
+            lines.append("")
+            lines.append("Items here:")
+            lines.extend(items_here)
+
         # List available exits
         if room.exits:
             exits = list(room.exits.keys())
             lines.append("")
             lines.append(f"Exits: {', '.join(exits)}")
 
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    def _look_at_item(self, player_id: PlayerId, item_name: str) -> List[Event]:
+        """Examine an item in detail, showing description and container contents."""
+        from .inventory import find_item_by_name, find_item_in_room
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        room = world.rooms[player.room_id]
+        
+        # First check player's inventory and equipped items
+        found_item_id = find_item_by_name(world, player_id, item_name, "both")
+        
+        # If not found in inventory, check room
+        if not found_item_id:
+            found_item_id = find_item_in_room(world, room.id, item_name)
+        
+        if not found_item_id:
+            return [self._msg_to_player(player_id, f"You don't see '{item_name}' anywhere.")]
+        
+        item = world.items[found_item_id]
+        template = world.item_templates[item.template_id]
+        
+        # Build detailed description
+        lines = [f"**{template.name}**"]
+        lines.append(template.description)
+        
+        # Add flavor text if available
+        if template.flavor_text:
+            lines.append("")
+            lines.append(template.flavor_text)
+        
+        # Show item properties
+        lines.append("")
+        properties = []
+        
+        # Item type and rarity
+        type_str = template.item_type.title()
+        if template.item_subtype:
+            type_str += f" ({template.item_subtype})"
+        if template.rarity != "common":
+            type_str += f" - {template.rarity.title()}"
+        properties.append(f"Type: {type_str}")
+        
+        # Weight
+        total_weight = template.weight * item.quantity
+        if item.quantity > 1:
+            properties.append(f"Weight: {total_weight:.1f} kg ({template.weight:.1f} kg each)")
+        else:
+            properties.append(f"Weight: {total_weight:.1f} kg")
+        
+        # Durability
+        if template.has_durability and item.current_durability is not None:
+            properties.append(f"Durability: {item.current_durability}/{template.max_durability}")
+        
+        # Equipment slot
+        if template.equipment_slot:
+            slot_name = template.equipment_slot.replace("_", " ").title()
+            properties.append(f"Equipment Slot: {slot_name}")
+        
+        # Stat modifiers
+        if template.stat_modifiers:
+            stat_strs = []
+            for stat, value in template.stat_modifiers.items():
+                sign = "+" if value >= 0 else ""
+                stat_display = stat.replace("_", " ").title()
+                stat_strs.append(f"{sign}{value} {stat_display}")
+            properties.append(f"Effects: {', '.join(stat_strs)}")
+        
+        # Value
+        if template.value > 0:
+            total_value = template.value * item.quantity
+            if item.quantity > 1:
+                properties.append(f"Value: {total_value} gold ({template.value} each)")
+            else:
+                properties.append(f"Value: {total_value} gold")
+        
+        # Stackable info
+        if template.max_stack_size > 1:
+            properties.append(f"Quantity: {item.quantity}/{template.max_stack_size}")
+        elif item.quantity > 1:
+            properties.append(f"Quantity: {item.quantity}")
+        
+        lines.extend(f"  {prop}" for prop in properties)
+        
+        # Show equipped status
+        if item.is_equipped():
+            lines.append("")
+            lines.append("  [Currently Equipped]")
+        
+        # Container contents
+        if template.is_container:
+            lines.append("")
+            container_items = []
+            
+            # Find all items in this container
+            for other_item_id, other_item in world.items.items():
+                if other_item.container_id == found_item_id:
+                    other_template = world.item_templates[other_item.template_id]
+                    quantity_str = f" x{other_item.quantity}" if other_item.quantity > 1 else ""
+                    container_items.append(f"  {other_template.name}{quantity_str}")
+            
+            if container_items:
+                lines.append(f"**Contents of {template.name}:**")
+                lines.extend(container_items)
+                
+                # Show container capacity if available
+                if template.container_capacity:
+                    if template.container_type == "weight_based":
+                        # Calculate current weight in container
+                        container_weight = 0.0
+                        for other_item_id, other_item in world.items.items():
+                            if other_item.container_id == found_item_id:
+                                other_template = world.item_templates[other_item.template_id]
+                                container_weight += other_template.weight * other_item.quantity
+                        lines.append(f"  Weight: {container_weight:.1f}/{template.container_capacity:.1f} kg")
+                    else:
+                        # Slot-based container
+                        item_count = len(container_items)
+                        lines.append(f"  Slots: {item_count}/{template.container_capacity}")
+            else:
+                lines.append(f"**{template.name} is empty.**")
+        
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
     def _show_stats(self, player_id: PlayerId) -> List[Event]:
@@ -1415,3 +1722,571 @@ class WorldEngine:
                     }
                     wire_event["player_id"] = pid
                     await q.put(wire_event)
+
+    # ---------- Inventory system commands (Phase 3) ----------
+
+    def _inventory(self, player_id: PlayerId) -> List[Event]:
+        """Show player inventory."""
+        from .inventory import calculate_inventory_weight
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        inventory = player.inventory_meta
+        
+        if not inventory:
+            return [self._msg_to_player(player_id, "You have no inventory.")]
+        
+        if not player.inventory_items:
+            return [self._msg_to_player(player_id, "Your inventory is empty.")]
+        
+        # Group items by template (for stacking display)
+        items_display = []
+        for item_id in player.inventory_items:
+            item = world.items[item_id]
+            template = world.item_templates[item.template_id]
+            
+            equipped_marker = " [equipped]" if item.is_equipped() else ""
+            quantity_str = f" x{item.quantity}" if item.quantity > 1 else ""
+            
+            items_display.append(f"  {template.name}{quantity_str}{equipped_marker}")
+        
+        weight = calculate_inventory_weight(world, player_id)
+        
+        lines = [
+            "=== Inventory ===",
+            *items_display,
+            "",
+            f"Weight: {weight:.1f}/{inventory.max_weight:.1f} kg",
+            f"Slots: {inventory.current_slots}/{inventory.max_slots}"
+        ]
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    def _get(self, player_id: PlayerId, item_name: str) -> List[Event]:
+        """Pick up item from room (one at a time for stacks)."""
+        from .inventory import add_item_to_inventory, InventoryFullError, find_item_in_room
+        import uuid
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        room = world.rooms[player.room_id]
+        
+        # Find item in room by name
+        found_item_id = find_item_in_room(world, room.id, item_name)
+        
+        if not found_item_id:
+            return [self._msg_to_player(player_id, f"You don't see '{item_name}' here.")]
+        
+        item = world.items[found_item_id]
+        template = world.item_templates[item.template_id]
+        
+        # Check quest item / no pickup flags
+        if template.flags.get("no_pickup"):
+            return [self._msg_to_player(player_id, f"You cannot pick up {template.name}.")]
+        
+        # Handle stacked items - only pick up one at a time
+        if item.quantity > 1:
+            # Reduce stack on ground
+            item.quantity -= 1
+            
+            # Create a new item instance for the one we're picking up
+            from .world import WorldItem
+            new_item_id = str(uuid.uuid4())
+            new_item = WorldItem(
+                id=new_item_id,
+                template_id=item.template_id,
+                room_id=None,
+                player_id=player_id,
+                container_id=None,
+                quantity=1,
+                current_durability=item.current_durability,
+                equipped_slot=None,
+                instance_data=dict(item.instance_data)
+            )
+            world.items[new_item_id] = new_item
+            
+            # Try to add to inventory (will stack with existing if possible)
+            try:
+                add_item_to_inventory(world, player_id, new_item_id)
+                
+                return [
+                    self._msg_to_player(player_id, f"You pick up {template.name}."),
+                    self._msg_to_room(room.id, f"{player.name} picks up {template.name}.", exclude={player_id})
+                ]
+                
+            except InventoryFullError as e:
+                # Revert: add back to ground stack and remove new item
+                item.quantity += 1
+                del world.items[new_item_id]
+                return [self._msg_to_player(player_id, str(e))]
+        else:
+            # Single item - just move it
+            try:
+                room.items.remove(found_item_id)
+                add_item_to_inventory(world, player_id, found_item_id)
+                
+                return [
+                    self._msg_to_player(player_id, f"You pick up {template.name}."),
+                    self._msg_to_room(room.id, f"{player.name} picks up {template.name}.", exclude={player_id})
+                ]
+                
+            except InventoryFullError as e:
+                # Return item to room
+                room.items.add(found_item_id)
+                item.room_id = room.id
+                return [self._msg_to_player(player_id, str(e))]
+
+    def _get_from_container(self, player_id: PlayerId, item_name: str, container_name: str) -> List[Event]:
+        """Get an item from a container."""
+        from .inventory import find_item_by_name, add_item_to_inventory, InventoryFullError
+        import uuid
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        
+        # Find the container (in inventory or room)
+        container_id = find_item_by_name(world, player_id, container_name, "both")
+        
+        if not container_id:
+            # Check room for container
+            from .inventory import find_item_in_room
+            room = world.rooms[player.room_id]
+            container_id = find_item_in_room(world, room.id, container_name)
+        
+        if not container_id:
+            return [self._msg_to_player(player_id, f"You don't see '{container_name}' anywhere.")]
+        
+        container = world.items[container_id]
+        container_template = world.item_templates[container.template_id]
+        
+        if not container_template.is_container:
+            return [self._msg_to_player(player_id, f"{container_template.name} is not a container.")]
+        
+        # Find the item inside the container using keyword matching
+        from .inventory import _matches_item_name
+        item_name_lower = item_name.lower()
+        found_item_id = None
+        
+        # Exact match first
+        for other_id, other_item in world.items.items():
+            if other_item.container_id == container_id:
+                other_template = world.item_templates[other_item.template_id]
+                if _matches_item_name(other_template, item_name_lower, exact=True):
+                    found_item_id = other_id
+                    break
+        
+        # Partial match if no exact match
+        if not found_item_id:
+            for other_id, other_item in world.items.items():
+                if other_item.container_id == container_id:
+                    other_template = world.item_templates[other_item.template_id]
+                    if _matches_item_name(other_template, item_name_lower, exact=False):
+                        found_item_id = other_id
+                        break
+        
+        if not found_item_id:
+            return [self._msg_to_player(player_id, f"You don't see '{item_name}' in {container_template.name}.")]
+        
+        item = world.items[found_item_id]
+        template = world.item_templates[item.template_id]
+        
+        # Handle stacks - take one at a time
+        if item.quantity > 1:
+            item.quantity -= 1
+            
+            from .world import WorldItem
+            new_item_id = str(uuid.uuid4())
+            new_item = WorldItem(
+                id=new_item_id,
+                template_id=item.template_id,
+                room_id=None,
+                player_id=player_id,
+                container_id=None,
+                quantity=1,
+                current_durability=item.current_durability,
+                equipped_slot=None,
+                instance_data=dict(item.instance_data)
+            )
+            world.items[new_item_id] = new_item
+            
+            try:
+                add_item_to_inventory(world, player_id, new_item_id)
+                return [self._msg_to_player(player_id, f"You take {template.name} from {container_template.name}.")]
+            except InventoryFullError as e:
+                item.quantity += 1
+                del world.items[new_item_id]
+                return [self._msg_to_player(player_id, str(e))]
+        else:
+            # Single item - move it
+            item.container_id = None
+            try:
+                add_item_to_inventory(world, player_id, found_item_id)
+                return [self._msg_to_player(player_id, f"You take {template.name} from {container_template.name}.")]
+            except InventoryFullError as e:
+                item.container_id = container_id
+                return [self._msg_to_player(player_id, str(e))]
+
+    def _put_in_container(self, player_id: PlayerId, item_name: str, container_name: str) -> List[Event]:
+        """Put an item into a container."""
+        from .inventory import find_item_by_name, remove_item_from_inventory, InventoryError
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        
+        # Find the item in inventory
+        item_id = find_item_by_name(world, player_id, item_name, "inventory")
+        
+        if not item_id:
+            return [self._msg_to_player(player_id, f"You don't have '{item_name}'.")]
+        
+        item = world.items[item_id]
+        template = world.item_templates[item.template_id]
+        
+        # Can't put equipped items in containers
+        if item.is_equipped():
+            return [self._msg_to_player(player_id, f"Unequip {template.name} first.")]
+        
+        # Find the container (in inventory or room)
+        container_id = find_item_by_name(world, player_id, container_name, "both")
+        
+        if not container_id:
+            # Check room for container
+            from .inventory import find_item_in_room
+            room = world.rooms[player.room_id]
+            container_id = find_item_in_room(world, room.id, container_name)
+        
+        if not container_id:
+            return [self._msg_to_player(player_id, f"You don't see '{container_name}' anywhere.")]
+        
+        # Can't put item in itself
+        if container_id == item_id:
+            return [self._msg_to_player(player_id, "You can't put something inside itself.")]
+        
+        container = world.items[container_id]
+        container_template = world.item_templates[container.template_id]
+        
+        if not container_template.is_container:
+            return [self._msg_to_player(player_id, f"{container_template.name} is not a container.")]
+        
+        # Check container capacity
+        if container_template.container_capacity:
+            # Count current items in container
+            current_count = 0
+            current_weight = 0.0
+            
+            for other_id, other_item in world.items.items():
+                if other_item.container_id == container_id:
+                    current_count += 1
+                    other_template = world.item_templates[other_item.template_id]
+                    current_weight += other_template.weight * other_item.quantity
+            
+            if container_template.container_type == "weight_based":
+                new_weight = current_weight + (template.weight * item.quantity)
+                if new_weight > container_template.container_capacity:
+                    return [self._msg_to_player(player_id, f"{container_template.name} is too full. ({current_weight:.1f}/{container_template.container_capacity:.1f} kg)")]
+            else:
+                # Slot-based
+                if current_count >= container_template.container_capacity:
+                    return [self._msg_to_player(player_id, f"{container_template.name} is full. ({current_count}/{container_template.container_capacity} slots)")]
+        
+        # Remove from inventory and put in container
+        try:
+            player.inventory_items.remove(item_id)
+            item.player_id = None
+            item.container_id = container_id
+            
+            # Update inventory metadata
+            if player.inventory_meta:
+                from .inventory import calculate_inventory_weight
+                player.inventory_meta.current_weight = calculate_inventory_weight(world, player_id)
+                player.inventory_meta.current_slots = len(player.inventory_items)
+            
+            return [self._msg_to_player(player_id, f"You put {template.name} in {container_template.name}.")]
+            
+        except KeyError:
+            return [self._msg_to_player(player_id, f"Failed to put {template.name} in {container_template.name}.")]
+
+    def _drop(self, player_id: PlayerId, item_name: str) -> List[Event]:
+        """Drop item from inventory."""
+        from .inventory import remove_item_from_inventory, InventoryError, find_item_by_name
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        room = world.rooms[player.room_id]
+        
+        # Find item in inventory
+        found_item_id = find_item_by_name(world, player_id, item_name, "inventory")
+        
+        if not found_item_id:
+            return [self._msg_to_player(player_id, f"You don't have '{item_name}'.")]
+        
+        item = world.items[found_item_id]
+        template = world.item_templates[item.template_id]
+        
+        # Check no-drop flag
+        if template.flags.get("no_drop"):
+            return [self._msg_to_player(player_id, f"You cannot drop {template.name}.")]
+        
+        try:
+            remove_item_from_inventory(world, player_id, found_item_id)
+            item.room_id = room.id
+            room.items.add(found_item_id)
+            
+            # Broadcast to room
+            return [
+                self._msg_to_player(player_id, f"You drop {template.name}."),
+                self._msg_to_room(room.id, f"{player.name} drops {template.name}.", exclude={player_id})
+            ]
+            
+        except InventoryError as e:
+            return [self._msg_to_player(player_id, str(e))]
+
+    def _equip(self, player_id: PlayerId, item_name: str) -> List[Event]:
+        """Equip item."""
+        from .inventory import equip_item, InventoryError, find_item_by_name
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        
+        # Find item in inventory
+        found_item_id = find_item_by_name(world, player_id, item_name, "inventory")
+        
+        if not found_item_id:
+            return [self._msg_to_player(player_id, f"You don't have '{item_name}'.")]
+        
+        template = world.item_templates[world.items[found_item_id].template_id]
+        
+        try:
+            previously_equipped = equip_item(world, player_id, found_item_id)
+            
+            messages = [f"You equip {template.name}."]
+            
+            if previously_equipped:
+                prev_template = world.item_templates[world.items[previously_equipped].template_id]
+                messages.append(f"You unequip {prev_template.name}.")
+            
+            # Emit stat update event (reuse existing pattern from effect system)
+            events = [self._msg_to_player(player_id, "\n".join(messages))]
+            events.extend(self._emit_stat_update(player_id))
+            
+            return events
+            
+        except InventoryError as e:
+            return [self._msg_to_player(player_id, str(e))]
+
+    def _unequip(self, player_id: PlayerId, item_name: str) -> List[Event]:
+        """Unequip item."""
+        from .inventory import unequip_item, InventoryError, find_item_by_name
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        
+        # Find equipped item
+        found_item_id = find_item_by_name(world, player_id, item_name, "equipped")
+        
+        if not found_item_id:
+            return [self._msg_to_player(player_id, f"You don't have '{item_name}' equipped.")]
+        
+        template = world.item_templates[world.items[found_item_id].template_id]
+        
+        try:
+            unequip_item(world, player_id, found_item_id)
+            
+            # Emit stat update event
+            events = [self._msg_to_player(player_id, f"You unequip {template.name}.")]
+            events.extend(self._emit_stat_update(player_id))
+            
+            return events
+            
+        except InventoryError as e:
+            return [self._msg_to_player(player_id, str(e))]
+
+    def _use(self, player_id: PlayerId, item_name: str) -> List[Event]:
+        """Use/consume item."""
+        from .inventory import find_item_by_name, remove_item_from_inventory
+        from .world import Effect
+        import time
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        
+        # Find item in inventory
+        found_item_id = find_item_by_name(world, player_id, item_name, "inventory")
+        
+        if not found_item_id:
+            return [self._msg_to_player(player_id, f"You don't have '{item_name}'.")]
+        
+        item = world.items[found_item_id]
+        template = world.item_templates[item.template_id]
+        
+        if not template.is_consumable:
+            return [self._msg_to_player(player_id, f"You can't consume {template.name}.")]
+        
+        events = []
+        
+        # Apply consume effect
+        if template.consume_effect:
+            effect_data = template.consume_effect
+            effect_id = f"consumable_{found_item_id}_{time.time()}"
+            
+            effect = Effect(
+                effect_id=effect_id,
+                name=effect_data.get("name", "Consumable Effect"),
+                effect_type=effect_data.get("effect_type", "buff"),
+                stat_modifiers=effect_data.get("stat_modifiers", {}),
+                duration=effect_data.get("duration", 0.0),
+                magnitude=effect_data.get("magnitude", 0),
+            )
+            
+            # Apply instant healing if hot/magnitude specified
+            if effect.magnitude > 0 and effect.effect_type == "hot":
+                old_health = player.current_health
+                player.current_health = min(
+                    player.max_health,
+                    player.current_health + effect.magnitude
+                )
+                healed = player.current_health - old_health
+                if healed > 0:
+                    events.append(self._msg_to_player(player_id, f"You heal for {healed} health."))
+            
+            # Apply ongoing effect if duration > 0 or stat modifiers
+            if effect.stat_modifiers or effect.duration > 0:
+                player.apply_effect(effect)
+                # Schedule effect removal
+                if effect.duration > 0:
+                    self.schedule_event(
+                        delay_seconds=effect.duration,
+                        callback=lambda: self._remove_effect_callback(player_id, effect_id),
+                        event_id=f"remove_{effect_id}"
+                    )
+        
+        # Reduce quantity or remove item
+        if item.quantity > 1:
+            item.quantity -= 1
+        else:
+            remove_item_from_inventory(world, player_id, found_item_id)
+            del world.items[found_item_id]
+        
+        events.insert(0, self._msg_to_player(player_id, f"You consume {template.name}."))
+        events.extend(self._emit_stat_update(player_id))
+        
+        return events
+
+    async def _remove_effect_callback(self, player_id: PlayerId, effect_id: str) -> None:
+        """Callback to remove an effect and emit stat update."""
+        if player_id in self.world.players:
+            player = self.world.players[player_id]
+            removed_effect = player.remove_effect(effect_id)
+            
+            if removed_effect:
+                await self.emit_events(self._emit_stat_update(player_id))
+                await self.emit_events([
+                    self._msg_to_player(player_id, f"{removed_effect.name} wears off.")
+                ])
+
+    def _give(self, player_id: PlayerId, item_name: str, target_name: str) -> List[Event]:
+        """Give an item from your inventory to another player."""
+        from .inventory import find_item_by_name, add_item_to_inventory, InventoryFullError, calculate_inventory_weight
+        
+        world = self.world
+        
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        player = world.players[player_id]
+        room = world.rooms[player.room_id]
+        
+        # Find the item in giver's inventory
+        found_item_id = find_item_by_name(world, player_id, item_name, "inventory")
+        
+        if not found_item_id:
+            return [self._msg_to_player(player_id, f"You don't have '{item_name}'.")]
+        
+        item = world.items[found_item_id]
+        template = world.item_templates[item.template_id]
+        
+        # Can't give equipped items
+        if item.is_equipped():
+            return [self._msg_to_player(player_id, f"Unequip {template.name} first.")]
+        
+        # Find target player in the same room
+        target_id = None
+        target_name_lower = target_name.lower()
+        
+        for other_id in room.players:
+            if other_id == player_id:
+                continue
+            other_player = world.players[other_id]
+            if other_player.name.lower() == target_name_lower or other_player.name.lower().startswith(target_name_lower):
+                target_id = other_id
+                break
+        
+        if not target_id:
+            return [self._msg_to_player(player_id, f"You don't see '{target_name}' here.")]
+        
+        target = world.players[target_id]
+        
+        # Check if target is connected
+        if not target.is_connected:
+            return [self._msg_to_player(player_id, f"{target.name} is in stasis and cannot receive items.")]
+        
+        # Remove from giver's inventory
+        player.inventory_items.remove(found_item_id)
+        item.player_id = None
+        
+        # Update giver's inventory metadata
+        if player.inventory_meta:
+            player.inventory_meta.current_weight = calculate_inventory_weight(world, player_id)
+            player.inventory_meta.current_slots = len(player.inventory_items)
+        
+        # Try to add to target's inventory
+        try:
+            add_item_to_inventory(world, target_id, found_item_id)
+            
+            return [
+                self._msg_to_player(player_id, f"You give {template.name} to {target.name}."),
+                self._msg_to_player(target_id, f"{player.name} gives you {template.name}."),
+                self._msg_to_room(room.id, f"{player.name} gives {template.name} to {target.name}.", exclude={player_id, target_id})
+            ]
+            
+        except InventoryFullError as e:
+            # Revert: give item back to giver
+            item.player_id = player_id
+            player.inventory_items.add(found_item_id)
+            if player.inventory_meta:
+                player.inventory_meta.current_weight = calculate_inventory_weight(world, player_id)
+                player.inventory_meta.current_slots = len(player.inventory_items)
+            
+            return [self._msg_to_player(player_id, f"{target.name}'s inventory is full.")]

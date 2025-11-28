@@ -69,6 +69,9 @@ def upgrade() -> None:
     
     # Load area data from YAML files
     load_areas_from_yaml()
+    
+    # Load room data from YAML files
+    load_rooms_from_yaml()
 
 
 def downgrade() -> None:
@@ -135,4 +138,59 @@ def load_areas_from_yaml():
         connection.execute(areas_table.insert().values(**insert_data))
     
     print(f"Loaded {len(yaml_files)} area(s) from YAML files")
+
+
+def load_rooms_from_yaml():
+    """Load room definitions from YAML files into the database."""
+    
+    # Find YAML files in all subdirectories of world_data/rooms/
+    world_data_dir = Path(__file__).parent.parent.parent / 'world_data' / 'rooms'
+    
+    if not world_data_dir.exists():
+        print(f"No world_data/rooms directory found at {world_data_dir}, skipping room import")
+        return
+    
+    # Find all YAML files recursively
+    yaml_files = list(world_data_dir.glob('**/*.yaml')) + list(world_data_dir.glob('**/*.yml'))
+    
+    if not yaml_files:
+        print("No YAML files found in world_data/rooms/, skipping room import")
+        return
+    
+    # Get connection and metadata
+    connection = op.get_bind()
+    metadata = MetaData()
+    rooms_table = Table('rooms', metadata, autoload_with=connection)
+    
+    # Load each YAML file
+    for yaml_file in yaml_files:
+        print(f"Loading room from {yaml_file.name}")
+        
+        with open(yaml_file, 'r', encoding='utf-8') as f:
+            room_data = yaml.safe_load(f)
+        
+        # Prepare data for insertion
+        # Convert exits dict to individual columns
+        exits = room_data.get('exits', {})
+        
+        insert_data = {
+            'id': room_data['id'],
+            'name': room_data['name'],
+            'description': room_data['description'],
+            'room_type': room_data.get('room_type', 'ethereal'),
+            'area_id': room_data.get('area_id'),
+            'north_id': exits.get('north'),
+            'south_id': exits.get('south'),
+            'east_id': exits.get('east'),
+            'west_id': exits.get('west'),
+            'up_id': exits.get('up'),
+            'down_id': exits.get('down'),
+            'on_enter_effect': room_data.get('on_enter_effect'),
+            'on_exit_effect': room_data.get('on_exit_effect'),
+        }
+        
+        # Insert into database
+        connection.execute(rooms_table.insert().values(**insert_data))
+    
+    print(f"Loaded {len(yaml_files)} room(s) from YAML files")
 

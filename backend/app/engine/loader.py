@@ -2,8 +2,12 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Room, Player, Area
-from .world import World, WorldRoom, WorldPlayer, WorldArea, WorldTime, RoomId, PlayerId, AreaId, DEFAULT_TIME_PHASES
+from ..models import Room, Player, Area, ItemTemplate, ItemInstance, PlayerInventory
+from .world import (
+    World, WorldRoom, WorldPlayer, WorldArea, WorldTime, ItemTemplate as WorldItemTemplate,
+    WorldItem, PlayerInventory as WorldPlayerInventory, RoomId, PlayerId, AreaId, ItemId,
+    ItemTemplateId, DEFAULT_TIME_PHASES
+)
 
 
 async def load_world(session: AsyncSession) -> World:
@@ -110,4 +114,90 @@ async def load_world(session: AsyncSession) -> World:
             area = areas[room.area_id]
             area.room_ids.add(room.id)
 
-    return World(rooms=rooms, players=players, areas=areas)
+    # ----- Load item templates (Phase 3) -----
+    template_result = await session.execute(select(ItemTemplate))
+    template_models = template_result.scalars().all()
+
+    item_templates: dict[ItemTemplateId, WorldItemTemplate] = {}
+
+    for t in template_models:
+        item_templates[t.id] = WorldItemTemplate(
+            id=t.id,
+            name=t.name,
+            description=t.description,
+            item_type=t.item_type,
+            item_subtype=t.item_subtype,
+            equipment_slot=t.equipment_slot,
+            stat_modifiers=t.stat_modifiers,
+            weight=t.weight,
+            max_stack_size=t.max_stack_size,
+            has_durability=bool(t.has_durability),  # Convert SQLite int to bool
+            max_durability=t.max_durability,
+            is_container=bool(t.is_container),
+            container_capacity=t.container_capacity,
+            container_type=t.container_type,
+            is_consumable=bool(t.is_consumable),
+            consume_effect=t.consume_effect,
+            flavor_text=t.flavor_text,
+            rarity=t.rarity,
+            value=t.value,
+            flags=t.flags,
+            keywords=t.keywords or [],
+        )
+
+    # ----- Load item instances (Phase 3) -----
+    instance_result = await session.execute(select(ItemInstance))
+    instance_models = instance_result.scalars().all()
+
+    items: dict[ItemId, WorldItem] = {}
+
+    for i in instance_models:
+        items[i.id] = WorldItem(
+            id=i.id,
+            template_id=i.template_id,
+            room_id=i.room_id,
+            player_id=i.player_id,
+            container_id=i.container_id,
+            quantity=i.quantity,
+            current_durability=i.current_durability,
+            equipped_slot=i.equipped_slot,
+            instance_data=i.instance_data,
+        )
+
+    # ----- Load player inventories (Phase 3) -----
+    inventory_result = await session.execute(select(PlayerInventory))
+    inventory_models = inventory_result.scalars().all()
+
+    player_inventories: dict[PlayerId, WorldPlayerInventory] = {}
+
+    for inv in inventory_models:
+        player_inventories[inv.player_id] = WorldPlayerInventory(
+            player_id=inv.player_id,
+            max_weight=inv.max_weight,
+            max_slots=inv.max_slots,
+            current_weight=inv.current_weight,
+            current_slots=inv.current_slots,
+        )
+
+    # ----- Link items to locations (Phase 3) -----
+    for item in items.values():
+        if item.room_id and item.room_id in rooms:
+            rooms[item.room_id].items.add(item.id)
+        elif item.player_id and item.player_id in players:
+            players[item.player_id].inventory_items.add(item.id)
+            if item.equipped_slot:
+                players[item.player_id].equipped_items[item.equipped_slot] = item.id
+
+    # ----- Link inventories to players (Phase 3) -----
+    for player in players.values():
+        if player.id in player_inventories:
+            player.inventory_meta = player_inventories[player.id]
+
+    return World(
+        rooms=rooms, 
+        players=players, 
+        areas=areas,
+        item_templates=item_templates,
+        items=items,
+        player_inventories=player_inventories,
+    )

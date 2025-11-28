@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .db import engine, get_session, AsyncSessionLocal
-from .models import Base, Room, Player
+from .models import Base, Room, Player, PlayerInventory
 from .engine.loader import load_world
 from .engine.engine import WorldEngine
 
@@ -39,9 +39,9 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # 2) Seed world if empty
+    # 2) Seed players if empty (rooms/areas come from migrations)
     async with AsyncSession(engine) as session:
-        result = await session.execute(select(Room).limit(1))
+        result = await session.execute(select(Player).limit(1))
         if result.scalar_one_or_none() is None:
             await seed_world(session)
 
@@ -91,56 +91,8 @@ app = FastAPI(lifespan=lifespan)
 
 async def seed_world(session: AsyncSession) -> None:
     """
-    Dev-only seeding: 3x3x3 cube of rooms (27 rooms total).
+    Seed test players only. Rooms and areas are loaded from YAML via migrations.
     """
-    rooms = []
-    
-    # Create 3x3x3 grid of rooms
-    # Coordinates: x (east/west), y (north/south), z (up/down)
-    for x in range(3):
-        for y in range(3):
-            for z in range(3):
-                room_id = f"room_{x}_{y}_{z}"
-                
-                # Create descriptive names based on position
-                x_desc = ["western", "central", "eastern"][x]
-                y_desc = ["southern", "central", "northern"][y]
-                z_desc = ["lower", "central", "upper"][z]
-                
-                name = f"An Ethereal Cloud Chamber"
-                
-                if x == 1 and y == 1 and z == 1:
-                    description = "At the center of the luminous ethereal cloud. Bright, disorienting swirls of sparkling vapor surrounds you in all directions."    
-                else:
-                    article = "A" if z_desc in ("lower", "central") else "An"
-                    description = f"{article} {z_desc} pocket in the {y_desc} {x_desc} region of the clouds."
-                
-                # Calculate adjacent room IDs
-                north_id = f"room_{x}_{y+1}_{z}" if y < 2 else None
-                south_id = f"room_{x}_{y-1}_{z}" if y > 0 else None
-                east_id = f"room_{x+1}_{y}_{z}" if x < 2 else None
-                west_id = f"room_{x-1}_{y}_{z}" if x > 0 else None
-                up_id = f"room_{x}_{y}_{z+1}" if z < 2 else None
-                down_id = f"room_{x}_{y}_{z-1}" if z > 0 else None
-                
-                room = Room(
-                    id=room_id,
-                    name=name,
-                    description=description,
-                    room_type="ethereal",
-                    north_id=north_id,
-                    south_id=south_id,
-                    east_id=east_id,
-                    west_id=west_id,
-                    up_id=up_id,
-                    down_id=down_id,
-                    on_exit_effect="The ethereal clouds part and swirl around you as you pass.",
-                    area_id="area_ethereal_nexus",  # Assign all rooms to Ethereal Nexus
-                )
-                rooms.append(room)
-    
-    session.add_all(rooms)
-
     # Start players in the center of the grid (1, 1, 1)
     start_room_id = "room_1_1_1"
     
@@ -160,9 +112,26 @@ async def seed_world(session: AsyncSession) -> None:
         data={},
     )
     session.add_all([player1, player2])
+    
+    # Create inventory records for the new players (Phase 3)
+    inventory1 = PlayerInventory(
+        player_id=player1_id,
+        max_weight=100.0,
+        max_slots=20,
+        current_weight=0.0,
+        current_slots=0,
+    )
+    inventory2 = PlayerInventory(
+        player_id=player2_id,
+        max_weight=100.0,
+        max_slots=20,
+        current_weight=0.0,
+        current_slots=0,
+    )
+    session.add_all([inventory1, inventory2])
 
     await session.commit()
-    logger.info("Seeded 27 rooms in 3x3x3 grid and 2 test players: %s, %s", player1_id, player2_id)
+    logger.info("Seeded 2 test players with inventories: %s, %s", player1_id, player2_id)
 
 
 def get_world_engine() -> WorldEngine:

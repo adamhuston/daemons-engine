@@ -8,6 +8,8 @@ This directory contains the world content definitions in YAML format.
 world_data/
 ├── areas/          # Area definitions (regions with time scales, environments)
 └── rooms/          # Room definitions (individual locations)
+    ├── ethereal/   # Rooms in the Ethereal Nexus
+    └── temporal/   # Rooms in the Temporal Rift
 ```
 
 ## Area Schema
@@ -55,7 +57,7 @@ entry_points:                # List of room IDs that serve as entrances
 
 ## Room Schema (Future)
 
-File: `rooms/{room_id}.yaml`
+File: `rooms/{area_name}/{room_id}.yaml`
 
 ```yaml
 id: string                   # Unique identifier

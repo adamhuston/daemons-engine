@@ -9,6 +9,8 @@ RoomId = str
 PlayerId = str
 AreaId = str
 Direction = str  # "north", "south", "east", "west", "up", "down"
+ItemId = str
+ItemTemplateId = str
 
 
 # Room type emoji mapping
@@ -184,11 +186,10 @@ class WorldTime:
         return f"{current_hour:02d}:{current_minute:02d}"
     
     def format_full(self, time_scale: float = 1.0) -> str:
-        """Format full time with phase (without day number)."""
+        """Format full time with phase."""
         current_day, current_hour, current_minute = self.get_current_time(time_scale)
         phase = self.get_time_of_day(time_scale)
-        emoji = self.get_time_emoji(time_scale)
-        return f"{emoji} {current_hour:02d}:{current_minute:02d} ({phase})"
+        return f"{current_hour:02d}:{current_minute:02d} ({phase})"
 
 
 # Default time phase flavor text
@@ -279,12 +280,88 @@ class Effect:
 
 
 @dataclass
+class ItemTemplate:
+    """Runtime representation of an item template (read-only blueprint)."""
+    id: ItemTemplateId
+    name: str
+    description: str
+    item_type: str
+    item_subtype: str | None
+    equipment_slot: str | None
+    stat_modifiers: Dict[str, int]
+    weight: float
+    max_stack_size: int
+    has_durability: bool
+    max_durability: int | None
+    is_container: bool
+    container_capacity: int | None
+    container_type: str | None
+    is_consumable: bool
+    consume_effect: dict | None
+    flavor_text: str | None
+    rarity: str
+    value: int
+    flags: dict
+    keywords: list  # Alternative names for searching
+
+
+@dataclass
+class WorldItem:
+    """Runtime representation of a specific item instance."""
+    id: ItemId
+    template_id: ItemTemplateId
+    
+    # Location (exactly one should be set)
+    room_id: RoomId | None = None
+    player_id: PlayerId | None = None
+    container_id: ItemId | None = None
+    
+    # Instance state
+    quantity: int = 1
+    current_durability: int | None = None
+    equipped_slot: str | None = None
+    instance_data: dict = field(default_factory=dict)
+    
+    def is_equipped(self) -> bool:
+        """Check if item is currently equipped."""
+        return self.equipped_slot is not None
+    
+    def is_stackable(self, template: ItemTemplate) -> bool:
+        """Check if this item can stack with others."""
+        return template.max_stack_size > 1
+    
+    def can_stack_with(self, other: 'WorldItem', template: ItemTemplate) -> bool:
+        """Check if this item can stack with another item."""
+        return (
+            self.template_id == other.template_id
+            and self.is_stackable(template)
+            and not self.is_equipped()
+            and not other.is_equipped()
+            and self.current_durability == other.current_durability
+        )
+
+
+@dataclass
+class PlayerInventory:
+    """Runtime representation of player inventory metadata."""
+    player_id: PlayerId
+    max_weight: float = 100.0
+    max_slots: int = 20
+    current_weight: float = 0.0
+    current_slots: int = 0
+
+
+@dataclass
 class WorldPlayer:
     """Runtime representation of a player in the world."""
     id: PlayerId
     name: str
     room_id: RoomId
-    inventory: list[str] = field(default_factory=list)
+    
+    # Inventory system (replaces simple inventory list)
+    inventory_items: Set[ItemId] = field(default_factory=set)  # Item IDs in inventory
+    equipped_items: Dict[str, ItemId] = field(default_factory=dict)  # slot -> item_id
+    inventory_meta: PlayerInventory | None = None  # Capacity tracking
     # Movement effects - flavor text triggered by player movement
     on_move_effect: str | None = None  # e.g., "You glide gracefully"
     # Connection state - whether player is actively connected
@@ -364,6 +441,8 @@ class WorldRoom:
     on_exit_effect: str | None = None   # e.g., "Clouds part around you as you leave"
     # Time dilation - multiplier for time passage in this room (1.0 = normal)
     time_scale: float = 1.0  # e.g., 2.0 = double speed, 0.5 = half speed, 0.0 = frozen
+    # Items in this room
+    items: Set[ItemId] = field(default_factory=set)
 
 
 @dataclass
@@ -378,3 +457,8 @@ class World:
     players: Dict[PlayerId, WorldPlayer]
     areas: Dict[AreaId, WorldArea] = field(default_factory=dict)  # Geographic areas
     world_time: WorldTime = field(default_factory=WorldTime)  # Global time tracker
+    
+    # Item system
+    item_templates: Dict[ItemTemplateId, ItemTemplate] = field(default_factory=dict)
+    items: Dict[ItemId, WorldItem] = field(default_factory=dict)
+    player_inventories: Dict[PlayerId, PlayerInventory] = field(default_factory=dict)
