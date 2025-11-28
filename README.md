@@ -1,5 +1,7 @@
 ## Architecture
 
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for an overview of working on this project.
+
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for an overview of the backend, game engine, and WebSocket protocol.
 
 See [roadmap.md](./roadmap.md) for an overview of the feature development plan.
