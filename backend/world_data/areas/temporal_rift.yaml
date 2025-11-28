@@ -19,6 +19,7 @@ weather_profile: temporal_storm
 # Gameplay properties
 danger_level: 7
 magic_intensity: extreme
+default_respawn_time: 60  # Very fast respawn - temporal instability causes rapid regeneration
 
 # Atmospheric details
 ambient_sound: The ticking of a thousand unsynchronized clocks fills the air.

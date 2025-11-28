@@ -95,6 +95,7 @@ class Area(Base):
     # Gameplay properties
     danger_level: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     magic_intensity: Mapped[str] = mapped_column(String, nullable=False, server_default="low")
+    default_respawn_time: Mapped[int] = mapped_column(Integer, nullable=False, server_default="300")  # seconds
     
     # Atmospheric details
     ambient_sound: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -252,7 +253,8 @@ class NpcInstance(Base):
     is_alive: Mapped[bool] = mapped_column(Integer, nullable=False, server_default="1")  # SQLite uses 0/1
     
     # Respawn tracking
-    respawn_time: Mapped[int] = mapped_column(Integer, nullable=False, server_default="300")  # seconds
+    # If set, overrides area default. Use -1 to disable respawn entirely.
+    respawn_time: Mapped[int | None] = mapped_column(Integer, nullable=True)  # seconds, NULL = use area default
     last_killed_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # Unix timestamp
     
     # Instance-specific overrides (JSON: custom name, modified stats, etc.)

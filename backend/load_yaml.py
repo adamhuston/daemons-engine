@@ -39,6 +39,7 @@ async def load_data():
                     danger_level=area_data.get('danger_level', 1),
                     magic_intensity=area_data.get('magic_intensity', 'moderate'),
                     ambient_sound=area_data.get('ambient_sound'),
+                    default_respawn_time=area_data.get('default_respawn_time', 300),
                     time_phases=area_data.get('time_phases'),
                     entry_points=area_data.get('entry_points', []),
                     starting_day=area_data.get('starting_day', 1),
@@ -261,7 +262,7 @@ async def load_data():
                         spawn_room_id=room_id,  # Spawn in same room they're placed
                         current_health=current_health,
                         is_alive=True,
-                        respawn_time=spawn.get('respawn_time', 300),
+                        respawn_time=spawn.get('respawn_time'),  # None = use area default, -1 = no respawn
                         instance_data=spawn.get('instance_data', {}),
                     )
                     session.add(instance)

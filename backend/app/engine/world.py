@@ -318,6 +318,7 @@ class WorldArea:
     danger_level: int = 1  # ADD THIS
     magic_intensity: str = "normal"  # ADD THIS
     ambient_sound: str | None = None
+    default_respawn_time: int = 300  # Area-wide default respawn time in seconds
     time_phases: dict[str, str] = field(default_factory=lambda: DEFAULT_TIME_PHASES.copy())
     entry_points: set[RoomId] = field(default_factory=set)
     room_ids: set[RoomId] = field(default_factory=set)
@@ -573,6 +574,10 @@ class WorldEntity:
     
     # Real-time combat state
     combat: CombatState = field(default_factory=CombatState)
+    
+    # Death and respawn tracking
+    death_time: float | None = None  # Unix timestamp when entity died
+    respawn_event_id: str | None = None  # Event ID for scheduled respawn countdown
     
     def is_alive(self) -> bool:
         """Check if entity is alive."""
@@ -1006,7 +1011,8 @@ class WorldNpc(WorldEntity):
     spawn_room_id: RoomId = ""
     
     # Respawn tracking
-    respawn_time: int = 300  # seconds
+    # If set, overrides the area's default_respawn_time. Use -1 to disable respawn.
+    respawn_time_override: int | None = None
     last_killed_at: float | None = None
     
     # Combat state
@@ -1103,6 +1109,66 @@ class World:
     # NPC system
     npc_templates: Dict[NpcTemplateId, NpcTemplate] = field(default_factory=dict)
     npcs: Dict[NpcId, WorldNpc] = field(default_factory=dict)
+    
+    # Container contents index: container_id -> set of item_ids inside it
+    # Provides O(1) lookup for items in containers instead of O(n) world scan
+    container_contents: Dict[ItemId, Set[ItemId]] = field(default_factory=dict)
+    
+    # ---------- Container Index Helpers ----------
+    
+    def add_item_to_container(self, item_id: ItemId, container_id: ItemId) -> None:
+        """
+        Add an item to a container's contents index.
+        Also updates the item's container_id field.
+        """
+        item = self.items.get(item_id)
+        if item:
+            # Remove from old container if any
+            if item.container_id and item.container_id in self.container_contents:
+                self.container_contents[item.container_id].discard(item_id)
+            
+            # Add to new container
+            if container_id not in self.container_contents:
+                self.container_contents[container_id] = set()
+            self.container_contents[container_id].add(item_id)
+            item.container_id = container_id
+    
+    def remove_item_from_container(self, item_id: ItemId) -> None:
+        """
+        Remove an item from its container's contents index.
+        Also clears the item's container_id field.
+        """
+        item = self.items.get(item_id)
+        if item and item.container_id:
+            if item.container_id in self.container_contents:
+                self.container_contents[item.container_id].discard(item_id)
+            item.container_id = None
+    
+    def get_container_contents(self, container_id: ItemId) -> Set[ItemId]:
+        """
+        Get the set of item IDs inside a container.
+        Returns empty set if container has no contents.
+        """
+        return self.container_contents.get(container_id, set())
+    
+    def get_container_weight(self, container_id: ItemId) -> float:
+        """
+        Calculate the total weight of items inside a container.
+        """
+        total = 0.0
+        for item_id in self.get_container_contents(container_id):
+            item = self.items.get(item_id)
+            if item:
+                template = self.item_templates.get(item.template_id)
+                if template:
+                    total += template.weight * item.quantity
+        return total
+    
+    def get_container_slot_count(self, container_id: ItemId) -> int:
+        """
+        Get the number of item stacks inside a container.
+        """
+        return len(self.get_container_contents(container_id))
     
     def get_entity(self, entity_id: EntityId) -> WorldEntity | None:
         """

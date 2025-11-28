@@ -97,6 +97,36 @@ All messages are JSON objects sent as text frames.
 
 **Note:** Stats can have modifiers from active effects. The `stats` command shows effective values (e.g., "15 (10 base)" for armor_class with a +5 buff).
 
+### Respawn Countdown Event
+```json
+{
+  "type": "respawn_countdown",
+  "player_id": "uuid-string",
+  "payload": {
+    "seconds_remaining": 10,
+    "respawn_location": "Ethereal Nexus"
+  }
+}
+```
+
+**Fields:**
+- `type`: Always `"respawn_countdown"`
+- `player_id`: UUID of the player who died
+- `payload.seconds_remaining`: Seconds until respawn (counts down from 10 to 1)
+- `payload.respawn_location`: Name of the area where player will respawn
+
+**When Sent:**
+- After a player dies, one event per second counting down
+- Client should display a countdown overlay/modal
+- When countdown reaches 0, player is respawned and receives normal messages
+
+**Player Death Flow:**
+1. Player health reaches 0 → receives death message
+2. Player removed from current room
+3. Respawn countdown events sent (10, 9, 8... 1)
+4. Player respawned at area entry point with full health
+5. Player receives resurrection message and room description
+
 ## Event Scoping
 
 The server uses internal scoping to determine which players receive which events:

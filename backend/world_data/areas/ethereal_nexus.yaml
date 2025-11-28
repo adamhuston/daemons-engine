@@ -19,6 +19,7 @@ weather_profile: stable
 # Gameplay properties
 danger_level: 3
 magic_intensity: extreme
+default_respawn_time: 120  # Fast respawn - mystical energy causes rapid regeneration
 
 # Atmospheric details
 ambient_sound: A gentle humming resonates through the air.

@@ -205,11 +205,11 @@ def main(page: ft.Page):
                             hp_status.color = ft.Colors.RED
                         
                         page.update()
-                    
-                    # Display stat update info
-                    stat_info = ", ".join([f"{k}: {v}" for k, v in payload.items()])
-                    append_line(f"[stat update] {stat_info}", ft.Colors.CYAN)
+                elif ev_type == "respawn_countdown":
+                    # Respawn countdown is handled via message events, ignore the data event
+                    pass
                 else:
+                    # Unknown event type - show for debugging
                     append_line(f"[event] {ev}", ft.Colors.GREY_700)
         except Exception as e:
             append_line(f"[error] WebSocket closed: {e!r}")

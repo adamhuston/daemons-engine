@@ -7,6 +7,7 @@ from typing import Dict, List, Any, Callable, Awaitable
 from .world import (
     World, WorldRoom, Direction, PlayerId, RoomId, AreaId, get_room_emoji, 
     TimeEvent, Effect, EntityType, EntityId, WorldEntity, WorldPlayer, WorldNpc,
+    WorldArea,
     Targetable, TargetableType, WorldItem, ItemId,
     CombatPhase, CombatState, CombatResult, WeaponStats,
     get_xp_for_next_level, LEVEL_UP_STAT_GAINS
@@ -420,8 +421,15 @@ class WorldEngine:
                 if npc.is_alive():
                     continue
                 
+                # Resolve respawn time: NPC override > area default > 300s fallback
+                respawn_time = self._get_npc_respawn_time(npc)
+                
+                # -1 means never respawn
+                if respawn_time < 0:
+                    continue
+                
                 # Check if respawn time has elapsed
-                if npc.last_killed_at and current_time - npc.last_killed_at >= npc.respawn_time:
+                if npc.last_killed_at and current_time - npc.last_killed_at >= respawn_time:
                     # Respawn the NPC
                     template = self.world.npc_templates.get(npc.template_id)
                     if template:
@@ -457,6 +465,32 @@ class WorldEngine:
             callback=npc_housekeeping_tick,
             event_id="npc_housekeeping_tick"
         )
+    
+    def _get_npc_respawn_time(self, npc: WorldNpc) -> int:
+        """
+        Resolve the respawn time for an NPC.
+        
+        Resolution order:
+        1. NPC respawn_time_override (if set)
+        2. Area default_respawn_time (if NPC's spawn room is in an area)
+        3. Hardcoded fallback of 300 seconds
+        
+        Returns:
+            Respawn time in seconds. -1 means never respawn.
+        """
+        # If NPC has an override, use it
+        if npc.respawn_time_override is not None:
+            return npc.respawn_time_override
+        
+        # Try to get the area for this NPC's spawn room
+        spawn_room = self.world.rooms.get(npc.spawn_room_id)
+        if spawn_room and spawn_room.area_id:
+            area = self.world.areas.get(spawn_room.area_id)
+            if area:
+                return area.default_respawn_time
+        
+        # Fallback to hardcoded default
+        return 300
     
     def _init_npc_behaviors(self) -> None:
         """
@@ -590,6 +624,209 @@ class WorldEngine:
         if npc.wander_event_id:
             self.cancel_event(npc.wander_event_id)
             npc.wander_event_id = None
+
+    # ---------- Player Respawn System ----------
+
+    def schedule_player_respawn(
+        self, 
+        player_id: PlayerId, 
+        countdown_seconds: int = 10
+    ) -> None:
+        """
+        Schedule a player respawn with countdown.
+        
+        Sends respawn_countdown events to the player every second,
+        then respawns them at their area's entry point.
+        
+        Args:
+            player_id: The player who died
+            countdown_seconds: Seconds before respawn (default 10)
+        """
+        import random
+        
+        player = self.world.players.get(player_id)
+        if not player:
+            return
+        
+        # Record death time
+        player.death_time = time.time()
+        
+        # Get respawn location (area entry point)
+        area = self._get_player_area(player)
+        if not area or not area.entry_points:
+            print(f"[Respawn] No entry points for player {player.name}, using current room")
+            respawn_room_id = player.room_id
+        else:
+            # Pick random entry point
+            respawn_room_id = random.choice(list(area.entry_points))
+        
+        respawn_room = self.world.rooms.get(respawn_room_id)
+        area_name = area.name if area else "Unknown"
+        
+        # Schedule countdown events
+        for i in range(countdown_seconds, 0, -1):
+            delay = countdown_seconds - i
+            event_id = f"respawn_countdown_{player_id}_{i}"
+            
+            # Create closure with captured value
+            seconds_remaining = i
+            async def send_countdown(secs=seconds_remaining, area=area_name):
+                # Different messages based on countdown progress
+                if secs == 10:
+                    msg = f"💀 Your flesh failed you, but your spirit is not yet defeated... ({secs}s)"
+                elif secs >= 7:
+                    msg = f"👻 Darkness surrounds you... ({secs}s)"
+                elif secs >= 4:
+                    msg = f"✨ A distant light calls to you... ({secs}s)"
+                elif secs >= 2:
+                    msg = f"🌟 You feel yourself being pulled back... ({secs}s)"
+                else:
+                    msg = f"⚡ Reality snaps back into focus... ({secs}s)"
+                
+                await self._dispatch_events([
+                    {
+                        "type": "message",
+                        "scope": "player",
+                        "player_id": player_id,
+                        "text": msg
+                    },
+                    {
+                        "type": "respawn_countdown",
+                        "scope": "player",
+                        "player_id": player_id,
+                        "payload": {
+                            "seconds_remaining": secs,
+                            "respawn_location": area
+                        }
+                    }
+                ])
+            
+            self.schedule_event(
+                delay_seconds=delay,
+                callback=send_countdown,
+                event_id=event_id
+            )
+        
+        # Schedule the actual respawn
+        respawn_event_id = f"respawn_{player_id}_{time.time()}"
+        player.respawn_event_id = respawn_event_id
+        
+        async def do_respawn():
+            await self._execute_player_respawn(player_id, respawn_room_id)
+        
+        self.schedule_event(
+            delay_seconds=countdown_seconds,
+            callback=do_respawn,
+            event_id=respawn_event_id
+        )
+        
+        print(f"[Respawn] Scheduled respawn for {player.name} in {countdown_seconds}s at {respawn_room_id}")
+
+    async def _execute_player_respawn(
+        self, 
+        player_id: PlayerId, 
+        respawn_room_id: RoomId
+    ) -> None:
+        """
+        Execute the actual player respawn.
+        
+        - Restores health
+        - Clears combat state
+        - Moves to respawn room
+        - Sends confirmation message
+        """
+        player = self.world.players.get(player_id)
+        if not player:
+            return
+        
+        old_room_id = player.room_id
+        old_room = self.world.rooms.get(old_room_id)
+        new_room = self.world.rooms.get(respawn_room_id)
+        
+        if not new_room:
+            print(f"[Respawn] ERROR: Respawn room {respawn_room_id} not found")
+            return
+        
+        # Restore player state
+        player.current_health = player.max_health
+        player.death_time = None
+        player.respawn_event_id = None
+        
+        # Clear combat state using the proper method
+        player.combat.clear_combat()
+        
+        print(f"[Respawn DEBUG] Executing respawn for {player.name}")
+        
+        # Move player to respawn room
+        if old_room:
+            old_room.entities.discard(player_id)
+        new_room.entities.add(player_id)
+        player.room_id = respawn_room_id
+        
+        # Send respawn confirmation and look at new room
+        events: List[Event] = []
+        
+        resurrection_msg = {
+            "type": "message",
+            "scope": "player",
+            "player_id": player_id,
+            "text": "✨ **Sensation floods into you.** Every nerve prickles with fresh sensitivity as your spirit and your body are restored."
+        }
+        events.append(resurrection_msg)
+        print(f"[Respawn DEBUG] Queued resurrection message for {player_id}")
+        
+        # Show the new room
+        look_events = self._look(player_id)
+        events.extend(look_events)
+        
+        # Update player stats
+        events.append({
+            "type": "stat_update",
+            "scope": "player",
+            "player_id": player_id,
+            "payload": {
+                "health": player.current_health,
+                "max_health": player.max_health,
+            }
+        })
+        
+        # Announce arrival if room changed
+        if old_room_id != respawn_room_id:
+            events.append({
+                "type": "message",
+                "scope": "room",
+                "room_id": respawn_room_id,
+                "exclude": [player_id],
+                "text": f"✨ {player.name} materializes in a shimmer of light."
+            })
+        
+        await self._dispatch_events(events)
+        print(f"[Respawn DEBUG] Dispatched {len(events)} events for {player.name}")
+        print(f"[Respawn] {player.name} respawned at {respawn_room_id}")
+
+    def _get_player_area(self, player: WorldPlayer) -> WorldArea | None:
+        """Get the area a player is currently in."""
+        room = self.world.rooms.get(player.room_id)
+        if not room:
+            return None
+        return self.world.areas.get(room.area_id)
+
+    def cancel_player_respawn(self, player_id: PlayerId) -> None:
+        """
+        Cancel a scheduled player respawn (e.g., if they disconnect).
+        """
+        player = self.world.players.get(player_id)
+        if not player:
+            return
+        
+        if player.respawn_event_id:
+            self.cancel_event(player.respawn_event_id)
+            player.respawn_event_id = None
+        
+        # Also cancel any countdown events
+        for i in range(10, 0, -1):
+            event_id = f"respawn_countdown_{player_id}_{i}"
+            self.cancel_event(event_id)
     
     def _get_npc_behavior_context(self, npc_id: str) -> BehaviorContext | None:
         """
@@ -699,10 +936,14 @@ class WorldEngine:
                             "up": "down", "down": "up"
                         }
                         from_dir = opposite.get(result.move_direction, "somewhere")
-                        events.append(self._msg_to_room(
-                            result.move_to, 
-                            f"{npc.name} arrives from the {from_dir}."
-                        ))
+                        # Use "from above/below" for vertical movement
+                        if from_dir == "up":
+                            arrival_msg = f"{npc.name} arrives from above."
+                        elif from_dir == "down":
+                            arrival_msg = f"{npc.name} arrives from below."
+                        else:
+                            arrival_msg = f"{npc.name} arrives from the {from_dir}."
+                        events.append(self._msg_to_room(result.move_to, arrival_msg))
         
         # Dispatch all events
         if events:
@@ -1255,6 +1496,51 @@ class WorldEngine:
         """Deprecated: Use _format_room_entities instead."""
         return self._format_room_entities(room, exclude_player_id)
 
+    def _format_container_contents(self, container_id: str, template: Any) -> list[str]:
+        """
+        Format the contents of a container for display.
+        Uses the container_contents index for O(1) lookup.
+        
+        Args:
+            container_id: The container item's ID
+            template: The container's ItemTemplate
+        
+        Returns:
+            List of formatted lines describing the container contents
+        """
+        from .world import ItemTemplate
+        
+        world = self.world
+        lines: list[str] = [""]
+        container_items: list[str] = []
+        
+        # Use container index for O(1) lookup
+        for other_item_id in world.get_container_contents(container_id):
+            other_item = world.items.get(other_item_id)
+            if other_item:
+                other_template = world.item_templates.get(other_item.template_id)
+                if other_template:
+                    quantity_str = f" x{other_item.quantity}" if other_item.quantity > 1 else ""
+                    container_items.append(f"  {other_template.name}{quantity_str}")
+        
+        if container_items:
+            lines.append(f"**Contents of {template.name}:**")
+            lines.extend(container_items)
+            
+            # Show container capacity if available
+            if template.container_capacity:
+                if template.container_type == "weight_based":
+                    container_weight = world.get_container_weight(container_id)
+                    lines.append(f"  Weight: {container_weight:.1f}/{template.container_capacity:.1f} kg")
+                else:
+                    # Slot-based container
+                    item_count = len(container_items)
+                    lines.append(f"  Slots: {item_count}/{template.container_capacity}")
+        else:
+            lines.append(f"**{template.name} is empty.**")
+        
+        return lines
+
     def _move_player(self, player_id: PlayerId, direction: Direction) -> List[Event]:
         events: List[Event] = []
         world = self.world
@@ -1375,10 +1661,24 @@ class WorldEngine:
         # Broadcast to players in the new room (they see you enter)
         new_room_players = self._get_player_ids_in_room(new_room_id)
         if len(new_room_players) > 1:  # More than just the moving player
+            # Calculate the direction they arrived from (opposite of movement)
+            opposite = {
+                "north": "south", "south": "north",
+                "east": "west", "west": "east",
+                "up": "down", "down": "up"
+            }
+            from_dir = opposite.get(direction, "somewhere")
+            # Use "from above/below" for vertical movement
+            if from_dir == "up":
+                arrival_msg = f"{player.name} arrives from above."
+            elif from_dir == "down":
+                arrival_msg = f"{player.name} arrives from below."
+            else:
+                arrival_msg = f"{player.name} arrives from the {from_dir}."
             events.append(
                 self._msg_to_room(
                     new_room_id,
-                    f"{player.name} enters.",
+                    arrival_msg,
                     exclude={player_id},
                 )
             )
@@ -1545,36 +1845,7 @@ class WorldEngine:
         
         # Container contents
         if template.is_container:
-            lines.append("")
-            container_items = []
-            
-            # Find all items in this container
-            for other_item_id, other_item in world.items.items():
-                if other_item.container_id == found_item_id:
-                    other_template = world.item_templates[other_item.template_id]
-                    quantity_str = f" x{other_item.quantity}" if other_item.quantity > 1 else ""
-                    container_items.append(f"  {other_template.name}{quantity_str}")
-            
-            if container_items:
-                lines.append(f"**Contents of {template.name}:**")
-                lines.extend(container_items)
-                
-                # Show container capacity if available
-                if template.container_capacity:
-                    if template.container_type == "weight_based":
-                        # Calculate current weight in container
-                        container_weight = 0.0
-                        for other_item_id, other_item in world.items.items():
-                            if other_item.container_id == found_item_id:
-                                other_template = world.item_templates[other_item.template_id]
-                                container_weight += other_template.weight * other_item.quantity
-                        lines.append(f"  Weight: {container_weight:.1f}/{template.container_capacity:.1f} kg")
-                    else:
-                        # Slot-based container
-                        item_count = len(container_items)
-                        lines.append(f"  Slots: {item_count}/{template.container_capacity}")
-            else:
-                lines.append(f"**{template.name} is empty.**")
+            lines.extend(self._format_container_contents(found_item_id, template))
         
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
@@ -1791,36 +2062,7 @@ class WorldEngine:
         
         # Container contents
         if template.is_container:
-            lines.append("")
-            container_items = []
-            
-            # Find all items in this container
-            for other_item_id, other_item in world.items.items():
-                if other_item.container_id == item.id:
-                    other_template = world.item_templates[other_item.template_id]
-                    quantity_str = f" x{other_item.quantity}" if other_item.quantity > 1 else ""
-                    container_items.append(f"  {other_template.name}{quantity_str}")
-            
-            if container_items:
-                lines.append(f"**Contents of {template.name}:**")
-                lines.extend(container_items)
-                
-                # Show container capacity if available
-                if template.container_capacity:
-                    if template.container_type == "weight_based":
-                        # Calculate current weight in container
-                        container_weight = 0.0
-                        for other_item_id, other_item in world.items.items():
-                            if other_item.container_id == item.id:
-                                other_template = world.item_templates[other_item.template_id]
-                                container_weight += other_template.weight * other_item.quantity
-                        lines.append(f"  Weight: {container_weight:.1f}/{template.container_capacity:.1f} kg")
-                    else:
-                        # Slot-based container
-                        item_count = len(container_items)
-                        lines.append(f"  Slots: {item_count}/{template.container_capacity}")
-            else:
-                lines.append(f"**{template.name} is empty.**")
+            lines.extend(self._format_container_contents(item.id, template))
         
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
@@ -2755,14 +2997,18 @@ class WorldEngine:
         if not container_template.is_container:
             return [self._msg_to_player(player_id, f"{container_template.name} is not a container.")]
         
-        # Find the item inside the container using keyword matching
+        # Find the item inside the container using index + keyword matching
         from .inventory import _matches_item_name
         item_name_lower = item_name.lower()
         found_item_id = None
         
+        # Use container index for O(1) lookup of container contents
+        container_item_ids = world.get_container_contents(container_id)
+        
         # Exact match first
-        for other_id, other_item in world.items.items():
-            if other_item.container_id == container_id:
+        for other_id in container_item_ids:
+            other_item = world.items.get(other_id)
+            if other_item:
                 other_template = world.item_templates[other_item.template_id]
                 if _matches_item_name(other_template, item_name_lower, exact=True):
                     found_item_id = other_id
@@ -2770,8 +3016,9 @@ class WorldEngine:
         
         # Partial match if no exact match
         if not found_item_id:
-            for other_id, other_item in world.items.items():
-                if other_item.container_id == container_id:
+            for other_id in container_item_ids:
+                other_item = world.items.get(other_id)
+                if other_item:
                     other_template = world.item_templates[other_item.template_id]
                     if _matches_item_name(other_template, item_name_lower, exact=False):
                         found_item_id = other_id
@@ -2810,13 +3057,14 @@ class WorldEngine:
                 del world.items[new_item_id]
                 return [self._msg_to_player(player_id, str(e))]
         else:
-            # Single item - move it
-            item.container_id = None
+            # Single item - move it using index helper
+            world.remove_item_from_container(found_item_id)
             try:
                 add_item_to_inventory(world, player_id, found_item_id)
                 return [self._msg_to_player(player_id, f"You take {template.name} from {container_template.name}.")]
             except InventoryFullError as e:
-                item.container_id = container_id
+                # Restore to container on failure
+                world.add_item_to_container(found_item_id, container_id)
                 return [self._msg_to_player(player_id, str(e))]
 
     def _put_in_container(self, player_id: PlayerId, item_name: str, container_name: str) -> List[Event]:
@@ -2865,17 +3113,14 @@ class WorldEngine:
         if not container_template.is_container:
             return [self._msg_to_player(player_id, f"{container_template.name} is not a container.")]
         
-        # Check container capacity
+        # Prevent putting containers inside other containers
+        if template.is_container:
+            return [self._msg_to_player(player_id, f"You can't put {template.name} inside another container.")]
+        
+        # Check container capacity using index helpers
         if container_template.container_capacity:
-            # Count current items in container
-            current_count = 0
-            current_weight = 0.0
-            
-            for other_id, other_item in world.items.items():
-                if other_item.container_id == container_id:
-                    current_count += 1
-                    other_template = world.item_templates[other_item.template_id]
-                    current_weight += other_template.weight * other_item.quantity
+            current_count = world.get_container_slot_count(container_id)
+            current_weight = world.get_container_weight(container_id)
             
             if container_template.container_type == "weight_based":
                 new_weight = current_weight + (template.weight * item.quantity)
@@ -2886,11 +3131,11 @@ class WorldEngine:
                 if current_count >= container_template.container_capacity:
                     return [self._msg_to_player(player_id, f"{container_template.name} is full. ({current_count}/{container_template.container_capacity} slots)")]
         
-        # Remove from inventory and put in container
+        # Remove from inventory and put in container using index helper
         try:
             player.inventory_items.remove(item_id)
             item.player_id = None
-            item.container_id = container_id
+            world.add_item_to_container(item_id, container_id)
             
             # Update inventory metadata
             if player.inventory_meta:

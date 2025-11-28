@@ -107,6 +107,7 @@ async def load_world(session: AsyncSession) -> World:
             danger_level=a.danger_level,
             magic_intensity=a.magic_intensity,
             ambient_sound=a.ambient_sound,
+            default_respawn_time=a.default_respawn_time,
             time_phases=time_phases,
             entry_points=entry_points,
         )
@@ -200,6 +201,14 @@ async def load_world(session: AsyncSession) -> World:
             players[item.player_id].inventory_items.add(item.id)
             if item.equipped_slot:
                 players[item.player_id].equipped_items[item.equipped_slot] = item.id
+    
+    # ----- Build container contents index (Phase 3) -----
+    container_contents: dict[str, set[str]] = {}
+    for item in items.values():
+        if item.container_id:
+            if item.container_id not in container_contents:
+                container_contents[item.container_id] = set()
+            container_contents[item.container_id].add(item.id)
 
     # ----- Link inventories to players (Phase 3) -----
     for player in players.values():
@@ -284,7 +293,7 @@ async def load_world(session: AsyncSession) -> World:
             # NPC-specific fields
             template_id=n.template_id,
             spawn_room_id=n.spawn_room_id,
-            respawn_time=n.respawn_time,
+            respawn_time_override=n.respawn_time,  # NULL means use area default
             last_killed_at=n.last_killed_at,
             instance_data=n.instance_data or {},
         )
@@ -303,4 +312,5 @@ async def load_world(session: AsyncSession) -> World:
         player_inventories=player_inventories,
         npc_templates=npc_templates,
         npcs=npcs,
+        container_contents=container_contents,
     )

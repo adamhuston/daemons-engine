@@ -483,6 +483,8 @@ class CombatSystem:
             # Apply damage
             target.current_health = max(0, target.current_health - damage)
             
+            print(f"[Combat DEBUG] Damage applied: {damage} to {target.name}, health now: {target.current_health}, is_alive: {target.is_alive()}")
+            
             # Build result
             result = CombatResult(
                 success=True,
@@ -523,6 +525,7 @@ class CombatSystem:
             
             # Check for death
             if not target.is_alive():
+                print(f"[Combat DEBUG] Target {target.name} is dead, calling handle_death")
                 events.extend(await self.handle_death(target_id, attacker_id))
                 attacker.combat.clear_combat()
             else:
@@ -754,10 +757,31 @@ class CombatSystem:
         
         # If victim was a player, handle death state
         if victim_id in world.players:
+            print(f"[Combat DEBUG] Player {victim_id} death handling triggered")
+            player = world.players[victim_id]
+            
+            # Remove player from room (they're dead)
+            if room:
+                room.entities.discard(victim_id)
+            
+            # Clear combat state using the proper method
+            player.combat.clear_combat()
+            
+            # Cancel any pending attack timer
+            if player.combat.swing_event_id:
+                self.ctx.time_manager.cancel(player.combat.swing_event_id)
+                player.combat.swing_event_id = None
+            
             events.append(self.ctx.msg_to_player(
                 victim_id,
-                "☠️ You have been slain! (Use 'respawn' to return)"
+                f"☠️ **You have been slain by {killer_name}!**\n\n"
+                "Your vision fades to black as your spirit separates from your body...\n"
+                "Respawning in 10 seconds."
             ))
+            
+            # Schedule respawn countdown via engine
+            if self.ctx.engine:
+                self.ctx.engine.schedule_player_respawn(victim_id, countdown_seconds=10)
         
         return events
     
