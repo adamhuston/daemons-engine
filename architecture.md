@@ -377,45 +377,9 @@ Future events (planned, not implemented yet):
     - Event format has a payload field reserved for structured data.
     - Models (Player, items, NPCs, etc.) are designed to be extended incrementally.
 
-###  5.2 Future roadmap (backend-centric)
+###  5.2 Future roadmap
 
-Rough phases (see detailed roadmap in `roadmap.md`):
-
-#### 0. Hardening:
-- Better logging, error handling, and protocol documentation.
-#### 1. Stats & progression: ✅ **COMPLETE**
-- ✅ Extend Player with stats, HP/MP, level, XP.
-- ✅ Introduce stat_update events and a stats command.
-- ✅ Persistence layer: save player stats on disconnect.
-#### 2. Time system & time-based effects: ✅ **COMPLETE**
-- ✅ Event-driven time system (not traditional ticks)
-- ✅ TimeEvent priority queue with async processing
-- ✅ Effect system: buffs/debuffs, DoT/HoT
-- ✅ WorldTime and WorldArea with independent time scales
-- ✅ Time advancement and continuous time calculation
-- ✅ Commands: bless, poison, effects, time, testtimer
-#### 3. Items & inventory: ✅ **COMPLETE**
-- ✅ ItemTemplate + ItemInstance in DB
-- ✅ WorldItem, inventory and equipment on players
-- ✅ Commands: get, drop, equip, unequip, give, use, put, inventory
-- ✅ Weapon stats on items (damage_min, damage_max, attack_speed)
-#### 4. NPCs & combat: ✅ **COMPLETE**
-- ✅ NPC templates and instances
-- ✅ Real-time combat with swing timers
-- ✅ Modular behavior script system
-- ✅ Commands: attack, kill, stop, flee
-- ✅ NPCs can equip weapons and get stat benefits
-#### 5. World scripting & triggers:
-- Room triggers (on enter, on command, on timer).
-- Simple rule-based scripting or DSL for richer interactions.
-#### 6. Persistence & scaling:
-- Regular state sync from World → DB.
-- Optionally run WorldEngine as a separate process and use a queue/bus.
-#### 7. Accounts & auth:
-- Users & characters.
-- Token-based auth for WebSocket connections.
-#### 8. Admin and content tools:
-- HTTP APIs and/or in-game commands to edit world content and inspect state.
+See `roadmap.md` for detailed phase tracking and progress.
 
 ## 6. Client Notes (for future UIs)
 

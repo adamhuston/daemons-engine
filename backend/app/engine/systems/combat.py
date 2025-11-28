@@ -531,15 +531,16 @@ class CombatSystem:
             else:
                 # If the target is a player, make them automatically retaliate
                 if target_id in world.players:
-                    try:
-                        # If player is not already in combat or not targeting attacker, start their attack
-                        if not target.combat.is_in_combat() or getattr(target.combat, 'target_id', None) != attacker_id:
+                    # Only auto-retaliate if the player is not already in combat
+                    # (if they're fighting something else, let them handle it manually)
+                    if not target.combat.is_in_combat():
+                        try:
                             retaliation_events = self.start_attack_entity(target_id, attacker_id)
                             if retaliation_events:
                                 await self.ctx.dispatch_events(retaliation_events)
-                    except Exception:
-                        # Don't let retaliation errors break the combat flow
-                        pass
+                        except Exception:
+                            # Don't let retaliation errors break the combat flow
+                            pass
                 # If the target is an NPC, trigger engine hooks so behaviors can respond
                 elif target_id in world.npcs and self.ctx.engine:
                     await self.ctx.engine._trigger_npc_combat_start(target_id, attacker_id)

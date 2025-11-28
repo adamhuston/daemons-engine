@@ -143,6 +143,7 @@ Before adding big systems, make the core loop solid.
     -  Keyword system (items can have multiple searchable names).
     -  Stack handling (pick up one at a time).
     -  Weight and slot-based inventory limits.
+    -  O(1) container contents lookup via index (not O(n) world scan).
 
 ### Events 
 
@@ -189,7 +190,9 @@ Before adding big systems, make the core loop solid.
 - Combat Flow:
     - ✅ `attack <target>` / `kill <target>` - Start attacking
     - ✅ `stop` - Disengage from combat
-    - ✅ Movement cancels combat automatically
+    - ✅ Movement blocked while in combat (must flee)
+    - ✅ Player auto-retaliation when attacked
+    - ✅ NPC retaliation via CombatSystem
     - ✅ Swing timer based on weapon speed
     - ✅ Damage calculation with strength modifier and armor reduction
     - ✅ Critical hit system (10% chance, 1.5x damage)
@@ -198,8 +201,9 @@ Before adding big systems, make the core loop solid.
     - ✅ HP tracking and death detection
     - ✅ Death messages broadcast to room
     - ✅ XP rewards for killing NPCs
-    - ⏳ Respawn timers (structure exists, needs activation)
-    - ⏳ Loot drops (drop table structure exists)
+    - ✅ NPC respawn timers with area defaults and per-NPC overrides
+    - ✅ Player respawn with countdown timer and area entry point
+    - ✅ Loot drops from NPC drop tables
 
 ### Weapon & Equipment System ✅
 
@@ -249,6 +253,11 @@ Before adding big systems, make the core loop solid.
     - ✅ "💀 Goblin has been slain by Alice!"
 - Stat updates:
     - ✅ HP changes via stat_update events
+- Movement:
+    - ✅ Arrival messages use "from above/below" for vertical movement
+- Player death:
+    - ✅ respawn_countdown event type for client UI
+    - ✅ Flavorful death and respawn messages
 - NPC reactions:
     - ✅ Aggressive NPCs attack when players enter room
     - ✅ NPCs call for help (allies join fight)

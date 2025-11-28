@@ -26,19 +26,49 @@ All messages are JSON objects sent as text frames.
 - `text`: The command string (e.g., "look", "north", "say hello")
 
 **Supported Commands:**
-- `look` or `l` - Examine current room, exits, and other players
+
+### Movement
 - `north`, `south`, `east`, `west`, `up`, `down` - Movement in cardinal directions
 - `n`, `s`, `e`, `w`, `u`, `d` - Short forms of movement commands
-- `say <message>` - Speak to other players in the same room
+- `flee` - Escape from combat in a random direction
+
+### Looking & Information
+- `look` or `l` - Examine current room, exits, entities, and items
+- `look <target>` - Examine a specific player, NPC, or item
 - `stats`, `sheet`, `status` - View your character stats
-- `effects`, `status` - View active buffs/debuffs with durations
+- `effects` - View active buffs/debuffs with durations
 - `time` - View current in-game time with area-specific context
+
+### Communication
+- `say <message>` - Speak to others in the same room
 - `smile`, `nod`, `laugh`, `cringe`, `smirk`, `frown`, `wink`, `lookaround` - Emotes
-- `heal <player_name>`, `hurt <player_name>` - Debug/admin commands for stat manipulation
-- `bless <player_name>` - Apply +5 Armor Class buff for 30 seconds (debug/admin)
-- `poison <player_name>` - Apply damage over time: 5 damage every 3s for 15s (debug/admin)
-- `testtimer [seconds]` - Test the time event system (debug)
-- **Keyword:** `self` - Auto-replaces with your character name in commands
+
+### Inventory & Items
+- `inventory`, `inv`, `i` - View your inventory with weight/slots
+- `get <item>`, `take <item>`, `pickup <item>` - Pick up item from room
+- `drop <item>` - Drop item to room floor
+- `give <item> to <player>` - Transfer item to another player
+- `put <item> in <container>` - Store item in a container
+- `get <item> from <container>` - Retrieve item from container
+
+### Equipment
+- `equip <item>`, `wear <item>`, `wield <item>` - Equip an item
+- `unequip <item>`, `remove <item>` - Unequip an item
+- `use <item>`, `consume <item>`, `drink <item>` - Use a consumable
+
+### Combat
+- `attack <target>`, `kill <target>`, `k <target>` - Start attacking a target
+- `stop` - Stop auto-attacking and disengage from combat
+
+### Debug/Admin Commands
+- `heal <player_name>` - Heal a player for 20 HP
+- `hurt <player_name>` - Damage a player for 10 HP
+- `bless <player_name>` - Apply +5 Armor Class buff for 30 seconds
+- `poison <player_name>` - Apply DoT: 5 damage every 3s for 15s
+- `testtimer [seconds]` - Test the time event system
+
+### Special Keywords
+- `self` - Auto-replaces with your character name in commands
 
 ## Server → Client Messages
 
@@ -59,10 +89,13 @@ All messages are JSON objects sent as text frames.
 - `text`: The message content (may contain `\n` for formatting)
 
 **Message Types:**
-- **Room descriptions** - Name, description, exits, and other players
+- **Room descriptions** - Name, description, exits, entities, and items
 - **Movement feedback** - "You move north." or error messages
 - **Chat messages** - Speech from other players
-- **Flavor text** - Movement effects, stasis messages, etc.
+- **Combat messages** - Attack, damage, death notifications
+- **Item messages** - Pickup, drop, equip, use feedback
+- **Effect messages** - Buff/debuff application and expiration
+- **Flavor text** - Movement effects, stasis messages, respawn text
 - **System messages** - Connection/disconnection notifications
 
 **Error Handling:**
@@ -96,6 +129,13 @@ All messages are JSON objects sent as text frames.
 - Common stats include: `current_health`, `max_health`, `current_energy`, `max_energy`, `level`, `experience`, `armor_class`
 
 **Note:** Stats can have modifiers from active effects. The `stats` command shows effective values (e.g., "15 (10 base)" for armor_class with a +5 buff).
+
+**Common Payload Fields:**
+- `current_health`, `max_health` - Health points
+- `current_energy`, `max_energy` - Energy/mana points
+- `level`, `experience` - Progression
+- `armor_class` - Defense rating
+- `strength`, `dexterity`, `intelligence`, `vitality` - Base stats
 
 ### Respawn Countdown Event
 ```json
@@ -136,6 +176,29 @@ The server uses internal scoping to determine which players receive which events
 - **`exclude: [player_ids]`** - Room-scoped events can exclude specific players
 
 *Note: Scope fields are internal and stripped before sending to clients. Clients only see the `type`, `player_id`, and `text` fields.*
+
+## Time System
+
+The server maintains an event-driven time system:
+
+**World Time:**
+- Each area has independent time that advances continuously
+- Areas can have different time scales (e.g., 4x faster in Ethereal Nexus)
+- Time of day affects ambient descriptions
+- Use `time` command to see current time and area info
+
+**Effects System:**
+- Buffs and debuffs are time-limited effects
+- Effects can modify stats (e.g., +5 armor_class)
+- Periodic effects tick at intervals (e.g., poison every 3s)
+- Effects expire automatically and trigger stat updates
+- Use `effects` command to see active effects with remaining duration
+
+**Effect Types:**
+- **Buff** - Positive stat modifiers (e.g., Blessed)
+- **Debuff** - Negative stat modifiers
+- **DoT** - Damage over time (e.g., Poison)
+- **HoT** - Healing over time
 
 ## Connection Lifecycle
 
@@ -192,14 +255,192 @@ Client disconnects
 ← (Other players receive: "A bright flash engulfs PlayerName. Their form flickers and freezes, suspended in prismatic stasis.")
 ```
 
-## Future Extensions
+## Implemented Event Types
 
-The protocol is designed to be extensible. Implemented event types:
-- ✅ `message` - Text-based messages and room descriptions
-- ✅ `stat_update` - Player stat changes
+The protocol supports the following event types:
 
-Potential future message types:
-- `combat` events with structured damage/health data
-- `inventory` updates with item lists
-- `quest` notifications
-- `effect` messages for status effects/buffs/debuffs
+| Event Type | Description |
+|------------|-------------|
+| `message` | Text-based messages, room descriptions, combat feedback |
+| `stat_update` | Player stat changes (health, level, XP, etc.) |
+| `respawn_countdown` | Death countdown timer with respawn location |
+
+## Combat System
+
+Combat is **real-time** with auto-attack:
+
+1. Player uses `attack <target>` to start combat
+2. Weapon determines swing speed (windup → swing → recovery phases)
+3. Auto-attack continues until target dies or player uses `stop`/`flee`
+4. Movement is blocked while in combat (must `flee` to escape)
+5. Players automatically retaliate when attacked
+
+**Combat Messages:**
+- `⚔️ You attack Goblin Scout!` - Combat initiated
+- `You hit Goblin Scout for 5 damage!` - Damage dealt
+- `💥 Goblin Scout hits you for 3 damage! **CRITICAL!**` - Damage received
+- `💀 Goblin Scout has been slain by PlayerName!` - Death broadcast
+- `✨ You gain 25 experience!` - XP reward
+
+**Death & Respawn:**
+- On death, player sees countdown messages (10 seconds)
+- Player respawns at area entry point with full health
+- Other players see resurrection announcement
+
+## NPC System
+
+NPCs appear in rooms and can have various behaviors:
+
+**NPC Display in Room:**
+```
+Creatures:
+  🧌 Goblin Scout - A small, wiry goblin with beady eyes.
+```
+
+**NPC Behaviors:**
+- **Aggressive** - Attacks players on sight
+- **Defensive** - Only retaliates when attacked
+- **Wandering** - Moves between rooms periodically
+- **Fleeing** - Runs away when health is low
+- **Social** - Calls for help from nearby allies
+
+**NPC Respawn:**
+- Dead NPCs respawn after area-configured time (default 300s)
+- Per-NPC overrides possible (-1 = never respawn)
+
+## Item System
+
+Items can be in rooms, containers, or player inventories.
+
+**Room Items Display:**
+```
+Items:
+  ⚔️ Rusty Sword - A worn blade, still sharp enough to cut.
+  🧪 Health Potion (x2)
+```
+
+**Item Properties:**
+- Weight and slot requirements
+- Equipment slots (weapon, head, chest, etc.)
+- Stat modifiers when equipped
+- Consumable effects (healing, buffs)
+- Container capacity
+
+**Container System:**
+- Items can contain other items (e.g., backpacks)
+- `put <item> in <container>` / `get <item> from <container>`
+
+## Internal Architecture
+
+This section documents internal protocols used by the game engine. These are not part of the client-server protocol but are important for understanding the codebase.
+
+### Entity System
+
+The game uses a unified entity system where players and NPCs share a common base.
+
+**EntityType Enum:**
+```
+PLAYER = "player"
+NPC = "npc"
+```
+
+**WorldEntity Base Class:**
+All entities (players, NPCs) inherit from `WorldEntity`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `EntityId` | Unique identifier (UUID for players, generated for NPCs) |
+| `name` | `str` | Display name |
+| `room_id` | `RoomId` | Current location |
+| `level` | `int` | Entity level |
+| `current_health` | `int` | Current HP |
+| `max_health` | `int` | Maximum HP |
+| `current_energy` | `int` | Current energy/mana |
+| `max_energy` | `int` | Maximum energy/mana |
+| `base_strength` | `int` | Base STR stat |
+| `base_dexterity` | `int` | Base DEX stat |
+| `base_intelligence` | `int` | Base INT stat |
+| `base_vitality` | `int` | Base VIT stat |
+| `base_armor_class` | `int` | Base AC |
+| `inventory` | `List[ItemId]` | Items carried |
+| `equipped_items` | `Dict[str, ItemTemplateId]` | Slot → equipped template |
+| `active_effects` | `Dict[str, Effect]` | Active buffs/debuffs |
+| `combat` | `CombatState` | Real-time combat state |
+| `death_time` | `float \| None` | Unix timestamp when died |
+| `respawn_event_id` | `str \| None` | Scheduled respawn event |
+
+**Key Methods:**
+- `is_alive()` → `bool` - Check if health > 0
+- `get_effective_stat(stat_name)` → `int` - Base + effect modifiers
+- `get_weapon_stats(item_templates)` → `WeaponStats` - Equipped or unarmed
+
+**WorldPlayer** extends WorldEntity with:
+- `experience` - Current XP
+- `is_connected` - WebSocket connection status
+- `inventory_meta` - Weight/slot tracking
+
+**WorldNpc** extends WorldEntity with:
+- `template_id` - Reference to NpcTemplate
+- `spawn_room_id` - Where to respawn
+- `last_killed_at` - For respawn timing
+- `respawn_time_override` - Per-NPC respawn time (-1 = never)
+- `idle_event_id`, `wander_event_id` - Behavior timers
+
+### Targetable Protocol
+
+The `Targetable` protocol enables unified command targeting across entity types.
+
+**Protocol Definition:**
+```python
+class Targetable(Protocol):
+    id: str
+    name: str
+    room_id: RoomId
+    
+    def get_target_type(self) -> TargetableType: ...
+```
+
+**TargetableType Enum:**
+```
+PLAYER = "player"
+NPC = "npc"
+ITEM = "item"
+```
+
+**Usage:**
+Commands like `attack`, `look`, `give` use the Targetable protocol to find targets by name in the current room, regardless of whether the target is a player, NPC, or item.
+
+### CombatState
+
+Tracks real-time combat for an entity:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `phase` | `CombatPhase` | IDLE, WINDUP, SWING, RECOVERY |
+| `target_id` | `EntityId \| None` | Current attack target |
+| `phase_started_at` | `float` | Unix timestamp |
+| `phase_duration` | `float` | Duration of current phase |
+| `swing_event_id` | `str \| None` | Scheduled swing event |
+| `auto_attack` | `bool` | Continue attacking after swing |
+| `current_weapon` | `WeaponStats` | Cached weapon stats |
+| `threat_table` | `Dict[EntityId, float]` | Aggro tracking (NPCs) |
+
+**Combat Phases:**
+1. **IDLE** - Not in combat
+2. **WINDUP** - Preparing attack (interruptible)
+3. **SWING** - Attack committed (damage applies at end)
+4. **RECOVERY** - Cooldown before next swing
+
+### Room Entity Management
+
+Rooms track entities via a unified `entities` set:
+
+```python
+class WorldRoom:
+    entities: Set[EntityId]  # Both players and NPCs
+```
+
+**Helper Methods on WorldEngine:**
+- `_get_players_in_room(room_id)` - Filter to players only
+- `_get_npcs_in_room(room_id)` - Filter to NPCs only
+- `_find_entity_in_room(room_id, name)` - Find by name match
