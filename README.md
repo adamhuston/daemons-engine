@@ -105,11 +105,11 @@ Reference Flet client included.
 
 ## Documentation
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) – Backend and engine design
-- [CONTRIBUTING.md](./CONTRIBUTING.md) – Development workflow
-- [protocol.md](./protocol.md) – WebSocket message format
-- [roadmap.md](./roadmap.md) – Feature roadmap
-- [alembic.md](./alembic.md) – Database migrations
+- [ARCHITECTURE.md](./documentation/ARCHITECTURE.md) – Backend and engine design
+- [CONTRIBUTING.md](./documentation/CONTRIBUTING.md) – Development workflow
+- [protocol.md](./documentation/protocol.md) – WebSocket message format
+- [roadmap.md](./documentation/roadmap.md) – Feature roadmap
+- [alembic.md](./documentation/alembic.md) – Database migrations
 
 ## Quick Start
 
