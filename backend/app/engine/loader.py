@@ -74,6 +74,7 @@ async def load_world(session: AsyncSession) -> World:
             description=r.description,
             room_type=r.room_type,
             room_type_emoji=getattr(r, 'room_type_emoji', None),
+            yaml_managed=getattr(r, 'yaml_managed', True),
             exits=exits,
             area_id=r.area_id,
             on_enter_effect=r.on_enter_effect,

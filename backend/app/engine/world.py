@@ -1089,6 +1089,97 @@ class WorldNpc(WorldEntity):
         object.__setattr__(self, 'entity_type', EntityType.NPC)
 
 
+# =============================================================================
+# Phase 9: Character Classes & Abilities System
+# =============================================================================
+
+@dataclass
+class ResourceDef:
+    """
+    Defines a character resource (mana, rage, energy, etc.).
+    
+    Resources are pools that can regenerate and be spent on abilities.
+    Regen can be modified by character stats through regen_modifiers.
+    """
+    resource_id: str  # "mana", "rage", "energy", "focus"
+    name: str  # Display name (e.g., "Mana", "Rage")
+    description: str  # Flavor text
+    max_amount: int  # Base max value (before stat modifiers)
+    regen_rate: float  # Per-second base regeneration
+    regen_type: str  # "passive", "in_combat", "out_of_combat"
+    regen_modifiers: Dict[str, float] = field(default_factory=dict)
+    # e.g., {"strength": 0.1, "intelligence": 0.2}
+    # Means: regen += stat_value * modifier
+    color: str = "#FFFFFF"  # UI hint for client rendering
+
+
+@dataclass
+class StatGrowth:
+    """Defines how a stat grows per level."""
+    per_level: float  # Amount added per level (e.g., 1.5)
+    per_milestone: Dict[int, int] = field(default_factory=dict)
+    # e.g., {10: 5, 20: 10} = bonus +5 at level 10, +10 at level 20
+    
+    def calculate_at_level(self, base: int, level: int) -> int:
+        """Calculate effective stat value at a given level."""
+        value = base + (self.per_level * level)
+        # Add milestone bonuses
+        for milestone_level, milestone_bonus in sorted(self.per_milestone.items()):
+            if level >= milestone_level:
+                value += milestone_bonus
+        return int(value)
+
+
+@dataclass
+class ResourcePool:
+    """
+    Runtime resource state for a player.
+    
+    Tracks current amount, max capacity, and regen rate.
+    """
+    resource_id: str  # Reference to ResourceDef
+    current: int  # Current amount
+    max: int  # Maximum capacity
+    regen_per_second: float  # Calculated from ResourceDef + stat modifiers
+    last_regen_tick: float = field(default_factory=time.time)
+    # Unix timestamp for offline regen calculation
+
+
+@dataclass
+class AbilitySlot:
+    """
+    An equipped ability in a character's loadout.
+    
+    Tracks position, ability ID, and cooldown state.
+    """
+    slot_id: int  # Position in loadout (0, 1, 2, ...)
+    ability_id: str | None = None  # None if slot is empty
+    last_used_at: float = 0.0  # Unix timestamp for cooldown tracking
+    learned_at: int = 0  # Level when ability was learned
+
+
+@dataclass
+class CharacterSheet:
+    """
+    Character class and progression data.
+    
+    This is optional for backward compatibility - existing players without
+    character sheets can still function in the game.
+    """
+    class_id: str  # "warrior", "mage", "rogue", etc.
+    level: int  # Class-specific level
+    experience: int  # Class-specific experience
+    
+    # Learned abilities (can be equipped in slots)
+    learned_abilities: Set[str] = field(default_factory=set)
+    
+    # Currently equipped abilities (ordered by slot)
+    ability_loadout: list[AbilitySlot] = field(default_factory=list)
+    
+    # Runtime resource pools (mana, rage, energy, etc.)
+    resource_pools: Dict[str, ResourcePool] = field(default_factory=dict)
+
+
 @dataclass
 class WorldPlayer(WorldEntity):
     """
@@ -1121,9 +1212,49 @@ class WorldPlayer(WorldEntity):
     dialogue_node: str | None = None             # Current node ID in dialogue tree
     active_dialogue_npc_id: str | None = None    # Instance ID of NPC being talked to
     
+    # Phase 9: Character class and abilities
+    character_sheet: CharacterSheet | None = None  # Optional - backward compatible
+    
     def __post_init__(self):
         """Ensure entity_type is set correctly."""
         object.__setattr__(self, 'entity_type', EntityType.PLAYER)
+    
+    # ========== Phase 9: Character Sheet Helper Methods ==========
+    
+    def has_character_sheet(self) -> bool:
+        """Check if player has a character sheet (has chosen a class)."""
+        return self.character_sheet is not None
+    
+    def get_class_id(self) -> str | None:
+        """Get the player's class ID, or None if no class."""
+        return self.character_sheet.class_id if self.character_sheet else None
+    
+    def get_resource_pool(self, resource_id: str) -> ResourcePool | None:
+        """
+        Get a resource pool by ID (e.g., "mana", "rage").
+        Returns None if player has no character sheet or resource doesn't exist.
+        """
+        if not self.character_sheet:
+            return None
+        return self.character_sheet.resource_pools.get(resource_id)
+    
+    def get_learned_abilities(self) -> set[str]:
+        """Get the set of learned ability IDs, or empty set if no class."""
+        if not self.character_sheet:
+            return set()
+        return self.character_sheet.learned_abilities
+    
+    def get_ability_loadout(self) -> list[AbilitySlot]:
+        """Get the current ability loadout, or empty list if no class."""
+        if not self.character_sheet:
+            return []
+        return self.character_sheet.ability_loadout
+    
+    def has_learned_ability(self, ability_id: str) -> bool:
+        """Check if player has learned a specific ability."""
+        if not self.character_sheet:
+            return False
+        return ability_id in self.character_sheet.learned_abilities
 
 
 @dataclass
@@ -1134,6 +1265,7 @@ class WorldRoom:
     description: str
     room_type: str = "ethereal"
     room_type_emoji: str | None = None  # Per-room emoji override
+    yaml_managed: bool = True  # True = managed by YAML, False = API-created/modified
     exits: Dict[Direction, RoomId] = field(default_factory=dict)
     
     # Unified entity tracking (players + NPCs)

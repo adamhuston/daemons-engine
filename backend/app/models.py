@@ -1,6 +1,6 @@
 # backend/app/models.py
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, ForeignKey, JSON, Integer, Float, Text, MetaData
+from sqlalchemy import String, ForeignKey, JSON, Integer, Float, Text, MetaData, Boolean
 
 
 # Naming convention for constraints (required for batch migrations)
@@ -54,6 +54,10 @@ class Room(Base):
     # Movement effects
     on_enter_effect: Mapped[str | None] = mapped_column(String, nullable=True)
     on_exit_effect: Mapped[str | None] = mapped_column(String, nullable=True)
+    
+    # YAML content management
+    # True = managed by YAML files, False = created/modified via API
+    yaml_managed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
 
 
 class Player(Base):

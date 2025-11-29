@@ -24,79 +24,71 @@ Now I have a clear picture. Let me create a comprehensive analysis:
 
 | Design Document Requirement | Implementation Status | Notes |
 |----------------------------|----------------------|-------|
-| **Admin API Foundation** |||
+| **Admin API Foundation** | | |
 | Authentication middleware | ✅ Complete | `get_current_admin`, `require_permission`, `require_role` |
 | Role-based access | ✅ Complete | Properly checks MODERATOR, GAME_MASTER, ADMIN |
-
-| **Server Status** |||
+| **Server Status** | | |
 | GET /server/status | ✅ Complete | Uptime, players, NPCs, rooms, events |
-| GET /server/metrics | ❌ Missing | Prometheus-style metrics not implemented |
-| POST /server/maintenance | ❌ Missing | Maintenance mode toggle |
-| POST /server/shutdown | ❌ Missing | Graceful shutdown endpoint |
-
-| **World Inspection** |||
+| GET /server/metrics | ✅ Complete | Prometheus-style metrics with prometheus_client |
+| POST /server/maintenance | ✅ Complete | Maintenance mode toggle with broadcast |
+| POST /server/shutdown | ✅ Complete | Graceful shutdown with countdown + cancel |
+| **World Inspection** | | |
 | GET /world/players | ✅ Complete | With health, location, combat status |
 | GET /world/rooms | ✅ Complete | With filtering by area |
 | GET /world/rooms/{id} | ✅ Complete | Full room details |
 | GET /world/areas | ✅ Complete | With time scale, counts |
 | GET /world/npcs | ✅ Complete | With room/alive filtering |
 | GET /world/items | ✅ Complete | With location filtering |
-| GET /world/state | ❌ Missing | Full world snapshot |
-| PUT /world/rooms/{id} | ❌ Missing | Room modification |
-| POST /world/rooms | ❌ Missing | Room creation |
-
-| **Player Manipulation** |||
+| GET /world/state | ✅ Complete | Full world snapshot (GAME_MASTER+) |
+| PUT /world/rooms/{id} | ✅ Complete | Room modification with audit logging |
+| POST /world/rooms | ✅ Complete | Room creation (ADMIN only) |
+| PATCH /world/rooms/{id}/exits | ✅ Complete | Exit management with bidirectional support |
+| **Player Manipulation** | | |
 | POST /players/{id}/teleport | ✅ Complete | With audit logging |
-| POST /players/{id}/heal | ✅ Complete ||
+| POST /players/{id}/heal | ✅ Complete | |
 | POST /players/{id}/kick | ✅ Complete | With audit logging |
 | POST /players/{id}/give | ✅ Complete | With audit logging |
 | POST /players/{id}/effect | ❌ Missing | Apply effect to player |
 | POST /players/{id}/kill | ❌ Missing | Kill player instantly |
 | POST /players/{id}/message | ❌ Missing | Send direct message |
-
-| **Spawning** |||
+| **Spawning** | | |
 | POST /npcs/spawn | ✅ Complete | With audit logging |
 | DELETE /npcs/{id} | ✅ Complete | With audit logging |
-| POST /items/spawn | ✅ Complete ||
-| DELETE /items/{id} | ✅ Complete ||
+| POST /items/spawn | ✅ Complete | |
+| DELETE /items/{id} | ✅ Complete | |
 | POST /npcs/{id}/move | ❌ Missing | Move NPC to room |
 | POST /items/{id}/move | ❌ Missing | Move item |
-
-| **Triggers/Quests** |||
+| **Triggers/Quests** | | |
 | Trigger APIs | ❌ Missing | Fire, enable, disable, reset |
 | Quest APIs | ❌ Missing | Manipulation endpoints |
-
-| **Content Hot-Reload** |||
+| **Content Hot-Reload** | | |
 | ContentReloader class | ✅ Complete | Full implementation |
 | POST /content/reload | ✅ Complete | All content types |
 | POST /content/validate | ✅ Complete | With error details |
-
-| **Account Management** |||
-| Account listing/details | ❌ Missing ||
+| **Account Management** | | |
+| Account listing/details | ❌ Missing | |
 | PUT /accounts/{id}/role | ❌ Missing | Role changes |
 | POST /accounts/{id}/ban | ❌ Missing | Ban/unban |
-| Security event queries | ❌ Missing ||
-
-| **In-World Commands** |||
-| who | ✅ Complete ||
-| where | ✅ Complete ||
-| goto | ✅ Complete ||
-| summon | ✅ Complete ||
-| spawn | ✅ Complete ||
-| despawn | ✅ Complete ||
-| give | ✅ Complete ||
-| broadcast | ✅ Complete ||
-| inspect | ✅ Complete ||
+| Security event queries | ❌ Missing | |
+| **In-World Commands** | | |
+| who | ✅ Complete | |
+| where | ✅ Complete | |
+| goto | ✅ Complete | |
+| summon | ✅ Complete | |
+| spawn | ✅ Complete | |
+| despawn | ✅ Complete | |
+| give | ✅ Complete | |
+| broadcast | ✅ Complete | |
+| inspect | ✅ Complete | |
 | kick (in-world) | ❌ Missing | Only API version |
-| mute/unmute | ❌ Missing ||
-| warn | ❌ Missing ||
+| mute/unmute | ❌ Missing | |
+| warn | ❌ Missing | |
 | setstat | ❌ Incomplete | Registered but handler may be missing |
-| invis/visible | ❌ Missing ||
-| revive | ❌ Missing ||
-| ban/unban | ❌ Missing ||
+| invis/visible | ❌ Missing | |
+| revive | ❌ Missing | |
+| ban/unban | ❌ Missing | |
 | reload | ❌ Missing | In-world command version |
-
-| **Observability** |||
+| **Observability** | | |
 | Structured logging | ✅ Complete | structlog with AdminAuditLogger |
 | Prometheus metrics | ❌ Missing ||
 | Audit log DB table | ✅ Complete | AdminAction model + migration |
@@ -111,29 +103,25 @@ Now I have a clear picture. Let me create a comprehensive analysis:
 4. Structured logging with specialized loggers
 5. Database audit tables ready
 6. In-world commands have permission checks
+7. Server management APIs complete (status, metrics, maintenance, shutdown)
 
 **Gaps to Address:**
 
-1. **Missing Server Management APIs:**
-   - `/server/maintenance` - Toggle maintenance mode
-   - `/server/shutdown` - Graceful shutdown
-   - `/server/metrics` - Prometheus-style metrics
-
-2. **Missing Account Management:**
+1. **Missing Account Management:**
    - Ban/unban functionality
    - Role modification via API
    - Security event querying
 
-3. **Missing Player APIs:**
+2. **Missing Player APIs:**
    - `/players/{id}/effect` - Apply effects
    - `/players/{id}/kill` - Instant kill
    - `/players/{id}/message` - Direct message
 
-4. **Missing Trigger/Quest Control:**
+3. **Missing Trigger/Quest Control:**
    - Trigger fire/enable/disable/reset
    - Quest manipulation APIs
 
-5. **Missing In-World Commands:**
+4. **Missing In-World Commands:**
    - `kick` (in-world version)
    - `mute`/`unmute`
    - `warn`
@@ -141,11 +129,7 @@ Now I have a clear picture. Let me create a comprehensive analysis:
    - `reload` (in-world version)
    - `invis`/`visible`
 
-6. **Prometheus Metrics Not Implemented:**
-   - Design calls for `prometheus_client` integration
-   - Currently only audit logging exists
-
 Would you like me to implement the missing pieces? I can prioritize:
-1. **Critical gaps** (account ban/unban, maintenance mode, metrics)
+1. **Critical gaps** (account ban/unban)
 2. **In-world command parity** (kick, mute, revive, reload commands)
 3. **Full API coverage** (trigger/quest APIs, player effect/kill/message)

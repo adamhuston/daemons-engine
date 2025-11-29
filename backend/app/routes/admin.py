@@ -26,7 +26,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import UserAccount, Player
+from app.models import UserAccount, Player, Room
 from app.engine.systems.auth import (
     AuthSystem, UserRole, Permission, ROLE_PERMISSIONS,
     verify_access_token, SecurityEventType
@@ -253,6 +253,33 @@ class AreaSummary(BaseModel):
     time_scale: float
 
 
+class WorldStateResponse(BaseModel):
+    """Complete world state snapshot for debugging and admin dashboards."""
+    # Server info
+    server_uptime: float
+    server_time: float
+    maintenance_mode: bool
+    shutdown_pending: bool
+    
+    # Counts
+    players_online: int
+    players_total: int
+    npcs_alive: int
+    npcs_total: int
+    rooms_total: int
+    areas_total: int
+    items_total: int
+    active_combats: int
+    scheduled_events: int
+    
+    # Full entity listings
+    players: list[PlayerSummary]
+    rooms: list[RoomDetail]
+    areas: list[AreaSummary]
+    npcs: list[NpcSummary]
+    items: list[ItemSummary]
+
+
 # ============================================================================
 # Request Models
 # ============================================================================
@@ -310,6 +337,43 @@ class ShutdownRequest(BaseModel):
     """Request to initiate graceful shutdown."""
     countdown_seconds: int = Field(60, ge=10, le=600, description="Countdown before shutdown (10-600 seconds)")
     reason: str = Field("Server shutdown", description="Reason for shutdown")
+
+
+class RoomUpdateRequest(BaseModel):
+    """Request to update a room's properties."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Room name")
+    description: Optional[str] = Field(None, min_length=1, max_length=2000, description="Room description")
+    room_type: Optional[str] = Field(None, description="Room type (e.g., forest, urban, underground)")
+    room_type_emoji: Optional[str] = Field(None, max_length=10, description="Per-room emoji override")
+    on_enter_effect: Optional[str] = Field(None, max_length=500, description="Text shown when entering")
+    on_exit_effect: Optional[str] = Field(None, max_length=500, description="Text shown when exiting")
+    area_id: Optional[str] = Field(None, description="Area this room belongs to")
+
+
+class RoomCreateRequest(BaseModel):
+    """Request to create a new room."""
+    id: str = Field(..., min_length=1, max_length=100, description="Unique room ID")
+    name: str = Field(..., min_length=1, max_length=100, description="Room name")
+    description: str = Field(..., min_length=1, max_length=2000, description="Room description")
+    room_type: str = Field("ethereal", description="Room type (e.g., forest, urban, underground)")
+    room_type_emoji: Optional[str] = Field(None, max_length=10, description="Per-room emoji override")
+    area_id: Optional[str] = Field(None, description="Area this room belongs to")
+    on_enter_effect: Optional[str] = Field(None, max_length=500, description="Text shown when entering")
+    on_exit_effect: Optional[str] = Field(None, max_length=500, description="Text shown when exiting")
+    # Exits as direction -> room_id mapping
+    exits: Optional[dict[str, str]] = Field(None, description="Exits: {direction: room_id}")
+
+
+class RoomExitUpdate(BaseModel):
+    """Request to update a room's exits."""
+    exits: dict[str, Optional[str]] = Field(
+        ..., 
+        description="Exits to set: {direction: room_id or null to remove}. Valid directions: north, south, east, west, up, down"
+    )
+    bidirectional: bool = Field(
+        False, 
+        description="If true, also create/remove reverse exits in target rooms"
+    )
 
 
 class MaintenanceStatusResponse(BaseModel):
@@ -869,6 +933,411 @@ async def get_room_details(
     )
 
 
+@router.put("/world/rooms/{room_id}", response_model=RoomDetail)
+async def update_room(
+    room_id: str,
+    body: RoomUpdateRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: dict = Depends(require_role(UserRole.GAME_MASTER))
+):
+    """
+    Update a room's properties.
+    
+    Updates both the database and in-memory state.
+    Only provided fields are updated; omitted fields remain unchanged.
+    
+    Requires: GAME_MASTER or higher
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    admin_id = admin.get("user_id", "unknown")
+    
+    # Check room exists in memory
+    world_room = world.rooms.get(room_id)
+    if not world_room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    # Get database room
+    db_room = await session.get(Room, room_id)
+    if not db_room:
+        raise HTTPException(status_code=404, detail="Room not found in database")
+    
+    # Track changes for audit log
+    changes = {}
+    
+    # Update fields if provided
+    if body.name is not None:
+        changes["name"] = {"old": world_room.name, "new": body.name}
+        world_room.name = body.name
+        db_room.name = body.name
+    
+    if body.description is not None:
+        changes["description"] = {"old": world_room.description[:50] + "..." if len(world_room.description) > 50 else world_room.description, 
+                                   "new": body.description[:50] + "..." if len(body.description) > 50 else body.description}
+        world_room.description = body.description
+        db_room.description = body.description
+    
+    if body.room_type is not None:
+        changes["room_type"] = {"old": world_room.room_type, "new": body.room_type}
+        world_room.room_type = body.room_type
+        db_room.room_type = body.room_type
+    
+    if body.room_type_emoji is not None:
+        changes["room_type_emoji"] = {"old": world_room.room_type_emoji, "new": body.room_type_emoji}
+        world_room.room_type_emoji = body.room_type_emoji
+        db_room.room_type_emoji = body.room_type_emoji
+    
+    if body.on_enter_effect is not None:
+        changes["on_enter_effect"] = {"old": world_room.on_enter_effect, "new": body.on_enter_effect}
+        world_room.on_enter_effect = body.on_enter_effect
+        db_room.on_enter_effect = body.on_enter_effect
+    
+    if body.on_exit_effect is not None:
+        changes["on_exit_effect"] = {"old": world_room.on_exit_effect, "new": body.on_exit_effect}
+        world_room.on_exit_effect = body.on_exit_effect
+        db_room.on_exit_effect = body.on_exit_effect
+    
+    if body.area_id is not None:
+        # Validate area exists
+        if body.area_id and body.area_id not in world.areas:
+            raise HTTPException(status_code=400, detail=f"Area '{body.area_id}' not found")
+        changes["area_id"] = {"old": world_room.area_id, "new": body.area_id}
+        world_room.area_id = body.area_id
+        db_room.area_id = body.area_id
+    
+    # Mark as API-managed (will be skipped during YAML reload)
+    if changes:
+        world_room.yaml_managed = False
+        db_room.yaml_managed = False
+        changes["yaml_managed"] = {"old": True, "new": False}
+    
+    # Commit database changes
+    await session.commit()
+    
+    # Audit log
+    if changes:
+        admin_audit_logger.info(
+            "room_updated",
+            admin_id=admin_id,
+            room_id=room_id,
+            changes=changes
+        )
+    
+    # Return updated room details
+    npc_ids = [npc.id for npc in world.npcs.values() if npc.room_id == room_id]
+    item_ids = [item.id for item in world.items.values() if item.room_id == room_id]
+    trigger_ids = [t.trigger_id for t in world_room.triggers] if hasattr(world_room, 'triggers') else []
+    
+    return RoomDetail(
+        id=world_room.id,
+        name=world_room.name,
+        description=world_room.get_effective_description(),
+        room_type=world_room.room_type,
+        area_id=world_room.area_id,
+        exits=world_room.exits,
+        dynamic_exits=world_room.dynamic_exits,
+        players=list(world_room.players),
+        npcs=npc_ids,
+        items=item_ids,
+        flags=world_room.room_flags,
+        triggers=trigger_ids
+    )
+
+
+@router.post("/world/rooms", response_model=RoomDetail, status_code=201)
+async def create_room(
+    body: RoomCreateRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: dict = Depends(require_role(UserRole.ADMIN))
+):
+    """
+    Create a new room.
+    
+    Creates both the database record and in-memory WorldRoom.
+    Optionally links exits to existing rooms.
+    
+    Requires: ADMIN
+    """
+    from app.engine.world import WorldRoom
+    
+    engine = get_engine_from_request(request)
+    world = engine.world
+    admin_id = admin.get("user_id", "unknown")
+    
+    # Validate room ID doesn't exist
+    if body.id in world.rooms:
+        raise HTTPException(status_code=409, detail=f"Room '{body.id}' already exists")
+    
+    # Validate area if provided
+    if body.area_id and body.area_id not in world.areas:
+        raise HTTPException(status_code=400, detail=f"Area '{body.area_id}' not found")
+    
+    # Validate exits if provided
+    exits_dict = {}
+    if body.exits:
+        valid_directions = {"north", "south", "east", "west", "up", "down"}
+        for direction, target_id in body.exits.items():
+            if direction not in valid_directions:
+                raise HTTPException(status_code=400, detail=f"Invalid exit direction: {direction}")
+            if target_id not in world.rooms:
+                raise HTTPException(status_code=400, detail=f"Exit target room '{target_id}' not found")
+            exits_dict[direction] = target_id
+    
+    # Create database room (API-created, so yaml_managed=False)
+    db_room = Room(
+        id=body.id,
+        name=body.name,
+        description=body.description,
+        room_type=body.room_type,
+        room_type_emoji=body.room_type_emoji,
+        area_id=body.area_id,
+        on_enter_effect=body.on_enter_effect,
+        on_exit_effect=body.on_exit_effect,
+        yaml_managed=False,
+        north_id=exits_dict.get("north"),
+        south_id=exits_dict.get("south"),
+        east_id=exits_dict.get("east"),
+        west_id=exits_dict.get("west"),
+        up_id=exits_dict.get("up"),
+        down_id=exits_dict.get("down")
+    )
+    session.add(db_room)
+    await session.commit()
+    
+    # Create in-memory WorldRoom (API-created)
+    world_room = WorldRoom(
+        id=body.id,
+        name=body.name,
+        description=body.description,
+        room_type=body.room_type,
+        room_type_emoji=body.room_type_emoji,
+        yaml_managed=False,
+        area_id=body.area_id,
+        on_enter_effect=body.on_enter_effect,
+        on_exit_effect=body.on_exit_effect,
+        exits=exits_dict
+    )
+    world.rooms[body.id] = world_room
+    
+    # Audit log
+    admin_audit_logger.info(
+        "room_created",
+        admin_id=admin_id,
+        room_id=body.id,
+        room_name=body.name,
+        area_id=body.area_id,
+        exits=list(exits_dict.keys()) if exits_dict else []
+    )
+    
+    return RoomDetail(
+        id=world_room.id,
+        name=world_room.name,
+        description=world_room.get_effective_description(),
+        room_type=world_room.room_type,
+        area_id=world_room.area_id,
+        exits=world_room.exits,
+        dynamic_exits=world_room.dynamic_exits,
+        players=list(world_room.players),
+        npcs=[],
+        items=[],
+        flags=world_room.room_flags,
+        triggers=[]
+    )
+
+
+# Direction opposites for bidirectional exits
+_OPPOSITE_DIRECTIONS = {
+    "north": "south",
+    "south": "north",
+    "east": "west",
+    "west": "east",
+    "up": "down",
+    "down": "up"
+}
+
+# Direction to DB column mapping
+_DIRECTION_TO_COLUMN = {
+    "north": "north_id",
+    "south": "south_id",
+    "east": "east_id",
+    "west": "west_id",
+    "up": "up_id",
+    "down": "down_id"
+}
+
+
+@router.patch("/world/rooms/{room_id}/exits", response_model=RoomDetail)
+async def update_room_exits(
+    room_id: str,
+    body: RoomExitUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: dict = Depends(require_role(UserRole.GAME_MASTER))
+):
+    """
+    Update a room's exits.
+    
+    Allows adding, modifying, or removing exits. Set a direction to null to remove it.
+    If bidirectional=true, also creates/removes the reverse exit in the target room.
+    
+    Example: {"exits": {"north": "room_2", "south": null}, "bidirectional": true}
+    - Creates north exit to room_2 (and south exit from room_2 back)
+    - Removes south exit (and north exit from whatever room was linked)
+    
+    Requires: GAME_MASTER or higher
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    admin_id = admin.get("user_id", "unknown")
+    
+    valid_directions = set(_OPPOSITE_DIRECTIONS.keys())
+    
+    # Validate room exists
+    world_room = world.rooms.get(room_id)
+    if not world_room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    db_room = await session.get(Room, room_id)
+    if not db_room:
+        raise HTTPException(status_code=404, detail="Room not found in database")
+    
+    changes = []
+    
+    for direction, target_id in body.exits.items():
+        if direction not in valid_directions:
+            raise HTTPException(status_code=400, detail=f"Invalid direction: {direction}")
+        
+        old_target = world_room.exits.get(direction)
+        
+        if target_id is None:
+            # Removing exit
+            if direction in world_room.exits:
+                # Handle bidirectional removal
+                if body.bidirectional and old_target:
+                    opposite = _OPPOSITE_DIRECTIONS[direction]
+                    old_target_room = world.rooms.get(old_target)
+                    if old_target_room and opposite in old_target_room.exits:
+                        del old_target_room.exits[opposite]
+                        # Update DB
+                        old_target_db = await session.get(Room, old_target)
+                        if old_target_db:
+                            setattr(old_target_db, _DIRECTION_TO_COLUMN[opposite], None)
+                
+                del world_room.exits[direction]
+                setattr(db_room, _DIRECTION_TO_COLUMN[direction], None)
+                changes.append(f"Removed {direction} exit (was -> {old_target})")
+        else:
+            # Adding/updating exit
+            if target_id not in world.rooms:
+                raise HTTPException(status_code=400, detail=f"Target room '{target_id}' not found")
+            
+            # Update in-memory
+            world_room.exits[direction] = target_id
+            # Update DB
+            setattr(db_room, _DIRECTION_TO_COLUMN[direction], target_id)
+            
+            if old_target != target_id:
+                changes.append(f"Set {direction} exit -> {target_id}" + (f" (was {old_target})" if old_target else ""))
+            
+            # Handle bidirectional creation
+            if body.bidirectional:
+                opposite = _OPPOSITE_DIRECTIONS[direction]
+                target_room = world.rooms.get(target_id)
+                if target_room:
+                    target_room.exits[opposite] = room_id
+                    target_db = await session.get(Room, target_id)
+                    if target_db:
+                        setattr(target_db, _DIRECTION_TO_COLUMN[opposite], room_id)
+                    changes.append(f"Set reverse {opposite} exit in {target_id} -> {room_id}")
+    
+    # Mark room as API-managed
+    if changes:
+        world_room.yaml_managed = False
+        db_room.yaml_managed = False
+    
+    await session.commit()
+    
+    # Audit log
+    if changes:
+        admin_audit_logger.info(
+            "room_exits_updated",
+            admin_id=admin_id,
+            room_id=room_id,
+            changes=changes,
+            bidirectional=body.bidirectional
+        )
+    
+    # Return updated room
+    npc_ids = [npc.id for npc in world.npcs.values() if npc.room_id == room_id]
+    item_ids = [item.id for item in world.items.values() if item.room_id == room_id]
+    trigger_ids = [t.trigger_id for t in world_room.triggers] if hasattr(world_room, 'triggers') else []
+    
+    return RoomDetail(
+        id=world_room.id,
+        name=world_room.name,
+        description=world_room.get_effective_description(),
+        room_type=world_room.room_type,
+        area_id=world_room.area_id,
+        exits=world_room.exits,
+        dynamic_exits=world_room.dynamic_exits,
+        players=list(world_room.players),
+        npcs=npc_ids,
+        items=item_ids,
+        flags=world_room.room_flags,
+        triggers=trigger_ids
+    )
+
+
+@router.post("/world/rooms/{room_id}/reset-yaml-managed")
+async def reset_room_yaml_managed(
+    room_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: dict = Depends(require_role(UserRole.ADMIN))
+):
+    """
+    Reset a room to be YAML-managed.
+    
+    After calling this, the room will be updated during YAML content reloads.
+    Use this when you want YAML changes to take precedence again.
+    
+    Requires: ADMIN
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    admin_id = admin.get("user_id", "unknown")
+    
+    world_room = world.rooms.get(room_id)
+    if not world_room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    db_room = await session.get(Room, room_id)
+    if not db_room:
+        raise HTTPException(status_code=404, detail="Room not found in database")
+    
+    was_api_managed = not world_room.yaml_managed
+    
+    world_room.yaml_managed = True
+    db_room.yaml_managed = True
+    await session.commit()
+    
+    if was_api_managed:
+        admin_audit_logger.info(
+            "room_reset_to_yaml_managed",
+            admin_id=admin_id,
+            room_id=room_id
+        )
+    
+    return {
+        "success": True,
+        "room_id": room_id,
+        "yaml_managed": True,
+        "message": "Room is now YAML-managed and will be updated during content reloads"
+    }
+
+
 @router.get("/world/areas", response_model=list[AreaSummary])
 async def list_areas(
     request: Request,
@@ -989,6 +1458,147 @@ async def list_items(
         ))
     
     return items
+
+
+@router.get("/world/state", response_model=WorldStateResponse)
+async def get_world_state(
+    request: Request,
+    admin: dict = Depends(require_role(UserRole.GAME_MASTER))
+):
+    """
+    Get complete world state snapshot.
+    
+    Returns all players, rooms, areas, NPCs, and items in a single response.
+    WARNING: This can be a large response for big worlds. Use with caution.
+    
+    Requires: GAME_MASTER or higher
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    # Build player summaries
+    players = []
+    players_online = 0
+    for player in world.players.values():
+        if player.is_connected:
+            players_online += 1
+        in_combat = hasattr(engine, 'combat_system') and player.id in engine.combat_system.active_combats
+        players.append(PlayerSummary(
+            id=player.id,
+            name=player.name,
+            room_id=player.current_room_id,
+            level=player.level,
+            current_health=player.current_health,
+            max_health=player.max_health,
+            is_connected=player.is_connected,
+            in_combat=in_combat
+        ))
+    
+    # Build room details
+    rooms = []
+    for room in world.rooms.values():
+        npc_ids = [npc.id for npc in world.npcs.values() if npc.room_id == room.id]
+        item_ids = [item.id for item in world.items.values() if item.room_id == room.id]
+        trigger_ids = [t.trigger_id for t in room.triggers] if hasattr(room, 'triggers') else []
+        
+        rooms.append(RoomDetail(
+            id=room.id,
+            name=room.name,
+            description=room.get_effective_description(),
+            room_type=room.room_type,
+            area_id=room.area_id,
+            exits=room.exits,
+            dynamic_exits=room.dynamic_exits,
+            players=list(room.players),
+            npcs=npc_ids,
+            items=item_ids,
+            flags=room.room_flags,
+            triggers=trigger_ids
+        ))
+    
+    # Build area summaries
+    areas = []
+    for area in world.areas.values():
+        room_count = sum(1 for r in world.rooms.values() if r.area_id == area.area_id)
+        player_count = sum(
+            1 for r in world.rooms.values() 
+            if r.area_id == area.area_id 
+            for _ in r.players
+        )
+        areas.append(AreaSummary(
+            id=area.area_id,
+            name=area.name,
+            room_count=room_count,
+            player_count=player_count,
+            time_scale=area.time_scale
+        ))
+    
+    # Build NPC summaries
+    npcs = []
+    npcs_alive = 0
+    for npc in world.npcs.values():
+        is_alive = npc.current_health > 0
+        if is_alive:
+            npcs_alive += 1
+        npcs.append(NpcSummary(
+            id=npc.id,
+            template_id=npc.template_id,
+            name=npc.name,
+            room_id=npc.room_id,
+            current_health=npc.current_health,
+            max_health=npc.max_health,
+            is_alive=is_alive
+        ))
+    
+    # Build item summaries
+    items = []
+    for item in world.items.values():
+        if item.room_id:
+            location_type = "room"
+            location_id = item.room_id
+        elif item.player_id:
+            location_type = "player"
+            location_id = item.player_id
+        elif item.container_id:
+            location_type = "container"
+            location_id = item.container_id
+        else:
+            location_type = "unknown"
+            location_id = ""
+        
+        items.append(ItemSummary(
+            id=item.id,
+            template_id=item.template_id,
+            name=item.name,
+            location_type=location_type,
+            location_id=location_id,
+            quantity=item.quantity
+        ))
+    
+    # Get combat and event counts
+    active_combats = len(engine.combat_system.active_combats) if hasattr(engine, 'combat_system') else 0
+    scheduled_events = len(engine.time_manager.events) if hasattr(engine, 'time_manager') else 0
+    
+    return WorldStateResponse(
+        server_uptime=time.time() - _server_start_time,
+        server_time=time.time(),
+        maintenance_mode=_maintenance_mode,
+        shutdown_pending=_shutdown_requested,
+        players_online=players_online,
+        players_total=len(world.players),
+        npcs_alive=npcs_alive,
+        npcs_total=len(world.npcs),
+        rooms_total=len(world.rooms),
+        areas_total=len(world.areas),
+        items_total=len(world.items),
+        active_combats=active_combats,
+        scheduled_events=scheduled_events,
+        players=players,
+        rooms=rooms,
+        areas=areas,
+        npcs=npcs,
+        items=items
+    )
 
 
 # ============================================================================
@@ -1481,6 +2091,7 @@ class ReloadRequest(BaseModel):
     """Request to reload content."""
     content_type: ReloadContentType = Field(..., description="Type of content to reload")
     file_path: Optional[str] = Field(None, description="Specific file to reload (optional)")
+    force: bool = Field(False, description="Force reload even for API-managed content (ignores yaml_managed flag)")
 
 
 class ValidateRequest(BaseModel):
@@ -1788,8 +2399,12 @@ class ContentReloader:
         
         return result
     
-    async def reload_rooms(self, file_path: Optional[Path] = None) -> ReloadResult:
-        """Reload room data from YAML files."""
+    async def reload_rooms(self, file_path: Optional[Path] = None, force: bool = False) -> ReloadResult:
+        """
+        Reload room data from YAML files.
+        
+        Rooms with yaml_managed=False (API-modified) are skipped unless force=True.
+        """
         import yaml
         
         rooms_dir = self.world_data_dir / 'rooms'
@@ -1806,6 +2421,8 @@ class ContentReloader:
         else:
             yaml_files = list(rooms_dir.glob('**/*.yaml')) if rooms_dir.exists() else []
         
+        skipped_rooms = []
+        
         for yaml_file in yaml_files:
             try:
                 with open(yaml_file, 'r', encoding='utf-8') as f:
@@ -1820,6 +2437,11 @@ class ContentReloader:
                 existing_room = self.world.rooms.get(room_id)
                 
                 if existing_room:
+                    # Check if room is API-managed (skip unless forced)
+                    if not existing_room.yaml_managed and not force:
+                        skipped_rooms.append(room_id)
+                        continue
+                    
                     # Update existing room (preserve players and entities)
                     existing_room.name = room_data['name']
                     existing_room.description = room_data['description']
@@ -1843,6 +2465,11 @@ class ContentReloader:
             except Exception as e:
                 result.errors.append(f"{yaml_file}: {e}")
                 result.items_failed += 1
+        
+        # Report skipped API-managed rooms
+        if skipped_rooms:
+            result.warnings.append(f"Skipped {len(skipped_rooms)} API-managed rooms: {', '.join(skipped_rooms[:5])}" + 
+                                   (f" and {len(skipped_rooms) - 5} more" if len(skipped_rooms) > 5 else ""))
         
         if result.items_failed > 0:
             result.success = False
@@ -1906,11 +2533,11 @@ class ContentReloader:
         
         return result
     
-    async def reload_all(self) -> dict:
+    async def reload_all(self, force: bool = False) -> dict:
         """Reload all content types."""
         results = {
             "areas": await self.reload_areas(),
-            "rooms": await self.reload_rooms(),
+            "rooms": await self.reload_rooms(force=force),
             "item_templates": await self.reload_item_templates(),
             "npc_templates": await self.reload_npc_templates(),
         }
@@ -1943,7 +2570,7 @@ async def reload_content(
     file_path = Path(reload_request.file_path) if reload_request.file_path else None
     
     if reload_request.content_type == ReloadContentType.ALL:
-        all_results = await reloader.reload_all()
+        all_results = await reloader.reload_all(force=reload_request.force)
         # Return summary as ReloadResult
         total_loaded = sum(r["items_loaded"] for r in all_results["results"].values())
         total_updated = sum(r["items_updated"] for r in all_results["results"].values())
@@ -1974,7 +2601,7 @@ async def reload_content(
     elif reload_request.content_type == ReloadContentType.AREAS:
         result = await reloader.reload_areas(file_path)
     elif reload_request.content_type == ReloadContentType.ROOMS:
-        result = await reloader.reload_rooms(file_path)
+        result = await reloader.reload_rooms(file_path, force=reload_request.force)
     elif reload_request.content_type in (ReloadContentType.ITEMS, ReloadContentType.ITEM_TEMPLATES):
         result = await reloader.reload_item_templates(file_path)
     elif reload_request.content_type in (ReloadContentType.NPCS, ReloadContentType.NPC_TEMPLATES):
