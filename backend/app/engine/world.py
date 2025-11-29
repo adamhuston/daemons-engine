@@ -34,8 +34,8 @@ EntityId = str  # Unified ID for players and NPCs
 TargetableId = str  # Unified ID for anything targetable (entities + items)
 
 
-# Room type emoji mapping
-ROOM_TYPE_EMOJIS = {
+# Default room type emoji mapping (used as fallback if DB not loaded)
+DEFAULT_ROOM_TYPE_EMOJIS = {
     "forest": "🌲",
     "urban": "🏙️",
     "rural": "🏘️",
@@ -51,6 +51,22 @@ ROOM_TYPE_EMOJIS = {
     "ethereal": "✨",
     "forsaken": "💀",
 }
+
+# Runtime cache for room type emojis (loaded from database)
+_room_type_emoji_cache: dict[str, str] = {}
+
+
+def set_room_type_emojis(emojis: dict[str, str]) -> None:
+    """Set the room type emoji cache from database data."""
+    global _room_type_emoji_cache
+    _room_type_emoji_cache = emojis
+
+
+def get_room_type_emojis() -> dict[str, str]:
+    """Get the current room type emoji mapping."""
+    if _room_type_emoji_cache:
+        return _room_type_emoji_cache
+    return DEFAULT_ROOM_TYPE_EMOJIS
 
 
 @runtime_checkable
@@ -79,9 +95,26 @@ class Targetable(Protocol):
         ...
 
 
-def get_room_emoji(room_type: str) -> str:
-    """Get the emoji for a room type, or a default if unknown."""
-    return ROOM_TYPE_EMOJIS.get(room_type, "❓")
+def get_room_emoji(room_type: str, room_emoji_override: str | None = None) -> str:
+    """
+    Get the emoji for a room type.
+    
+    Args:
+        room_type: The room type name (e.g., "forest", "urban")
+        room_emoji_override: Optional per-room emoji override
+    
+    Returns:
+        The emoji to display, with priority:
+        1. room_emoji_override (if set)
+        2. Database room type emoji
+        3. Default room type emoji
+        4. "❓" if unknown
+    """
+    if room_emoji_override:
+        return room_emoji_override
+    
+    emojis = get_room_type_emojis()
+    return emojis.get(room_type, DEFAULT_ROOM_TYPE_EMOJIS.get(room_type, "❓"))
 
 
 # Experience thresholds for leveling up
@@ -1100,6 +1133,7 @@ class WorldRoom:
     name: str
     description: str
     room_type: str = "ethereal"
+    room_type_emoji: str | None = None  # Per-room emoji override
     exits: Dict[Direction, RoomId] = field(default_factory=dict)
     
     # Unified entity tracking (players + NPCs)

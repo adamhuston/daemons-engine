@@ -622,7 +622,7 @@ class QuestSystem:
         # Experience
         if template.rewards.experience > 0:
             player.experience += template.rewards.experience
-            reward_lines.append(f"   ✨ {template.rewards.experience} XP")
+            reward_lines.append(f"   {template.rewards.experience} XP")
         
         # Currency
         if template.rewards.currency > 0:
@@ -706,7 +706,7 @@ class QuestSystem:
         
         # Build failure message
         reason_text = f" ({reason})" if reason else ""
-        msg = f"❌ Quest Failed: {quest_name}{reason_text}"
+        msg = f"Quest Failed: {quest_name}{reason_text}"
         events.append(self.ctx.msg_to_player(player_id, msg))
         
         return events
@@ -762,7 +762,7 @@ class QuestSystem:
                 if xp_amount > 0:
                     player.experience += xp_amount
                     events.append(self.ctx.msg_to_player(
-                        player_id, f"✨ You gained {xp_amount} experience!"
+                        player_id, f"You gained {xp_amount} experience!"
                     ))
         
         return events
@@ -806,7 +806,7 @@ class QuestSystem:
         
         if chain.chain_rewards.experience > 0:
             player.experience += chain.chain_rewards.experience
-            reward_lines.append(f"   ✨ {chain.chain_rewards.experience} XP")
+            reward_lines.append(f"   {chain.chain_rewards.experience} XP")
         
         if chain.chain_rewards.currency > 0:
             current_gold = player.player_flags.get('gold', 0)
@@ -949,7 +949,7 @@ class QuestSystem:
         quest_name = template.name if template else quest_id
         
         del player.quest_progress[quest_id]
-        events.append(self.ctx.msg_to_player(player_id, f"❌ Quest Abandoned: {quest_name}"))
+        events.append(self.ctx.msg_to_player(player_id, f"Quest Abandoned: {quest_name}"))
         
         return events
     

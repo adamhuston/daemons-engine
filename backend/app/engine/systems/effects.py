@@ -188,7 +188,7 @@ class EffectSystem:
             # Message to target
             events.append(self.ctx._msg_to_player(
                 target_id,
-                f"✨ *Divine light surrounds you!* You feel blessed. (+{bonus} Armor Class for {duration:.0f} seconds)"
+                f"*Divine light surrounds you!* You feel blessed. (+{bonus} Armor Class for {duration:.0f} seconds)"
             ))
         
         return events
@@ -361,7 +361,7 @@ class EffectSystem:
                 elif effect.effect_type == "hot":
                     message = f"💚 The healing effect fades."
                 elif effect.effect_type == "buff":
-                    message = f"✨ The {effect_name} fades away."
+                    message = f"The {effect_name} fades away."
                 else:
                     message = f"{effect_name} wears off."
                 

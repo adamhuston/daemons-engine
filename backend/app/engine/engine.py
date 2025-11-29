@@ -316,6 +316,98 @@ class WorldEngine:
             description="Talk to an NPC",
             usage="<npc_name>"
         )
+        
+        # Phase 8: Admin commands
+        self.command_router.register_handler(
+            primary_name="who",
+            handler=self._who_handler,
+            names=["who", "online"],
+            category="admin",
+            description="[Mod] List online players",
+            usage=""
+        )
+        
+        self.command_router.register_handler(
+            primary_name="where",
+            handler=self._where_handler,
+            names=["where", "locate"],
+            category="admin",
+            description="[Mod] Find a player's location",
+            usage="<player_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="goto",
+            handler=self._goto_handler,
+            names=["goto", "tp"],
+            category="admin",
+            description="[GM] Teleport to a room or player",
+            usage="<room_id|player_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="summon",
+            handler=self._summon_handler,
+            names=["summon"],
+            category="admin",
+            description="[GM] Summon a player to your location",
+            usage="<player_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="spawn",
+            handler=self._spawn_handler,
+            names=["spawn"],
+            category="admin",
+            description="[GM] Spawn an NPC or item",
+            usage="npc|item <template_id>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="despawn",
+            handler=self._despawn_handler,
+            names=["despawn"],
+            category="admin",
+            description="[GM] Despawn an NPC",
+            usage="<npc_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="give",
+            handler=self._give_handler,
+            names=["give"],
+            category="admin",
+            description="[GM] Give an item to a player",
+            usage="<player_name> <item_template>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="inspect",
+            handler=self._inspect_handler,
+            names=["inspect", "examine"],
+            category="admin",
+            description="[GM] Get detailed info on a target",
+            usage="<target_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="broadcast",
+            handler=self._broadcast_handler,
+            names=["broadcast", "announce"],
+            category="admin",
+            description="[Admin] Broadcast message to all players",
+            usage="<message>"
+        )
+        
+        # Quit command - graceful disconnect
+        self.command_router.register_handler(
+            primary_name="quit",
+            handler=self._quit_handler,
+            names=["quit", "logout", "exit"],
+            category="system",
+            description="Disconnect and return to character selection",
+            usage=""
+        )
 
     # ---------- Command wrapper adapters (convert CommandRouter signature) ----------
 
@@ -408,6 +500,415 @@ class WorldEngine:
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Hurt whom?")]
         return self._hurt(player_id, args)
+
+    # ---------- Phase 8: Admin command handlers ----------
+
+    def _who_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Mod] List all online players with their locations."""
+        if not self._check_permission(player_id, "KICK_PLAYER"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        online_players = [p for p in self.world.players.values() if p.is_connected]
+        
+        if not online_players:
+            return [self._msg_to_player(player_id, "No players online.")]
+        
+        lines = ["📋 Online Players:"]
+        lines.append("-" * 40)
+        for p in sorted(online_players, key=lambda x: x.name):
+            room = self.world.rooms.get(p.room_id)
+            room_name = room.name if room else "Unknown"
+            hp_pct = int((p.current_health / p.max_health) * 100) if p.max_health > 0 else 0
+            lines.append(f"  {p.name} (Lv{p.level}) - {room_name} [{hp_pct}% HP]")
+        lines.append("-" * 40)
+        lines.append(f"Total: {len(online_players)} player(s)")
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    def _where_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Mod] Find a player's location."""
+        if not self._check_permission(player_id, "KICK_PLAYER"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Where is whom? Usage: where <player_name>")]
+        
+        target_name = args.strip().lower()
+        target = None
+        for p in self.world.players.values():
+            if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                target = p
+                break
+        
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{args.strip()}' not found.")]
+        
+        room = self.world.rooms.get(target.room_id)
+        area = self.world.areas.get(room.area_id) if room and room.area_id else None
+        
+        location = room.name if room else "Unknown"
+        if area:
+            location = f"{room.name} ({area.name})"
+        
+        status = "online" if target.is_connected else "offline (stasis)"
+        
+        return [self._msg_to_player(player_id, f"📍 {target.name}: {location} [{status}]")]
+
+    def _goto_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[GM] Teleport to a room or player."""
+        if not self._check_permission(player_id, "TELEPORT"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Go to where? Usage: goto <room_id|player_name>")]
+        
+        target = args.strip()
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        # First check if it's a room ID
+        if target in self.world.rooms:
+            target_room = self.world.rooms[target]
+        else:
+            # Try to find a player with that name
+            target_player = None
+            for p in self.world.players.values():
+                if p.name.lower() == target.lower() or p.name.lower().startswith(target.lower()):
+                    target_player = p
+                    break
+            
+            if target_player:
+                target_room = self.world.rooms.get(target_player.room_id)
+                if not target_room:
+                    return [self._msg_to_player(player_id, f"Could not find {target_player.name}'s location.")]
+            else:
+                return [self._msg_to_player(player_id, f"Room or player '{target}' not found.")]
+        
+        # Move player
+        old_room = self.world.rooms.get(player.room_id)
+        if old_room:
+            old_room.players.discard(player.id)
+        
+        player.room_id = target_room.id
+        target_room.players.add(player.id)
+        
+        # Show room description
+        room_desc = self._format_room_description(target_room, player_id)
+        return [self._msg_to_player(player_id, f"You teleport to {target_room.name}.\n\n{room_desc}")]
+
+    def _summon_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[GM] Summon a player to your location."""
+        if not self._check_permission(player_id, "TELEPORT"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Summon whom? Usage: summon <player_name>")]
+        
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        target_name = args.strip().lower()
+        target = None
+        for p in self.world.players.values():
+            if p.id != player_id and (p.name.lower() == target_name or p.name.lower().startswith(target_name)):
+                target = p
+                break
+        
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{args.strip()}' not found.")]
+        
+        target_room = self.world.rooms.get(player.room_id)
+        if not target_room:
+            return [self._msg_to_player(player_id, "You are not in a valid room.")]
+        
+        # Move target player
+        old_room = self.world.rooms.get(target.room_id)
+        if old_room:
+            old_room.players.discard(target.id)
+        
+        target.room_id = target_room.id
+        target_room.players.add(target.id)
+        
+        events = [self._msg_to_player(player_id, f"You summon {target.name} to your location.")]
+        
+        # Notify the summoned player
+        if target.id in self._listeners:
+            room_desc = self._format_room_description(target_room, target.id)
+            events.append({
+                "type": "message",
+                "scope": "player",
+                "player_id": target.id,
+                "text": f"You have been summoned by {player.name}.\n\n{room_desc}"
+            })
+        
+        return events
+
+    def _spawn_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[GM] Spawn an NPC or item in the current room."""
+        if not self._check_permission(player_id, "SPAWN_NPC"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Spawn what? Usage: spawn npc|item <template_id>")]
+        
+        parts = args.strip().split(maxsplit=1)
+        if len(parts) < 2:
+            return [self._msg_to_player(player_id, "Usage: spawn npc|item <template_id>")]
+        
+        spawn_type = parts[0].lower()
+        template_id = parts[1].strip()
+        
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        if spawn_type == "npc":
+            template = self.world.npc_templates.get(template_id)
+            if not template:
+                return [self._msg_to_player(player_id, f"NPC template '{template_id}' not found.")]
+            
+            # Use async spawn
+            import asyncio
+            async def do_spawn():
+                npc = await self._spawn_npc(template, player.room_id)
+                return npc
+            
+            # Schedule the spawn (can't await directly in sync handler)
+            # For now, just create the NPC synchronously
+            import uuid
+            npc_id = str(uuid.uuid4())
+            from .world import WorldNpc
+            npc = WorldNpc(
+                id=npc_id,
+                template_id=template.id,
+                name=template.name,
+                room_id=player.room_id,
+                spawn_room_id=player.room_id,
+                max_health=template.max_health,
+                current_health=template.max_health,
+                level=template.level,
+                keywords=template.keywords.copy() if template.keywords else [],
+                behaviors=template.behaviors.copy() if template.behaviors else []
+            )
+            self.world.npcs[npc_id] = npc
+            
+            return [self._msg_to_player(player_id, f"Spawned {template.name} ({npc_id[:8]}...)")]
+        
+        elif spawn_type == "item":
+            template = self.world.item_templates.get(template_id)
+            if not template:
+                return [self._msg_to_player(player_id, f"Item template '{template_id}' not found.")]
+            
+            import uuid
+            from .world import WorldItem
+            item_id = str(uuid.uuid4())
+            item = WorldItem(
+                id=item_id,
+                template_id=template.id,
+                name=template.name,
+                description=template.description,
+                room_id=player.room_id,
+                player_id=None,
+                container_id=None,
+                quantity=1,
+                keywords=template.keywords.copy() if template.keywords else []
+            )
+            self.world.items[item_id] = item
+            
+            return [self._msg_to_player(player_id, f"Spawned {template.name} on the ground.")]
+        
+        else:
+            return [self._msg_to_player(player_id, "Usage: spawn npc|item <template_id>")]
+
+    def _despawn_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[GM] Despawn an NPC in the current room."""
+        if not self._check_permission(player_id, "SPAWN_NPC"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Despawn whom? Usage: despawn <npc_name>")]
+        
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        target_name = args.strip().lower()
+        npc_id = self._find_npc_in_room(player.room_id, target_name)
+        
+        if not npc_id:
+            return [self._msg_to_player(player_id, f"No NPC named '{args.strip()}' in this room.")]
+        
+        npc = self.world.npcs.get(npc_id)
+        npc_name = npc.name if npc else "Unknown"
+        
+        del self.world.npcs[npc_id]
+        
+        return [self._msg_to_player(player_id, f"{npc_name} vanishes in a puff of smoke.")]
+
+    def _give_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[GM] Give an item to a player."""
+        if not self._check_permission(player_id, "SPAWN_ITEM"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Give what to whom? Usage: give <player_name> <item_template>")]
+        
+        parts = args.strip().split(maxsplit=1)
+        if len(parts) < 2:
+            return [self._msg_to_player(player_id, "Usage: give <player_name> <item_template>")]
+        
+        target_name = parts[0].lower()
+        template_id = parts[1].strip()
+        
+        # Find target player
+        target = None
+        for p in self.world.players.values():
+            if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                target = p
+                break
+        
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{parts[0]}' not found.")]
+        
+        # Find item template
+        template = self.world.item_templates.get(template_id)
+        if not template:
+            return [self._msg_to_player(player_id, f"Item template '{template_id}' not found.")]
+        
+        # Create item in player's inventory
+        import uuid
+        from .world import WorldItem
+        item_id = str(uuid.uuid4())
+        item = WorldItem(
+            id=item_id,
+            template_id=template.id,
+            name=template.name,
+            description=template.description,
+            room_id=None,
+            player_id=target.id,
+            container_id=None,
+            quantity=1,
+            keywords=template.keywords.copy() if template.keywords else []
+        )
+        self.world.items[item_id] = item
+        
+        events = [self._msg_to_player(player_id, f"Gave {template.name} to {target.name}.")]
+        
+        # Notify recipient
+        if target.id in self._listeners:
+            events.append({
+                "type": "message",
+                "scope": "player",
+                "player_id": target.id,
+                "text": f"You received {template.name} from a mysterious force."
+            })
+        
+        return events
+
+    def _inspect_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[GM] Get detailed info on a target (player, NPC, or item)."""
+        if not self._check_permission(player_id, "MODIFY_STATS"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Inspect what? Usage: inspect <target_name>")]
+        
+        target_name = args.strip().lower()
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        # Try to find a player
+        for p in self.world.players.values():
+            if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                lines = [f"📋 Player: {p.name}"]
+                lines.append("-" * 40)
+                lines.append(f"  ID: {p.id}")
+                lines.append(f"  Level: {p.level} ({p.experience} XP)")
+                lines.append(f"  Class: {p.character_class}")
+                lines.append(f"  Health: {p.current_health}/{p.max_health}")
+                lines.append(f"  Energy: {p.current_energy}/{p.max_energy}")
+                lines.append(f"  Room: {p.room_id}")
+                lines.append(f"  Connected: {p.is_connected}")
+                lines.append(f"  Stats: STR {p.strength}, DEX {p.dexterity}, INT {p.intelligence}, VIT {p.vitality}")
+                lines.append(f"  Active Effects: {len(p.active_effects)}")
+                return [self._msg_to_player(player_id, "\n".join(lines))]
+        
+        # Try to find an NPC in room
+        npc_id = self._find_npc_in_room(player.room_id, target_name)
+        if npc_id:
+            npc = self.world.npcs.get(npc_id)
+            if npc:
+                lines = [f"📋 NPC: {npc.name}"]
+                lines.append("-" * 40)
+                lines.append(f"  ID: {npc.id}")
+                lines.append(f"  Template: {npc.template_id}")
+                lines.append(f"  Level: {npc.level}")
+                lines.append(f"  Health: {npc.current_health}/{npc.max_health}")
+                lines.append(f"  Room: {npc.room_id}")
+                lines.append(f"  Spawn Room: {npc.spawn_room_id}")
+                lines.append(f"  Behaviors: {', '.join(npc.behaviors) if npc.behaviors else 'None'}")
+                return [self._msg_to_player(player_id, "\n".join(lines))]
+        
+        # Try to find an item in room or inventory
+        for item in self.world.items.values():
+            if item.room_id == player.room_id or item.player_id == player_id:
+                if item.name.lower() == target_name or item.name.lower().startswith(target_name):
+                    lines = [f"📋 Item: {item.name}"]
+                    lines.append("-" * 40)
+                    lines.append(f"  ID: {item.id}")
+                    lines.append(f"  Template: {item.template_id}")
+                    lines.append(f"  Quantity: {item.quantity}")
+                    lines.append(f"  Room: {item.room_id or 'N/A'}")
+                    lines.append(f"  Owner: {item.player_id or 'N/A'}")
+                    lines.append(f"  Container: {item.container_id or 'N/A'}")
+                    return [self._msg_to_player(player_id, "\n".join(lines))]
+        
+        return [self._msg_to_player(player_id, f"Could not find '{args.strip()}' to inspect.")]
+
+    def _broadcast_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Admin] Broadcast a message to all connected players."""
+        if not self._check_permission(player_id, "SERVER_COMMANDS"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Broadcast what? Usage: broadcast <message>")]
+        
+        player = self.world.players.get(player_id)
+        sender_name = player.name if player else "SYSTEM"
+        
+        message = f"📢 [{sender_name}]: {args.strip()}"
+        
+        events = []
+        for p in self.world.players.values():
+            if p.is_connected and p.id in self._listeners:
+                events.append({
+                    "type": "message",
+                    "scope": "player",
+                    "player_id": p.id,
+                    "text": message
+                })
+        
+        events.append(self._msg_to_player(player_id, f"Broadcast sent to {len(events)-1} player(s)."))
+        return events
+
+    def _quit_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Handle quit command - sends disconnect signal to client."""
+        player = self.world.players.get(player_id)
+        player_name = player.name if player else "Unknown"
+        
+        # Send farewell message and special quit event
+        return [
+            self._msg_to_player(player_id, "\nYou feel the world fade away as you enter a state of stasis...\nFarewell, brave adventurer. May your return be swift.\n"),
+            {
+                "type": "quit",
+                "scope": "player",
+                "player_id": player_id,
+                "text": "Disconnecting..."
+            }
+        ]
 
     # ---------- Quest command handlers (Phase X) ----------
 
@@ -823,13 +1324,13 @@ class WorldEngine:
                 if secs == 10:
                     msg = f"💀 Your flesh failed you, but your spirit is not yet defeated... ({secs}s)"
                 elif secs >= 7:
-                    msg = f"👻 Darkness surrounds you... ({secs}s)"
+                    msg = f"Darkness surrounds you... ({secs}s)"
                 elif secs >= 4:
-                    msg = f"✨ A distant light calls to you... ({secs}s)"
+                    msg = f"A distant light calls to you... ({secs}s)"
                 elif secs >= 2:
-                    msg = f"🌟 You feel yourself being pulled back... ({secs}s)"
+                    msg = f"You feel yourself being pulled back... ({secs}s)"
                 else:
-                    msg = f"⚡ Reality snaps back into focus... ({secs}s)"
+                    msg = f"Reality snaps back into focus... ({secs}s)"
                 
                 await self._dispatch_events([
                     {
@@ -918,7 +1419,7 @@ class WorldEngine:
             "type": "message",
             "scope": "player",
             "player_id": player_id,
-            "text": "✨ **Sensation floods into you.** Every nerve prickles with fresh sensitivity as your spirit and your body are restored."
+            "text": "**Sensation floods into you.** Every nerve prickles with fresh sensitivity as your spirit and your body are restored."
         }
         events.append(resurrection_msg)
         print(f"[Respawn DEBUG] Queued resurrection message for {player_id}")
@@ -945,7 +1446,7 @@ class WorldEngine:
                 "scope": "room",
                 "room_id": respawn_room_id,
                 "exclude": [player_id],
-                "text": f"✨ {player.name} materializes in a shimmer of light."
+                "text": f"{player.name} materializes in a shimmer of light."
             })
         
         await self._dispatch_events(events)
@@ -1843,7 +2344,7 @@ class WorldEngine:
             description_lines.append(player.on_move_effect)
         
         # Show new room (use effective description for trigger overrides)
-        room_emoji = get_room_emoji(new_room.room_type)
+        room_emoji = get_room_emoji(new_room.room_type, new_room.room_type_emoji)
         description_lines.extend([
             "",
             f"**{room_emoji} {new_room.name}**",
@@ -1977,7 +2478,7 @@ class WorldEngine:
                 )
             ]
 
-        room_emoji = get_room_emoji(room.room_type)
+        room_emoji = get_room_emoji(room.room_type, room.room_type_emoji)
         # Use effective description for trigger overrides
         lines: list[str] = [f"**{room_emoji} {room.name}**", room.get_effective_description()]
 
@@ -2950,9 +3451,9 @@ class WorldEngine:
                 exclude_set.add(target.id)
             
             if target_type == TargetableType.PLAYER and player_id == target.id:
-                room_msg = f"✨ *Divine light surrounds {entity.name}!*"
+                room_msg = f"*Divine light surrounds {entity.name}!*"
             else:
-                room_msg = f"✨ *{caster_name} blesses {entity.name} with divine light!*"
+                room_msg = f"*{caster_name} blesses {entity.name} with divine light!*"
             events.append(self._msg_to_room(room.id, room_msg, exclude=exclude_set))
         
         return events
@@ -3062,7 +3563,7 @@ class WorldEngine:
             if area.time_scale != 1.0:
                 message_parts.append("")
                 if area.time_scale > 1.0:
-                    message_parts.append(f"⚡ *Time flows {area.time_scale:.1f}x faster here.*")
+                    message_parts.append(f"*Time flows {area.time_scale:.1f}x faster here.*")
                 else:
                     message_parts.append(f"🐌 *Time flows {area.time_scale:.1f}x slower here.*")
             

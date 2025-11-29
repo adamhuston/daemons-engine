@@ -31,6 +31,7 @@ from .engine.loader import (
 )
 from .engine.engine import WorldEngine
 from .engine.systems.auth import AuthSystem, verify_access_token
+from .metrics import init_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,9 @@ async def lifespan(app: FastAPI):
     - Start a single WorldEngine instance in the background.
     """
     # Startup
+    # 0) Initialize Prometheus metrics (Phase 8)
+    init_metrics(version="1.0.0", environment="development")
+    
     # 1) Create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -114,6 +118,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Register admin routes (Phase 8)
+from .routes.admin import router as admin_router
+app.include_router(admin_router)
 
 
 async def seed_world(session: AsyncSession) -> None:
@@ -708,6 +716,244 @@ async def delete_character(
     return {"message": "Character deleted", "character_id": character_id}
 
 
+# ---------- Character Selection Mode Helper ----------
+
+async def _build_character_menu(
+    auth_system,
+    user_id: str,
+) -> tuple[str, list]:
+    """Build the character selection menu text."""
+    characters = await auth_system.get_characters_for_account(user_id)
+    
+    lines = [
+        "=== Character Selection ===",
+        "",
+    ]
+    
+    if characters:
+        lines.append("Your characters:")
+        for i, char in enumerate(characters, 1):
+            lines.append(f"  {i}. {char.name} (Level {char.level} {char.character_class})")
+        lines.append("")
+        lines.append("Commands:")
+        lines.append("  <number>        - Select a character to play")
+        lines.append("  new             - Create a new character")
+        lines.append("  delete <number> - Delete a character")
+    else:
+        lines.append("You have no characters yet.")
+        lines.append("")
+        lines.append("Commands:")
+        lines.append("  new             - Create a new character")
+    
+    lines.append("")
+    
+    return "\n".join(lines), characters
+
+
+async def _handle_character_selection(
+    websocket,
+    auth_system,
+    engine,
+    user_id: str,
+):
+    """
+    Handle character selection/creation mode.
+    
+    Returns the selected Character object, or None if disconnected/error.
+    """
+    # State for character creation
+    create_state = None  # None, "awaiting_name", "awaiting_class"
+    pending_name = None
+    
+    # Available classes
+    available_classes = ["warrior", "mage", "rogue", "cleric"]
+    
+    while True:
+        # Send current menu
+        menu_text, characters = await _build_character_menu(auth_system, user_id)
+        
+        if create_state == "awaiting_name":
+            menu_text = "=== Create New Character ===\n\nEnter a name for your character (or 'cancel' to go back):\n"
+        elif create_state == "awaiting_class":
+            class_list = ", ".join(available_classes)
+            menu_text = f"=== Create New Character ===\n\nChoose a class for {pending_name}:\n  {class_list}\n\n(or 'cancel' to go back):\n"
+        
+        await websocket.send_json({
+            "type": "character_menu",
+            "text": menu_text,
+        })
+        
+        try:
+            # Wait for input
+            data = await websocket.receive_json()
+            
+            if data.get("type") != "command":
+                continue
+            
+            cmd = data.get("text", "").strip().lower()
+            
+            # Handle creation states
+            if create_state == "awaiting_name":
+                if cmd == "cancel":
+                    create_state = None
+                    pending_name = None
+                    continue
+                
+                # Validate name
+                name = data.get("text", "").strip()  # Use original case
+                if len(name) < 2:
+                    await websocket.send_json({
+                        "type": "error",
+                        "text": "Name must be at least 2 characters.",
+                    })
+                    continue
+                if len(name) > 32:
+                    await websocket.send_json({
+                        "type": "error",
+                        "text": "Name must be 32 characters or less.",
+                    })
+                    continue
+                
+                pending_name = name
+                create_state = "awaiting_class"
+                continue
+            
+            elif create_state == "awaiting_class":
+                if cmd == "cancel":
+                    create_state = None
+                    pending_name = None
+                    continue
+                
+                if cmd not in available_classes:
+                    await websocket.send_json({
+                        "type": "error",
+                        "text": f"Invalid class. Choose from: {', '.join(available_classes)}",
+                    })
+                    continue
+                
+                # Create the character
+                from app.models import Character
+                from app.db import get_async_session
+                
+                async for session in get_async_session():
+                    # Check if name is taken
+                    from sqlalchemy import select
+                    existing = await session.execute(
+                        select(Character).where(Character.name == pending_name)
+                    )
+                    if existing.scalar():
+                        await websocket.send_json({
+                            "type": "error",
+                            "text": f"The name '{pending_name}' is already taken.",
+                        })
+                        create_state = "awaiting_name"
+                        pending_name = None
+                        break
+                    
+                    # Create character
+                    new_char = Character(
+                        account_id=user_id,
+                        name=pending_name,
+                        character_class=cmd,
+                        level=1,
+                        current_room_id="room_0_0_0",
+                    )
+                    session.add(new_char)
+                    await session.commit()
+                    await session.refresh(new_char)
+                    
+                    # Set as active
+                    await auth_system.set_active_character(user_id, new_char.id)
+                    
+                    await websocket.send_json({
+                        "type": "message",
+                        "text": f"Character '{pending_name}' created! Entering the world...",
+                    })
+                    
+                    create_state = None
+                    pending_name = None
+                    
+                    return new_char
+                
+                continue
+            
+            # Normal menu state
+            if cmd == "new":
+                create_state = "awaiting_name"
+                continue
+            
+            elif cmd.startswith("delete "):
+                try:
+                    num = int(cmd.split()[1])
+                    if 1 <= num <= len(characters):
+                        char_to_delete = characters[num - 1]
+                        
+                        from app.db import get_async_session
+                        async for session in get_async_session():
+                            # Remove from world if loaded
+                            if char_to_delete.id in engine.world.players:
+                                del engine.world.players[char_to_delete.id]
+                            
+                            await session.delete(char_to_delete)
+                            await session.commit()
+                        
+                        await websocket.send_json({
+                            "type": "message",
+                            "text": f"Character '{char_to_delete.name}' deleted.",
+                        })
+                    else:
+                        await websocket.send_json({
+                            "type": "error",
+                            "text": f"Invalid character number. Enter 1-{len(characters)}.",
+                        })
+                except (ValueError, IndexError):
+                    await websocket.send_json({
+                        "type": "error",
+                        "text": "Usage: delete <number>",
+                    })
+                continue
+            
+            # Try to select by number
+            try:
+                num = int(cmd)
+                if 1 <= num <= len(characters):
+                    selected_char = characters[num - 1]
+                    await auth_system.set_active_character(user_id, selected_char.id)
+                    
+                    await websocket.send_json({
+                        "type": "message",
+                        "text": f"Selected {selected_char.name}. Entering the world...",
+                    })
+                    
+                    return selected_char
+                else:
+                    await websocket.send_json({
+                        "type": "error",
+                        "text": f"Invalid character number. Enter 1-{len(characters)}.",
+                    })
+            except ValueError:
+                if characters:
+                    await websocket.send_json({
+                        "type": "error",
+                        "text": "Unknown command. Enter a number to select a character, 'new' to create one, or 'delete <number>' to delete one.",
+                    })
+                else:
+                    await websocket.send_json({
+                        "type": "error",
+                        "text": "Unknown command. Enter 'new' to create a character.",
+                    })
+        
+        except WebSocketDisconnect:
+            logger.info("Client disconnected during character selection")
+            return None
+        except Exception as e:
+            logger.error("Error during character selection: %s", e)
+            await websocket.send_json({
+                "type": "error",
+                "text": "An error occurred. Please try again.",
+            })
+
+
 # ---------- WebSocket Endpoints ----------
 
 @app.websocket("/ws/game/auth")
@@ -723,6 +969,7 @@ async def game_ws_auth(
     - server sends: events like {"type": "message", "player_id": "...", "text": "..."}
 
     The token is verified and the user's active character is loaded.
+    Supports returning to character selection via the 'quit' command.
     """
     # Verify token first (before accepting connection)
     claims = verify_access_token(token)
@@ -754,60 +1001,121 @@ async def game_ws_auth(
         await websocket.close(code=1011, reason="Auth system not ready")
         return
     
-    # Get active character
-    character = await auth_system.get_active_character(user_id)
-    if character is None:
-        # No active character - tell client they need to select/create one
+    # Outer loop: Character Selection -> Play -> Character Selection (on quit)
+    while True:
+        # Get active character - if none, enter character selection mode
+        character = await auth_system.get_active_character(user_id)
+        
+        if character is None:
+            # Enter character selection mode
+            character = await _handle_character_selection(
+                websocket, auth_system, engine, user_id
+            )
+            if character is None:
+                # User disconnected or error during character selection
+                return
+        
+        player_id = character.id
+        
+        # Ensure player exists in the in-memory world
+        if player_id not in engine.world.players:
+            # Character exists in DB but not in memory - load it now
+            logger.info("Loading character %s into memory from database", player_id)
+            from .engine.world import WorldPlayer
+            world_player = WorldPlayer(
+                id=character.id,
+                name=character.name,
+                room_id=character.current_room_id,
+                character_class=character.character_class,
+                level=character.level,
+                max_health=character.max_health,
+                current_health=character.current_health,
+                strength=character.strength,
+                dexterity=character.dexterity,
+                intelligence=character.intelligence,
+                vitality=character.vitality,
+                data=character.data or {},
+                account_id=character.account_id
+            )
+            engine.world.players[player_id] = world_player
+            
+            # Make sure the room exists and add player to it
+            if world_player.room_id in engine.world.rooms:
+                engine.world.rooms[world_player.room_id].players.add(player_id)
+        
+        # Store auth info in context for permission checks
+        auth_info = {"user_id": user_id, "role": user_role}
+        
+        # Register this player with the engine
+        event_queue = await engine.register_player(player_id)
+        logger.info("Player %s (user %s, role %s) connected via authenticated WebSocket", 
+                    player_id, user_id, user_role)
+        
+        # Send welcome message with auth info
         await websocket.send_json({
-            "type": "error",
-            "code": "no_active_character",
-            "text": "No active character. Please create or select a character first."
+            "type": "auth_success",
+            "user_id": user_id,
+            "player_id": player_id,
+            "role": user_role
         })
-        await websocket.close(code=4002, reason="No active character")
-        return
-    
-    player_id = character.id
-    
-    # Ensure player exists in the in-memory world
-    if player_id not in engine.world.players:
-        logger.info("WS connection rejected for unknown player %s", player_id)
-        await websocket.close(code=1008, reason="Character not loaded")
-        return
-    
-    # Store auth info in context for permission checks
-    auth_info = {"user_id": user_id, "role": user_role}
-    
-    # Register this player with the engine
-    event_queue = await engine.register_player(player_id)
-    logger.info("Player %s (user %s, role %s) connected via authenticated WebSocket", 
-                player_id, user_id, user_role)
-    
-    # Send welcome message with auth info
-    await websocket.send_json({
-        "type": "auth_success",
-        "user_id": user_id,
-        "player_id": player_id,
-        "role": user_role
-    })
 
-    send_task = asyncio.create_task(_ws_sender(websocket, event_queue))
-    recv_task = asyncio.create_task(_ws_receiver_auth(websocket, engine, player_id, auth_info))
+        # Use a flag to track if player quit (vs disconnected)
+        quit_flag = {"quit": False}
+        
+        send_task = asyncio.create_task(_ws_sender_with_quit(websocket, event_queue, quit_flag))
+        recv_task = asyncio.create_task(_ws_receiver_auth(websocket, engine, player_id, auth_info))
 
+        try:
+            done, pending = await asyncio.wait(
+                {send_task, recv_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            # If either sender or receiver stops, cancel the other
+            for task in pending:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+        finally:
+            # Broadcast disconnect message to other players
+            await engine.player_disconnect(player_id)
+            engine.unregister_player(player_id)
+            logger.info("Player %s disconnected", player_id)
+        
+        # If player used 'quit' command, loop back to character selection
+        if quit_flag["quit"]:
+            logger.info("Player %s used quit, returning to character selection", player_id)
+            # Clear active character so they go through selection again
+            await auth_system.clear_active_character(user_id)
+            continue
+        else:
+            # Real disconnect - exit the loop
+            return
+
+
+async def _ws_sender_with_quit(
+    websocket: WebSocket,
+    queue: asyncio.Queue,
+    quit_flag: dict,
+) -> None:
+    """
+    Sends events from the engine queue to the WebSocket.
+    Detects quit events and sets the quit_flag to signal return to character selection.
+    """
     try:
-        done, pending = await asyncio.wait(
-            {send_task, recv_task},
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        # If either sender or receiver stops, cancel the other
-        for task in pending:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
-    finally:
-        # Broadcast disconnect message to other players
-        await engine.player_disconnect(player_id)
-        engine.unregister_player(player_id)
-        logger.info("Player %s disconnected", player_id)
+        while True:
+            event = await queue.get()
+            
+            # Check if this is a quit event
+            if event.get("type") == "quit":
+                quit_flag["quit"] = True
+                # Send the quit event to client first
+                await websocket.send_json(event)
+                # Then stop the sender (which will trigger return to char select)
+                return
+            
+            await websocket.send_json(event)
+    except Exception as e:
+        logger.warning("Error in _ws_sender_with_quit: %s", e)
 
 
 async def _ws_receiver_auth(

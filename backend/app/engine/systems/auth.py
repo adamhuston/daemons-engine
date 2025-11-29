@@ -651,6 +651,17 @@ class AuthSystem:
             await session.commit()
             return True
     
+    async def clear_active_character(self, account_id: str) -> bool:
+        """Clear the active character for an account (used when returning to char select)."""
+        async with self.db_session_factory() as session:
+            await session.execute(
+                update(UserAccount)
+                .where(UserAccount.id == account_id)
+                .values(active_character_id=None)
+            )
+            await session.commit()
+            return True
+    
     async def get_active_character(self, account_id: str) -> Player | None:
         """Get the active character for an account."""
         async with self.db_session_factory() as session:

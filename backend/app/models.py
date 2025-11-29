@@ -17,6 +17,20 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=convention)
 
 
+class RoomType(Base):
+    """
+    Room types with their associated emoji icons.
+    
+    This table is dynamically populated from rooms in the database,
+    allowing new room types to be added without code changes.
+    """
+    __tablename__ = "room_types"
+    
+    name: Mapped[str] = mapped_column(String, primary_key=True)  # e.g., "forest", "urban"
+    emoji: Mapped[str] = mapped_column(String, nullable=False, server_default="❓")  # e.g., "🌲"
+    description: Mapped[str | None] = mapped_column(String, nullable=True)  # Optional description
+
+
 class Room(Base):
     __tablename__ = "rooms"
 
@@ -24,6 +38,8 @@ class Room(Base):
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str] = mapped_column(String)
     room_type: Mapped[str] = mapped_column(String, nullable=False, server_default="ethereal")
+    # Optional per-room emoji override (if None, uses room_type's default emoji)
+    room_type_emoji: Mapped[str | None] = mapped_column(String, nullable=True)
     
     # Link to area (nullable - rooms can exist without areas)
     area_id: Mapped[str | None] = mapped_column(String, ForeignKey("areas.id"), nullable=True)
@@ -393,3 +409,50 @@ class SecurityEvent(Base):
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     timestamp: Mapped[float] = mapped_column(Float, nullable=False, index=True)  # Unix timestamp
+
+
+class AdminAction(Base):
+    """
+    Audit log for administrative actions.
+    
+    Tracks all privileged actions taken by admins, game masters, and moderators:
+    - Teleport commands
+    - Item/NPC spawning
+    - Stat modifications
+    - Kicks and bans
+    - Content reloads
+    
+    Used for accountability and debugging.
+    """
+    __tablename__ = "admin_actions"
+    
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    admin_id: Mapped[str | None] = mapped_column(String, ForeignKey("user_accounts.id", ondelete="SET NULL"), nullable=True)
+    admin_name: Mapped[str] = mapped_column(String(32), nullable=False)  # Cached for readability
+    action: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # teleport, spawn, kick, etc.
+    target_type: Mapped[str | None] = mapped_column(String(50), nullable=True)  # player, npc, item, room
+    target_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # Action-specific data
+    success: Mapped[bool] = mapped_column(Integer, nullable=False, server_default="1")
+    timestamp: Mapped[float] = mapped_column(Float, nullable=False, index=True)  # Unix timestamp
+
+
+class ServerMetric(Base):
+    """
+    Historical server metrics for performance monitoring.
+    
+    Tracks periodic snapshots of server state:
+    - Player counts
+    - NPC counts
+    - Command processing times
+    - Tick durations
+    
+    Used for capacity planning and performance analysis.
+    """
+    __tablename__ = "server_metrics"
+    
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    timestamp: Mapped[float] = mapped_column(Float, nullable=False, index=True)  # Unix timestamp
+    metric_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # players_online, tick_duration, etc.
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # Additional context

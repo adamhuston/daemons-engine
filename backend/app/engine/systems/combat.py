@@ -136,13 +136,13 @@ class CombatSystem:
         if target.id in world.players:
             events.append(self.ctx.msg_to_player(
                 target.id,
-                f"⚔️ {player.name} attacks you!"
+                f"{player.name} attacks you!"
             ))
         
         # Broadcast to room
         events.append(self.ctx.msg_to_room(
             room.id,
-            f"⚔️ {player.name} attacks {target.name}!",
+            f"{player.name} attacks {target.name}!",
             exclude={player_id, target.id}
         ))
 
@@ -225,7 +225,7 @@ class CombatSystem:
         if target.id in world.players:
             events.append(self.ctx.msg_to_player(
                 target.id,
-                f"⚔️ {attacker.name} attacks you!"
+                f"{attacker.name} attacks you!"
             ))
 
         # Room broadcast
@@ -304,11 +304,11 @@ class CombatSystem:
                         
                         events.append(self.ctx.msg_to_room(
                             room.id,
-                            f"🏃 {player.name} flees {direction}!"
+                            f"{player.name} flees {direction}!"
                         ))
                         events.append(self.ctx.msg_to_player(
                             player_id,
-                            f"🏃 You flee {direction}! (Roll: {roll} + {dex_mod} DEX = {total} vs DC {flee_dc})"
+                            f"You flee {direction}!"
                         ))
                     else:
                         events.append(self.ctx.msg_to_player(player_id, "You try to flee but the exit leads nowhere!"))
@@ -318,7 +318,7 @@ class CombatSystem:
                 # Flee failed - stay in combat
                 events.append(self.ctx.msg_to_player(
                     player_id,
-                    f"😰 You fail to escape! (Roll: {roll} + {dex_mod} DEX = {total} vs DC {flee_dc})"
+                    "You fail to escape!"
                 ))
         else:
             # Regular disengage
@@ -375,7 +375,7 @@ class CombatSystem:
         weapon = combat.current_weapon
         
         lines = [
-            f"⚔️ **Combat Status**",
+            f"**Combat Status**",
             f"Target: {target_name}{target_health}",
             f"Phase: {phase_name} ({progress:.0f}% - {remaining:.1f}s remaining)",
             f"Weapon: {weapon.damage_min}-{weapon.damage_max} damage, {weapon.swing_speed:.1f}s speed",
@@ -510,7 +510,7 @@ class CombatSystem:
             if target_id in world.players:
                 events.append(self.ctx.msg_to_player(
                     target_id,
-                    f"💥 {attacker.name} hits you for {damage} damage!{crit_text}"
+                    f"{attacker.name} hits you for {damage} damage!{crit_text}"
                 ))
                 events.extend(self.ctx.event_dispatcher.emit_stat_update(target_id))
             
@@ -726,7 +726,7 @@ class CombatSystem:
                 killer_player.experience += xp_reward
                 events.append(self.ctx.msg_to_player(
                     killer_id,
-                    f"✨ You gain {xp_reward} experience!"
+                    f"You gain {xp_reward} experience!"
                 ))
                 
                 # Hook: Quest system KILL objective tracking

@@ -294,7 +294,72 @@ The game engine uses modular systems for different domains:
   - `requires_role()` and `requires_permission()` decorators
   - Security event logging for audit trail
 
-### 3.5 World loader
+- **AdminSystem** (`routes/admin.py`): **(Phase 8)**
+  - REST API for administrative operations
+  - Role-based access: MODERATOR, GAME_MASTER, ADMIN
+  - Endpoints for world inspection (players, rooms, NPCs, items)
+  - Player manipulation (teleport, heal, kick, give items)
+  - Entity spawning/despawning
+  - Content hot-reload without server restart
+  - Audit logging for all admin actions
+
+- **ContentReloader** (`routes/admin.py`): **(Phase 8)**
+  - Hot-reload YAML content into running world
+  - Supports: item templates, NPC templates, rooms, areas
+  - Validation before loading
+  - Returns detailed success/error reports
+
+- **Logging** (`logging.py`): **(Phase 8)**
+  - structlog-based structured logging
+  - AdminAuditLogger for admin actions
+  - GameEventLogger for combat, connections, deaths
+  - PerformanceLogger for timing metrics
+  - JSON output for production, pretty output for dev
+
+- **ClassSystem** (`classes.py`): **(Phase 9 - Planned)**
+  - ClassTemplate dataclass with base stats, stat growth, abilities
+  - AbilityTemplate dataclass with costs, cooldowns, effects
+  - Resource types: mana, rage, energy, focus
+  - Active, passive, and reactive ability types
+  - YAML-driven class and ability definitions
+  - Integration with EffectSystem for ability effects
+
+### 3.5 Admin Routes
+
+`app/routes/admin.py`
+
+- **Server Status:**
+  - `GET /api/admin/server/status` - Uptime, player counts, NPC counts, scheduled events
+
+- **World Inspection:**
+  - `GET /api/admin/world/players` - List online players
+  - `GET /api/admin/world/players/{id}` - Player details
+  - `GET /api/admin/world/rooms` - List rooms (filterable by area)
+  - `GET /api/admin/world/rooms/{id}` - Room details with entities
+  - `GET /api/admin/world/areas` - List areas
+  - `GET /api/admin/world/npcs` - List NPCs (filterable by room, alive status)
+  - `GET /api/admin/world/items` - List items (filterable by location)
+
+- **Player Manipulation:**
+  - `POST /api/admin/players/{id}/teleport` - Move player to room
+  - `POST /api/admin/players/{id}/heal` - Heal player
+  - `POST /api/admin/players/{id}/kick` - Disconnect player
+  - `POST /api/admin/players/{id}/give` - Give item to player
+
+- **Spawning:**
+  - `POST /api/admin/npcs/spawn` - Spawn NPC in room
+  - `DELETE /api/admin/npcs/{id}` - Despawn NPC
+  - `POST /api/admin/items/spawn` - Spawn item in room
+  - `DELETE /api/admin/items/{id}` - Despawn item
+
+- **Broadcasting:**
+  - `POST /api/admin/server/broadcast` - Message all players
+
+- **Content Management:**
+  - `POST /api/admin/content/reload` - Hot-reload YAML content
+  - `POST /api/admin/content/validate` - Validate YAML files
+
+### 3.6 World loader
 
 `app/engine/loader.py`
 

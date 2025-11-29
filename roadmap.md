@@ -671,21 +671,206 @@ Before adding big systems, make the core loop solid.
 -  Authenticated WebSocket connection flow
 -  Legacy mode toggle for backward compatibility
 
-## Phase 8 - Admin & content tools
+## Phase 8 - Admin & content tools **COMPLETE**
 
 **Goals**: Operate and extend the game without editing code.
 
-### Backend tasks
+### Admin API Foundation ✅
 
-- Admin HTTP APIs:
-    - Manage rooms, items, NPC templates, spawns.
-    - Inspect live world state (who's in which room, etc.).
-- In-world admin commands:
-    - Teleport, spawn/despawn NPCs, give items, inspect player stats.
-- Monitoring:
-    - Simple dashboards: current players, CPU load, command volume.
+- Route setup:
+    - ✅ `backend/app/routes/admin.py` - Dedicated admin router
+    - ✅ JWT-based auth with role checking (MODERATOR, GAME_MASTER, ADMIN)
+    - ✅ `require_permission()` and `require_role()` dependencies
+    - ✅ Registered at `/api/admin` prefix
 
-## Phase 9 - Niceties & polish
+### Server Status & Monitoring ✅
+
+- GET `/api/admin/server/status`:
+    - ✅ Uptime, players online, players in combat
+    - ✅ NPCs alive, rooms occupied, total areas
+    - ✅ Scheduled events count, next event timing
+    - ✅ Maintenance mode flag
+
+### World Inspection APIs ✅
+
+- Player inspection:
+    - ✅ GET `/world/players` - List online players with health, location, combat status
+    - ✅ GET `/world/players/{id}` - Detailed player info
+- World state:
+    - ✅ GET `/world/rooms` - List rooms with player/NPC/item counts (filterable by area)
+    - ✅ GET `/world/rooms/{id}` - Room details with entities, triggers, flags
+    - ✅ GET `/world/areas` - List areas with time scale, room/player counts
+    - ✅ GET `/world/npcs` - List NPCs (filterable by room, alive status)
+    - ✅ GET `/world/items` - List items (filterable by room, player)
+
+### Player Manipulation APIs ✅
+
+- ✅ POST `/players/{id}/teleport` - Move player to room (TELEPORT permission)
+- ✅ POST `/players/{id}/heal` - Heal player (MODIFY_STATS permission)
+- ✅ POST `/players/{id}/kick` - Disconnect player (KICK_PLAYER permission)
+- ✅ POST `/players/{id}/give` - Give item to player (SPAWN_ITEM permission)
+- ✅ POST `/players/{id}/effect` - Apply effect (MODIFY_STATS permission)
+
+### Spawn/Despawn APIs ✅
+
+- ✅ POST `/npcs/spawn` - Spawn NPC from template (SPAWN_NPC permission)
+- ✅ DELETE `/npcs/{id}` - Despawn NPC (SPAWN_NPC permission)
+- ✅ POST `/items/spawn` - Spawn item in room (SPAWN_ITEM permission)
+- ✅ DELETE `/items/{id}` - Despawn item (SPAWN_ITEM permission)
+
+### Broadcast System ✅
+
+- ✅ POST `/server/broadcast` - Send message to all players (ADMIN only)
+
+### Content Hot-Reload System ✅
+
+- ContentReloader class:
+    - ✅ `reload_item_templates()` - Reload item definitions from YAML
+    - ✅ `reload_npc_templates()` - Reload NPC definitions from YAML
+    - ✅ `reload_rooms()` - Update room descriptions and exits
+    - ✅ `reload_areas()` - Update area configurations
+    - ✅ `reload_all()` - Reload all content types
+
+- Validation before reload:
+    - ✅ `validate_yaml_file()` - Check YAML syntax and required fields
+    - ✅ Validation for each content type (areas, rooms, items, NPCs)
+    - ✅ Returns detailed error/warning lists
+
+- Endpoints:
+    - ✅ POST `/content/reload` - Hot-reload content (ADMIN only)
+    - ✅ POST `/content/validate` - Validate YAML files (GAME_MASTER+)
+
+### In-World Admin Commands ✅
+
+- MODERATOR commands:
+    - ✅ `who` - List online players with locations
+    - ✅ `where <player>` - Show specific player's location
+    - ✅ `kick <player> [reason]` - Disconnect player
+
+- GAME_MASTER commands:
+    - ✅ `goto <room_id>` or `goto <player>` - Teleport self
+    - ✅ `summon <player>` - Teleport player to you
+    - ✅ `teleport <player> <room_id>` - Teleport player to room
+    - ✅ `spawn <npc|item> <template_id>` - Spawn entity in current room
+    - ✅ `despawn <npc> <id>` - Remove NPC
+    - ✅ `give <player> <item_template_id> [quantity]` - Give item to player
+    - ✅ `setstat <player> <stat> <value>` - Modify player stat
+    - ✅ `heal <player> [amount]` - Heal player (existing)
+    - ✅ `hurt <player> <amount>` - Damage player (existing)
+
+- ADMIN commands:
+    - ✅ `broadcast <message>` - Send message to all players
+
+### Structured Logging ✅
+
+- `backend/app/logging.py`:
+    - ✅ structlog configuration (JSON for prod, pretty for dev)
+    - ✅ Custom processors: timestamp, service name, sensitive data redaction
+    - ✅ AdminAuditLogger - Specialized logging for admin actions
+    - ✅ GameEventLogger - Combat, player connect/disconnect, deaths
+    - ✅ PerformanceLogger - Command timing, tick duration, DB queries
+
+- Audit logging integrated:
+    - ✅ All admin API endpoints log to AdminAuditLogger
+    - ✅ Teleport, kick, give, spawn, despawn actions tracked
+    - ✅ Content reload operations logged
+
+### Database Audit Tables ✅
+
+- Migration `a1b2c3d4e5f6_phase8_admin_audit.py`:
+    - ✅ `admin_actions` table - All admin action audit logs
+    - ✅ `server_metrics` table - Historical performance metrics
+    - ✅ Proper indexes for time-series queries
+
+### Models Added ✅
+
+- ✅ `AdminAction` - Audit log entry for admin actions
+- ✅ `ServerMetric` - Performance metric snapshot
+
+### Dependencies ✅
+
+- ✅ Added `structlog==25.3.0` to requirements.txt
+
+## Phase 9 - Classes & Abilities
+
+**Goals**: Extensible character class system with unique abilities, resource management, and progression paths.
+
+### Class System Architecture
+
+- ClassTemplate dataclass:
+    - `class_id`, `name`, `description`
+    - `base_stats` - Starting stat modifiers
+    - `stat_growth` - Per-level stat gains
+    - `resource_type` - Primary resource (mana, rage, energy, focus)
+    - `abilities` - List of ability IDs unlocked by class
+    - `passive_effects` - Always-active class bonuses
+
+- YAML-driven class definitions:
+    - `world_data/classes/` directory
+    - Easy to add new classes without code changes
+
+### Ability System
+
+- AbilityTemplate dataclass:
+    - `ability_id`, `name`, `description`
+    - `resource_cost` - Cost to use
+    - `cooldown` - Seconds between uses
+    - `cast_time` - Channel/cast duration (0 = instant)
+    - `range` - self, target, room, area
+    - `effects` - List of effects to apply
+    - `requirements` - Level, class, equipment, etc.
+
+- Ability Types:
+    - Active: Explicitly triggered by player command
+    - Passive: Always active, modifies stats or triggers on events
+    - Reactive: Triggers on specific conditions (on_hit, on_kill, etc.)
+
+- Ability effects:
+    - Damage (direct, DoT)
+    - Healing (direct, HoT)
+    - Buff/Debuff application
+    - Movement (teleport, dash)
+    - Summon (temporary NPCs)
+    - Custom script hooks
+
+### Resource System
+
+- Resource types:
+    - Mana: Regenerates over time
+    - Rage: Builds from combat, decays out of combat
+    - Energy: Fast regen, low max
+    - Focus: Builds from specific actions
+
+- ResourceManager integration with EffectSystem:
+    - Regen rates modified by stats/effects
+    - Resource costs modified by talents/gear
+
+### Talent/Specialization Trees (Future)
+
+- Talent points earned on level-up
+- Specialization paths within each class
+- Talent effects: ability upgrades, new passives, stat bonuses
+
+### Commands
+
+- `abilities` / `skills`: List available abilities
+- `use <ability>` / `cast <ability>`: Activate an ability
+- `use <ability> <target>`: Targeted abilities
+- `class`: View current class info and progression
+
+### YAML Content
+
+- `world_data/classes/warrior.yaml`, `mage.yaml`, `rogue.yaml`, etc.
+- `world_data/abilities/` directory organized by class
+
+### Database Extensions
+
+- `players.class_id` - Selected class
+- `players.ability_cooldowns` (JSON) - Active cooldown tracking
+- `players.resource_current` - Current resource value
+- `class_templates` table (optional, can be YAML-only)
+
+## Phase 10 - Niceties & polish
 
 - Rate limiting & abuse protection (spam commands, chat).
     - Localization hooks in text output.

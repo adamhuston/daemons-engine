@@ -2,13 +2,39 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Room, Player, Area, ItemTemplate, ItemInstance, PlayerInventory, NpcTemplate, NpcInstance
+from ..models import Room, Player, Area, ItemTemplate, ItemInstance, PlayerInventory, NpcTemplate, NpcInstance, RoomType
 from .world import (
     World, WorldRoom, WorldPlayer, WorldArea, WorldTime, ItemTemplate as WorldItemTemplate,
     WorldItem, PlayerInventory as WorldPlayerInventory, RoomId, PlayerId, AreaId, ItemId,
     ItemTemplateId, DEFAULT_TIME_PHASES, NpcTemplate as WorldNpcTemplate, WorldNpc, NpcId,
-    NpcTemplateId, EntityType, resolve_behaviors
+    NpcTemplateId, EntityType, resolve_behaviors, set_room_type_emojis, DEFAULT_ROOM_TYPE_EMOJIS
 )
+
+
+async def load_room_types(session: AsyncSession) -> dict[str, str]:
+    """
+    Load room type emojis from the database.
+    
+    Returns a dict mapping room type names to their emojis.
+    Also ensures all default room types exist in the database.
+    """
+    # First, ensure all default room types exist in DB
+    existing_result = await session.execute(select(RoomType))
+    existing_types = {rt.name: rt for rt in existing_result.scalars().all()}
+    
+    # Add any missing default room types
+    for name, emoji in DEFAULT_ROOM_TYPE_EMOJIS.items():
+        if name not in existing_types:
+            new_type = RoomType(name=name, emoji=emoji)
+            session.add(new_type)
+            existing_types[name] = new_type
+    
+    # Build the emoji mapping BEFORE commit (objects expire after commit)
+    result = {rt.name: rt.emoji for rt in existing_types.values()}
+    
+    await session.commit()
+    
+    return result
 
 
 async def load_world(session: AsyncSession) -> World:
@@ -17,6 +43,10 @@ async def load_world(session: AsyncSession) -> World:
 
     Called once at startup (in main.py), but can be reused for reloads/tests.
     """
+    # ----- Load room types -----
+    room_type_emojis = await load_room_types(session)
+    set_room_type_emojis(room_type_emojis)
+    
     # ----- Load rooms -----
     room_result = await session.execute(select(Room))
     room_models = room_result.scalars().all()
@@ -29,17 +59,29 @@ async def load_world(session: AsyncSession) -> World:
             dest_id = getattr(r, f"{d}_id")
             if dest_id:
                 exits[d] = dest_id
+        
+        # Check if this room uses a new room type not in the database yet
+        if r.room_type not in room_type_emojis:
+            # Add new room type with default emoji
+            new_type = RoomType(name=r.room_type, emoji="❓")
+            session.add(new_type)
+            room_type_emojis[r.room_type] = "❓"
+            await session.commit()
 
         rooms[r.id] = WorldRoom(
             id=r.id,
             name=r.name,
             description=r.description,
             room_type=r.room_type,
+            room_type_emoji=getattr(r, 'room_type_emoji', None),
             exits=exits,
             area_id=r.area_id,
             on_enter_effect=r.on_enter_effect,
             on_exit_effect=r.on_exit_effect,
         )
+    
+    # Update the global emoji cache with any new types discovered
+    set_room_type_emojis(room_type_emojis)
 
     # ----- Load players -----
     player_result = await session.execute(select(Player))

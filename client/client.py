@@ -24,7 +24,7 @@ def main(page: ft.Page):
     }
     
     # Set default font for the page (optional)
-    page.theme = ft.Theme(font_family="IM Fell English")
+    page.theme = ft.Theme(font_family="Consolas")
 
     # UI controls - Column for colored log lines
     log_column = ft.Column([], scroll=ft.ScrollMode.AUTO, auto_scroll=True)
@@ -112,7 +112,7 @@ def main(page: ft.Page):
         "user_id": None,
         "username": None,
         "role": None,
-        "active_character_id": None,
+        "in_game": False,  # True once we're past character selection and in the game world
     }
     
     def update_mode_visibility(e=None):
@@ -149,17 +149,17 @@ def main(page: ft.Page):
                     state["user_id"] = data["user_id"]
                     state["username"] = data["username"]
                     state["role"] = data["role"]
-                    state["active_character_id"] = data.get("active_character_id")
                     
                     user_info.value = f"Logged in as: {data['username']} ({data['role']})"
                     user_info.color = ft.Colors.GREEN
                     connect_button.disabled = False
                     append_line(f"[auth] Login successful! Role: {data['role']}", ft.Colors.GREEN)
                     
-                    if not state["active_character_id"]:
-                        append_line("[auth] No active character. Create one or select from your characters.", ft.Colors.YELLOW)
-                    
                     page.update()
+                    
+                    # Auto-connect to WebSocket after login
+                    await connect_ws_auth()
+                    
                     return True
                 else:
                     error = response.json().get("detail", "Login failed")
@@ -194,6 +194,8 @@ def main(page: ft.Page):
             append_line(f"[auth] Error: {e!r}", ft.Colors.RED)
             return False
 
+    # ---------- WebSocket Connection ----------
+
     async def connect_ws_auth() -> None:
         """Connect using authenticated WebSocket endpoint."""
         if state["connected"]:
@@ -202,10 +204,6 @@ def main(page: ft.Page):
         
         if not state["access_token"]:
             append_line("[system] Please login first.")
-            return
-        
-        if not state["active_character_id"]:
-            append_line("[system] No active character. Please create or select a character first.")
             return
 
         url = f"{WS_AUTH_URL}?token={state['access_token']}"
@@ -223,7 +221,8 @@ def main(page: ft.Page):
 
         state["ws"] = ws
         state["connected"] = True
-        status_text.value = "Connected (Authenticated)"
+        state["in_game"] = False  # Will become True when we get auth_success
+        status_text.value = "Connected"
         page.update()
 
         try:
@@ -239,9 +238,17 @@ def main(page: ft.Page):
                 payload = ev.get("payload")
 
                 if ev_type == "auth_success":
+                    state["in_game"] = True
+                    status_text.value = "Connected (In Game)"
                     append_line(f"[auth] Connected as player {ev.get('player_id')}", ft.Colors.GREEN)
-                    # Auto-send look
-                    await ws.send(json.dumps({"type": "command", "text": "look"}))
+                    page.update()
+                elif ev_type == "character_menu":
+                    # Server-side character selection menu
+                    state["in_game"] = False
+                    status_text.value = "Connected (Character Select)"
+                    if text:
+                        append_line(text, ft.Colors.CYAN)
+                    page.update()
                 elif ev_type == "error":
                     append_line(f"[error] {text}", ft.Colors.RED)
                 elif ev_type == "message" and text:
@@ -266,6 +273,18 @@ def main(page: ft.Page):
                             hp_status.color = ft.Colors.RED
                         
                         page.update()
+                elif ev_type == "quit":
+                    # Graceful disconnect - server handles returning to character selection
+                    # The server will send a new character_menu after quit
+                    append_line("[system] Returning to character selection...", ft.Colors.CYAN)
+                    state["in_game"] = False
+                    hp_status.value = "HP: --/--"
+                    hp_status.color = ft.Colors.GREEN
+                    status_text.value = "Connected (Character Select)"
+                    page.update()
+                elif ev_type == "respawn_countdown":
+                    # Silently ignore - respawn info comes via message events
+                    pass
                 else:
                     append_line(f"[event] {ev}", ft.Colors.GREY_700)
         except Exception as e:
@@ -273,6 +292,7 @@ def main(page: ft.Page):
         finally:
             state["connected"] = False
             state["ws"] = None
+            state["in_game"] = False
             status_text.value = "Disconnected"
             append_line("[system] Disconnected.")
             page.update()
@@ -341,7 +361,7 @@ def main(page: ft.Page):
                     selectable=True, 
                     color=color, 
                     size=12,
-                    font_family="IM Fell English",  # Use the custom font
+                    font_family="Consolas",  # Option to use a custom font
                 )
             )
         page.update()
@@ -367,14 +387,10 @@ def main(page: ft.Page):
         state["ws"] = ws
         state["connected"] = True
         status_text.value = "Connected"
-        append_line("[system] Connected. Sending 'look'...")
+        append_line("[system] Connected.")
         page.update()
 
-        # Auto-send look
-        try:
-            await ws.send(json.dumps({"type": "command", "text": "look"}))
-        except Exception as e:
-            append_line(f"[error] Failed to send initial 'look' command: {e!r}")
+        # Server sends initial room description via register_player, no need to send look
 
         try:
             async for raw in ws:
@@ -416,6 +432,9 @@ def main(page: ft.Page):
                 elif ev_type == "respawn_countdown":
                     # Respawn countdown is handled via message events, ignore the data event
                     pass
+                elif ev_type in ("npc_state", "room_state"):
+                    # Internal state updates - silently ignore
+                    pass
                 else:
                     # Unknown event type - show for debugging
                     append_line(f"[event] {ev}", ft.Colors.GREY_700)
@@ -429,23 +448,25 @@ def main(page: ft.Page):
             page.update()
 
     async def send_command(cmd: str) -> None:
+        cmd = cmd.strip()
+        if not cmd:
+            return
+        
+        # Clear input field first
+        command_field.value = ""
+        command_field.focus()
+        page.update()
+        
+        # All commands are sent to the server (both in-game and character selection)
         ws = state["ws"]
         if not state["connected"] or ws is None:
             append_line("[system] Not connected.")
-            return
-
-        cmd = cmd.strip()
-        if not cmd:
             return
 
         try:
             await ws.send(json.dumps({"type": "command", "text": cmd}))
         except Exception as e:
             append_line(f"[error] Failed to send: {e!r}", ft.Colors.RED)
-        finally:
-            command_field.value = ""
-            command_field.focus()
-            page.update()
 
     def login_click(e: ft.ControlEvent) -> None:
         username = username_field.value.strip()

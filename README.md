@@ -134,6 +134,7 @@ python client.py
 |-------|-------------|
 | 0-7 | Complete (stats, time, items, combat, NPCs, triggers, quests, persistence, auth) |
 | 8 | Planned: Admin tools |
+| 9 | Planned: Classes & abilities |
 
 ## Stack
 
