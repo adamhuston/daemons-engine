@@ -1,11 +1,11 @@
-# Daemon
+# Daemons
 
 **A modern MUD engine.**
 
 Headless game engine for real-time, text-based multiplayer worlds. Python/FastAPI backend exposing a WebSocket API. Handles game state, persistence, and authentication—bring your own frontend.
 
 **Ecosystem (planned):**
-- **Daemonwright** — Visual content management for Daemon worlds
+- **Daemonswright** — Visual content management for Daemons worlds
 - **Scry** — Cross-platform game client
 
 ## Architecture Highlights
