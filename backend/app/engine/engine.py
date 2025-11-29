@@ -19,6 +19,9 @@ from .behaviors import (
 from .systems import GameContext, TimeEventManager, EventDispatcher, CombatSystem, EffectSystem, CommandRouter, TriggerSystem, TriggerContext, QuestSystem, StateTracker, ENTITY_PLAYER, ENTITY_ROOM, ENTITY_NPC, ENTITY_ITEM, ENTITY_TRIGGER
 from .systems.classes import ClassSystem
 from .systems.abilities import AbilityExecutor
+from .systems.group_system import GroupSystem
+from .systems.clan_system import ClanSystem
+from .systems.faction_system import FactionSystem
 
 
 
@@ -74,11 +77,28 @@ class WorldEngine:
         self.quest_system = QuestSystem(self.ctx)
         self.ctx.quest_system = self.quest_system
         
+        # Phase 10.1: Social systems (groups, tells, follows)
+        self.group_system = GroupSystem()
+        self.ctx.group_system = self.group_system
+        
+        # Phase 10.2: Clan system (persistent player organizations)
+        self.clan_system = ClanSystem(db_session_factory)
+        self.ctx.clan_system = self.clan_system
+        
+        # Phase 10.3: Faction system (NPC factions with reputation)
+        self.faction_system = FactionSystem(db_session_factory)
+        self.ctx.faction_system = self.faction_system
+        
         # Phase 9: Character classes and abilities system
         self.class_system = ClassSystem(self.ctx)
         self.ctx.class_system = self.class_system
         self.ability_executor = AbilityExecutor(self.ctx)
         self.ctx.ability_executor = self.ability_executor
+        
+        # Phase 11: Lighting and vision system
+        from app.engine.systems.lighting import LightingSystem
+        self.lighting_system = LightingSystem(world, self.time_manager)
+        self.ctx.lighting_system = self.lighting_system
         
         # Phase 6: State persistence tracker
         if db_session_factory:
@@ -394,6 +414,15 @@ class WorldEngine:
         )
         
         self.command_router.register_handler(
+            primary_name="lightlevel",
+            handler=self._lightlevel_handler,
+            names=["lightlevel", "ll"],
+            category="admin",
+            description="[GM] Check light level in current room",
+            usage=""
+        )
+        
+        self.command_router.register_handler(
             primary_name="inspect",
             handler=self._inspect_handler,
             names=["inspect", "examine"],
@@ -538,6 +567,22 @@ class WorldEngine:
             usage=""
         )
         
+        # Phase 10.1: Social commands (groups, tells, follows, yells)
+        from app.commands.social import (
+            register_group_commands,
+            register_tell_commands,
+            register_follow_commands,
+            register_yell_commands,
+            register_clan_commands,
+            register_faction_commands,
+        )
+        register_group_commands(self.command_router)
+        register_tell_commands(self.command_router)
+        register_follow_commands(self.command_router)
+        register_yell_commands(self.command_router)
+        register_clan_commands(self.command_router)
+        register_faction_commands(self.command_router)
+        
         # Quit command - graceful disconnect
         self.command_router.register_handler(
             primary_name="quit",
@@ -657,6 +702,100 @@ class WorldEngine:
         return self._hurt(player_id, args)
 
     # ---------- Phase 8: Admin command handlers ----------
+
+    def _lightlevel_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[GM] Check the light level in the current room and show contributing sources."""
+        if not self._check_permission(player_id, "TELEPORT"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "Player not found.")]
+        
+        room = self.world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are not in a valid room.")]
+        
+        # Get comprehensive light information
+        import time
+        current_time = time.time()
+        light_level = self.lighting_system.calculate_room_light(room, current_time)
+        visibility = self.lighting_system.get_visibility_level(light_level)
+        room_state = self.lighting_system.room_light_states.get(room.room_id)
+        
+        area = self.world.areas.get(room.area_id) if room.area_id else None
+        
+        # Build detailed light report
+        lines = [f"🔦 Light Level Analysis: {room.name}"]
+        lines.append("=" * 50)
+        lines.append(f"Light Level: {light_level}/100")
+        lines.append(f"Visibility: {visibility.name} ({visibility.value})")
+        lines.append("")
+        
+        if room_state:
+            lines.append("Contributing Light Sources:")
+            lines.append("-" * 50)
+            
+            # Calculate base ambient light
+            if area:
+                from .systems.lighting import AMBIENT_LIGHTING_VALUES
+                ambient_str = getattr(area, "ambient_lighting", "normal")
+                ambient = AMBIENT_LIGHTING_VALUES.get(ambient_str, 60)
+                biome_name = area.biome
+                lines.append(f"  Ambient ({biome_name}): +{ambient}")
+            else:
+                lines.append(f"  Ambient (no area): +60")
+            
+            # Time of day modifier
+            if area and hasattr(area, 'area_time'):
+                from .systems.lighting import TIME_IMMUNE_BIOMES
+                if area.biome not in TIME_IMMUNE_BIOMES:
+                    time_modifier = self.lighting_system._calculate_time_modifier(area, current_time)
+                    if time_modifier != 0:
+                        time_period = area.area_time.get_time_period() if hasattr(area.area_time, 'get_time_period') else "unknown"
+                        sign = "+" if time_modifier > 0 else ""
+                        lines.append(f"  Time of Day ({time_period}): {sign}{time_modifier}")
+            
+            # Active light/darkness sources
+            if room_state.active_light_sources:
+                light_count = sum(1 for s in room_state.active_light_sources.values() if s.intensity > 0)
+                dark_count = sum(1 for s in room_state.active_light_sources.values() if s.intensity < 0)
+                
+                if light_count > 0:
+                    lines.append(f"  Active Light Sources: {light_count}")
+                    for source_id, source in room_state.active_light_sources.items():
+                        if source.intensity > 0:
+                            source_type = source.source_type.replace('_', ' ').title()
+                            import datetime
+                            expires_str = datetime.datetime.fromtimestamp(source.expires_at).strftime("%H:%M:%S") if source.expires_at else "permanent"
+                            lines.append(f"    - {source_type} '{source_id}': +{source.intensity} (expires: {expires_str})")
+                
+                if dark_count > 0:
+                    lines.append(f"  Darkness Effects: {dark_count}")
+                    for source_id, source in room_state.active_light_sources.items():
+                        if source.intensity < 0:
+                            source_type = source.source_type.replace('_', ' ').title()
+                            import datetime
+                            expires_str = datetime.datetime.fromtimestamp(source.expires_at).strftime("%H:%M:%S") if source.expires_at else "permanent"
+                            lines.append(f"    - {source_type} '{source_id}': {source.intensity} (expires: {expires_str})")
+        else:
+            lines.append("Light state not initialized for this room.")
+        
+        lines.append("=" * 50)
+        
+        # Visibility implications
+        if visibility == VisibilityLevel.NONE:
+            lines.append("⚫ Pitch black - Cannot see anything")
+        elif visibility == VisibilityLevel.MINIMAL:
+            lines.append("🌑 Minimal - Can only sense presence of things")
+        elif visibility == VisibilityLevel.PARTIAL:
+            lines.append("🌘 Partial - Can see basic details")
+        elif visibility == VisibilityLevel.NORMAL:
+            lines.append("🌕 Normal - Full visibility")
+        elif visibility == VisibilityLevel.ENHANCED:
+            lines.append("✨ Enhanced - Perfect clarity")
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]
 
     def _who_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """[Mod] List all online players with their locations."""
@@ -1624,6 +1763,27 @@ class WorldEngine:
         # Phase 6: Start periodic state saves
         if self.state_tracker:
             self.state_tracker.schedule_periodic_save()
+        
+        # Phase 10.1: Schedule periodic cleanup of stale groups
+        self._schedule_stale_group_cleanup()
+    
+    def _schedule_stale_group_cleanup(self) -> None:
+        """Schedule recurring cleanup of stale groups (inactive 30+ minutes)."""
+        async def cleanup_stale_groups():
+            """Callback to clean up stale groups and reschedule."""
+            disbanded = self.group_system.clean_stale_groups()
+            if disbanded:
+                logger.info(f"Disbanded {len(disbanded)} stale groups")
+            # Reschedule for next cleanup
+            self._schedule_stale_group_cleanup()
+        
+        # Schedule cleanup every 5 minutes
+        interval = 5 * 60
+        self.schedule_event(
+            delay_seconds=interval,
+            callback=cleanup_stale_groups,
+            event_id="stale_group_cleanup"
+        )
     
     def _schedule_time_advancement(self) -> None:
         """
@@ -1634,6 +1794,11 @@ class WorldEngine:
         
         async def advance_world_time():
             """Callback to advance time in all areas and reschedule."""
+            # Track if time period changed for any area (for lighting recalculation)
+            time_periods_before = {}
+            for area in self.world.areas.values():
+                time_periods_before[area.id] = area.area_time.get_time_of_day(area.time_scale)
+            
             # Advance each area's time independently
             for area in self.world.areas.values():
                 area.area_time.advance(
@@ -1650,6 +1815,19 @@ class WorldEngine:
                 real_seconds_elapsed=30.0,
                 time_scale=1.0  # Global time runs at normal speed
             )
+            
+            # Phase 11: Check if time period changed for any area
+            time_period_changed = False
+            for area in self.world.areas.values():
+                new_period = area.area_time.get_time_of_day(area.time_scale)
+                old_period = time_periods_before.get(area.id)
+                if old_period and new_period != old_period:
+                    time_period_changed = True
+                    print(f"[Lighting] Time period changed in {area.name}: {old_period} → {new_period}")
+            
+            # If time period changed, recalculate all room lighting
+            if time_period_changed:
+                self.lighting_system.recalculate_all_rooms()
             
             # Reschedule for next hour
             self._schedule_time_advancement()
@@ -3214,6 +3392,7 @@ class WorldEngine:
             return self._look(player_id)
 
     def _look(self, player_id: PlayerId) -> List[Event]:
+        import time
         world = self.world
 
         if player_id not in world.players:
@@ -3235,15 +3414,38 @@ class WorldEngine:
                 )
             ]
 
+        # Phase 11: Check light level for visibility
+        current_time = time.time()
+        light_level = self.lighting_system.calculate_room_light(room, current_time)
+        visibility = self.lighting_system.get_visibility_level(light_level)
+        
+        # If pitch black, show darkness message
+        from app.engine.systems.lighting import VisibilityLevel
+        if visibility == VisibilityLevel.NONE:
+            return [self._msg_to_player(
+                player_id,
+                "It is pitch black. You can't see anything.\n"
+                "You might need a light source to see your surroundings."
+            )]
+        
         room_emoji = get_room_emoji(room.room_type, room.room_type_emoji)
-        # Use effective description for trigger overrides
-        lines: list[str] = [f"**{room_emoji} {room.name}**", room.get_effective_description()]
+        
+        # Get description based on light level
+        description = self.lighting_system.get_visible_description(room, light_level)
+        lines: list[str] = [f"**{room_emoji} {room.name}**", description]
 
         # List all entities (players and NPCs) in the same room
-        lines.extend(self._format_room_entities(room, player_id))
+        # Filter by visibility
+        if visibility != VisibilityLevel.MINIMAL:  # Can see entities in dim+ light
+            lines.extend(self._format_room_entities(room, player_id))
+        elif visibility == VisibilityLevel.MINIMAL:
+            # In minimal light, show only that entities are present
+            entity_count = len([e for e in room.entities if e != player_id])
+            if entity_count > 0:
+                lines.append(f"\nYou sense {entity_count} other presence(s) nearby.")
 
-        # Show items in room (Phase 3)
-        if room.items:
+        # Show items in room (Phase 3) - only if light is sufficient
+        if room.items and self.lighting_system.can_see_item_details(light_level):
             items_here = []
             for item_id in room.items:
                 item = world.items[item_id]
@@ -3254,8 +3456,11 @@ class WorldEngine:
             lines.append("")
             lines.append("Items here:")
             lines.extend(items_here)
+        elif room.items and visibility == VisibilityLevel.MINIMAL:
+            lines.append("\nYou can barely make out some objects on the ground.")
 
         # List available exits (use effective exits for trigger overrides)
+        # Always show exits unless pitch black (already handled above)
         effective_exits = room.get_effective_exits()
         if effective_exits:
             exits = list(effective_exits.keys())
@@ -3382,6 +3587,7 @@ class WorldEngine:
         
         Uses the Targetable protocol to find and describe targets uniformly.
         """
+        import time
         world = self.world
         
         if player_id not in world.players:
@@ -3391,6 +3597,15 @@ class WorldEngine:
         room = world.rooms.get(player.room_id)
         if not room:
             return [self._msg_to_player(player_id, "You are nowhere. (Room not found)")]
+        
+        # Phase 11: Check if there's enough light to inspect targets
+        current_time = time.time()
+        light_level = self.lighting_system.calculate_room_light(room, current_time)
+        if not self.lighting_system.can_inspect_target(light_level):
+            return [self._msg_to_player(
+                player_id,
+                "It's too dark to see details. You need more light to examine things closely."
+            )]
         
         # Use unified targeting to find the target
         target, target_type = self._find_targetable_in_room(
@@ -4743,6 +4958,33 @@ class WorldEngine:
             if previously_equipped:
                 prev_template = world.item_templates[world.items[previously_equipped].template_id]
                 messages.append(f"You unequip {prev_template.name}.")
+                
+                # Phase 11: Remove light source if previously equipped item provided light
+                if prev_template.provides_light:
+                    self.lighting_system.remove_light_source(
+                        room_id=player.room_id,
+                        source_id=f"item_{previously_equipped}"
+                    )
+            
+            # Phase 11: Add light source if item provides light
+            if template.provides_light and template.light_intensity > 0:
+                import time
+                expires_at = None
+                if template.light_duration:
+                    expires_at = time.time() + template.light_duration
+                
+                self.lighting_system.update_light_source(
+                    room_id=player.room_id,
+                    source_id=f"item_{found_item_id}",
+                    source_type="item",
+                    intensity=template.light_intensity,
+                    expires_at=expires_at
+                )
+                
+                if template.light_duration:
+                    messages.append(f"{template.name} begins to glow brightly!")
+                else:
+                    messages.append(f"{template.name} illuminates the area.")
             
             # Emit stat update event (reuse existing pattern from effect system)
             events = [self._msg_to_player(player_id, "\n".join(messages))]
@@ -4775,8 +5017,18 @@ class WorldEngine:
         try:
             unequip_item(world, player_id, found_item_id)
             
+            messages = [f"You unequip {template.name}."]
+            
+            # Phase 11: Remove light source if item provided light
+            if template.provides_light:
+                self.lighting_system.remove_light_source(
+                    room_id=player.room_id,
+                    source_id=f"item_{found_item_id}"
+                )
+                messages.append(f"{template.name}'s light fades.")
+            
             # Emit stat update event
-            events = [self._msg_to_player(player_id, f"You unequip {template.name}.")]
+            events = [self._msg_to_player(player_id, "\n".join(messages))]
             events.extend(self._emit_stat_update(player_id))
             
             return events

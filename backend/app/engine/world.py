@@ -885,6 +885,11 @@ class ItemTemplate:
     attack_speed: float = 2.0  # seconds per swing
     damage_type: str = "physical"  # physical, magic, fire, etc.
     
+    # Phase 11: Light source properties (torches, lanterns, glowing items)
+    provides_light: bool = False  # Whether item emits light when equipped
+    light_intensity: int = 0  # Light contribution (0-50)
+    light_duration: int | None = None  # Duration in seconds (None = permanent)
+    
     def is_weapon(self) -> bool:
         """Check if this item is a weapon."""
         return self.item_type == "weapon"
@@ -1280,6 +1285,10 @@ class WorldRoom:
     time_scale: float = 1.0  # e.g., 2.0 = double speed, 0.5 = half speed, 0.0 = frozen
     # Items in this room
     items: Set[ItemId] = field(default_factory=set)
+    
+    # ---------- Phase 11: Lighting System ----------
+    # Room-specific lighting override (replaces area ambient + time calculation)
+    lighting_override: str | None = None  # String value 0-100, or None for calculated light
     
     # ---------- Phase 5: Trigger System ----------
     # Triggers respond to events (on_enter, on_exit, on_command, on_timer)

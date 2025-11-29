@@ -56,6 +56,7 @@ class GameContext:
         self.quest_system: Any = None  # QuestSystem
         self.state_tracker: Any = None  # StateTracker (Phase 6)
         self.auth_system: Any = None  # AuthSystem (Phase 7)
+        self.group_system: Any = None  # GroupSystem (Phase 10.1)
         
         # Per-request auth info (set during WebSocket message handling)
         # Contains {"user_id": str, "role": str} from verified JWT

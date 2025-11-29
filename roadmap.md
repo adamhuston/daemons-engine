@@ -1,54 +1,42 @@
 ﻿# Roadmap
 
-## Phase 0  Hardening
+## Phase 0  Hardening **COMPLETE**
 
 Before adding big systems, make the core loop solid.
 
 **Goals**: No silent failures; predictable behavior under load.
 
-### Backend tasks
+### Backend tasks ✅
 
-- Logging & observability
-    - Structured logs for:
-        - player connect/disconnect,
-        - commands received,
-        - errors in engine / WS tasks.
-    - Simple metrics hooks (counters for active players, commands/sec).
-- Error handling
-    - Make sure _ws_sender / _ws_receiver never kill the app on exceptions.
-    - Graceful handling of bad JSON / unknown commands.
-- Protocol doc
-    - Write a short protocol.md:
-        - shape of clientserver commands,
-        - shape of serverclient events (type, text, optional payload).
+- ✅ Logging & observability
+    - ✅ Structured logs for: player connect/disconnect, commands received, errors in engine/WS tasks
+    - ✅ Metrics hooks and counters for active players
+- ✅ Error handling
+    - ✅ Graceful exception handling in _ws_sender / _ws_receiver
+    - ✅ Graceful handling of bad JSON / unknown commands
+- ✅ Protocol documentation
+    - ✅ protocol.md: client→server commands and server→client event shapes
 
 
 
-## Phase 1  Player stats and progression
+## Phase 1  Player stats and progression **COMPLETE**
 
 **Goals**: A player is more than just a name + room.
 
-### Backend model changes
+### Backend model changes ✅
 
--  Extend Player model:
-    -  Base stats: str, dex, int, vit, etc.
-    -  Derived stats: hp, max_hp, mp, max_mp, level, xp.
-    -  Class / archetype as a simple string/enum.
--  World model:
-    -  Add those fields to WorldPlayer.
-    -  Add a payload section in events for stat updates.
+- ✅ Extended Player model:
+    - ✅ Base stats: str, dex, int, vit, con, wis, cha
+    - ✅ Derived stats: hp, max_hp, mp, max_mp, level, xp
+    - ✅ Class/archetype tracking
+- ✅ Enhanced WorldPlayer with stat fields
+- ✅ Stat update events with payloads
 
-### Engine changes
+### Engine changes ✅
 
--  New commands:
-    -  stats/sheet: prints current stats.
--  Event types:
-    -  stat_update events:
-        - {"type": "stat_update", "payload": {"hp": 10, "max_hp": 20, "level": 3}}
--  Persistence policy:
-    -  Implemented: sync WorldPlayer  DB on disconnect
-    -  Future: periodically (can now use time event system from Phase 2)
-    -  Future: on key events (level up, death, etc.).
+- ✅ Commands: stats/sheet/status - print current stats
+- ✅ Event types: stat_update events with hp, max_hp, level, etc.
+- ✅ Persistence: sync WorldPlayer stats to DB on disconnect and key events
 
 
 
@@ -58,107 +46,107 @@ Before adding big systems, make the core loop solid.
 
 **Note**: The original design called for traditional "ticks" but we implemented an event-driven architecture instead.
 
-### Phase 2a  Core Time System 
-- Event-driven time system (not traditional ticks)
-- TimeEvent dataclass with priority queue
-- Async _time_loop() processes events at precise Unix timestamps
-- schedule_event() and cancel_event() methods
-- Supports one-shot and recurring events
-- Dynamic sleep until next event
-- testtimer command
+### Phase 2a  Core Time System ✅
+- ✅ Event-driven time system (not traditional ticks)
+- ✅ TimeEvent dataclass with priority queue
+- ✅ Async _time_loop() processes events at precise Unix timestamps
+- ✅ schedule_event() and cancel_event() methods
+- ✅ Supports one-shot and recurring events
+- ✅ Dynamic sleep until next event
+- ✅ testtimer command
 
-### Phase 2b  Effect System 
-- Effect dataclass with effect_id, name, effect_type (buff/debuff/dot/hot)
-- stat_modifiers: Dict[str, int]
-- duration, applied_at tracking
-- interval, magnitude for periodic effects
-- WorldPlayer active_effects: Dict[str, Effect]
-- apply_effect(), remove_effect(), get_effective_stat() methods
-- Commands: bless, poison, effects/status
-- Stat integration with effective vs base values
+### Phase 2b  Effect System ✅
+- ✅ Effect dataclass with effect_id, name, effect_type (buff/debuff/dot/hot)
+- ✅ stat_modifiers: Dict[str, int]
+- ✅ duration, applied_at tracking
+- ✅ interval, magnitude for periodic effects
+- ✅ WorldPlayer active_effects: Dict[str, Effect]
+- ✅ apply_effect(), remove_effect(), get_effective_stat() methods
+- ✅ Commands: bless, poison, effects/status
+- ✅ Stat integration with effective vs base values
 
-### Phase 2c  World Time System 
-- WorldTime dataclass tracking day/hour/minute
-- advance() and get_current_time() methods
-- WorldArea system with independent area_time
-- time_scale attribute for different time speeds
-- Environmental properties
-- Time advancement every 30 seconds
-- time command with area context
-- Sample areas (Ethereal Nexus 4x, Temporal Rift 2x)
+### Phase 2c  World Time System ✅
+- ✅ WorldTime dataclass tracking day/hour/minute
+- ✅ advance() and get_current_time() methods
+- ✅ WorldArea system with independent area_time
+- ✅ time_scale attribute for different time speeds
+- ✅ Environmental properties
+- ✅ Time advancement every 30 seconds
+- ✅ time command with area context
+- ✅ Sample areas (Ethereal Nexus 4x, Temporal Rift 2x)
 
 ## Phase 3 - Items & inventory  **COMPLETE**
 
 **Goals**: Physical objects in the world, inventory management, equipment.
 
-### Backend Model 
+### Backend Model ✅
 
 - DB:
-    -  ItemTemplate (static: name, type, modifiers, description, keywords).
-    -  ItemInstance (dynamic: owner, location, durability, unique flags).
-    -  PlayerInventory (capacity limits, weight/slot tracking).
+    - ✅ ItemTemplate (static: name, type, modifiers, description, keywords).
+    - ✅ ItemInstance (dynamic: owner, location, durability, unique flags).
+    - ✅ PlayerInventory (capacity limits, weight/slot tracking).
 
 - World:
-    -  WorldItem for runtime representation.
-    -  ItemTemplate dataclass with full properties.
-    -  Attach items to:
-        -  rooms (ground items)
-        -  other items (containers)
-        -  players (inventory and equipment).
+    - ✅ WorldItem for runtime representation.
+    - ✅ ItemTemplate dataclass with full properties.
+    - ✅ Attach items to:
+        - ✅ rooms (ground items)
+        - ✅ other items (containers)
+        - ✅ players (inventory and equipment).
 
-### YAML Content System 
+### YAML Content System ✅
 
--  world_data/items/ directory structure (weapons/, armor/, consumables/, containers/)
--  world_data/item_instances/ for spawn configurations
--  Migration loads items from YAML files
--  Example items: Rusty Sword, Wooden Staff, Iron Chestplate, Leather Cap, Health Potion, Scroll of Wisdom, Leather Backpack
+- ✅ world_data/items/ directory structure (weapons/, armor/, consumables/, containers/)
+- ✅ world_data/item_instances/ for spawn configurations
+- ✅ Migration loads items from YAML files
+- ✅ Example items: Rusty Sword, Wooden Staff, Iron Chestplate, Leather Cap, Health Potion, Scroll of Wisdom, Leather Backpack
 
-### Engine Changes 
+### Engine Changes ✅
 
 - Loader:
-    -  Load templates + instances into World.
-    -  Link items to players/rooms on startup.
-    -  Restore equipped items and apply stat effects.
+    - ✅ Load templates + instances into World.
+    - ✅ Link items to players/rooms on startup.
+    - ✅ Restore equipped items and apply stat effects.
 
 - Core item mechanics:
-    -  inventory/inv/i: View inventory with weight/slots.
-    -  get/take/pickup <item>: Pick up from room (one at a time for stacks).
-    -  drop <item>: Drop to room.
-    -  give <item> <player>: Transfer to another player.
-    -  equip/wear/wield <item>: Equip to appropriate slot.
-    -  unequip/remove <item>: Unequip item.
-    -  use/consume/drink <item>: Use consumable items.
-    -  look <item>: Detailed item inspection with properties.
-    -  put <item> in <container>: Store items in containers.
-    -  get <item> from <container>: Retrieve from containers.
+    - ✅ inventory/inv/i: View inventory with weight/slots.
+    - ✅ get/take/pickup <item>: Pick up from room (one at a time for stacks).
+    - ✅ drop <item>: Drop to room.
+    - ✅ give <item> <player>: Transfer to another player.
+    - ✅ equip/wear/wield <item>: Equip to appropriate slot.
+    - ✅ unequip/remove <item>: Unequip item.
+    - ✅ use/consume/drink <item>: Use consumable items.
+    - ✅ look <item>: Detailed item inspection with properties.
+    - ✅ put <item> in <container>: Store items in containers.
+    - ✅ get <item> from <container>: Retrieve from containers.
 
 - Stat interactions:
-    -  Equipment applies stat modifiers via Effect system.
-    -  On equip: create permanent effect with stat bonuses.
-    -  On unequip: remove effect, recalculate stats.
-    -  Consumables apply temporary effects (buffs, healing).
+    - ✅ Equipment applies stat modifiers via Effect system.
+    - ✅ On equip: create permanent effect with stat bonuses.
+    - ✅ On unequip: remove effect, recalculate stats.
+    - ✅ Consumables apply temporary effects (buffs, healing).
 
 - Quality of Life:
-    -  Partial name matching ("lea" finds "leather backpack").
-    -  Keyword system (items can have multiple searchable names).
-    -  Stack handling (pick up one at a time).
-    -  Weight and slot-based inventory limits.
-    -  O(1) container contents lookup via index (not O(n) world scan).
+    - ✅ Partial name matching ("lea" finds "leather backpack").
+    - ✅ Keyword system (items can have multiple searchable names).
+    - ✅ Stack handling (pick up one at a time).
+    - ✅ Weight and slot-based inventory limits.
+    - ✅ O(1) container contents lookup via index (not O(n) world scan).
 
-### Events 
+### Events ✅
 
 - Room broadcasts:
-    -  "Alice drops Rusty Sword."
-    -  "Bob picks up Health Potion."
-    -  "Alice gives Health Potion to Bob."
+    - ✅ "Alice drops Rusty Sword."
+    - ✅ "Bob picks up Health Potion."
+    - ✅ "Alice gives Health Potion to Bob."
 - Stat updates:
-    -  stat_update events on equip/unequip/consume.
+    - ✅ stat_update events on equip/unequip/consume.
 
-### Persistence 
+### Persistence ✅
 
--  Inventory saved on player disconnect.
--  Item locations, quantities, durability persisted.
--  Equipment state restored on reconnect.
+- ✅ Inventory saved on player disconnect.
+- ✅ Item locations, quantities, durability persisted.
+- ✅ Equipment state restored on reconnect.
 
 
 
@@ -388,68 +376,70 @@ Before adding big systems, make the core loop solid.
     - ✅ room_0_0_0.yaml: Origin with conditional and level-gated triggers
     - ✅ ethereal_nexus.yaml: Area enter/exit triggers
 
-## Phase X - Quest System and Narrative Progression
+## Phase X - Quest System and Narrative Progression ✅ COMPLETE
 
 **Goals**: Structured narrative experiences, player-driven story progression, and meaningful rewards.
 
-### Core Quest Infrastructure
+**Status**: ✅ All phases complete (X.1-X.4 including reconciliation)
+
+### Core Quest Infrastructure ✅
 
 - Quest System Architecture:
-    - QuestSystem class following GameContext pattern
-    - QuestTemplate dataclass: id, name, description, objectives, rewards, prerequisites
-    - QuestStatus enum: NOT_AVAILABLE → AVAILABLE → ACCEPTED → IN_PROGRESS → COMPLETED → TURNED_IN
-    - QuestProgress dataclass for player-specific quest state tracking
-    - QuestObjective dataclass with type-specific parameters
+    - ✅ QuestSystem class following GameContext pattern
+    - ✅ QuestTemplate dataclass: id, name, description, objectives, rewards, prerequisites
+    - ✅ QuestStatus enum: NOT_AVAILABLE → AVAILABLE → ACCEPTED → IN_PROGRESS → COMPLETED → TURNED_IN
+    - ✅ QuestProgress dataclass for player-specific quest state tracking
+    - ✅ QuestObjective dataclass with type-specific parameters
 
 - Objective Types:
-    - KILL: Kill N of NPC template
-    - COLLECT: Collect N of item template
-    - DELIVER: Bring item to NPC
-    - VISIT: Enter a specific room
-    - INTERACT: Use command in room (trigger-based)
-    - ESCORT: Keep NPC alive to destination
-    - DEFEND: Prevent NPCs from reaching location
-    - TALK: Speak to NPC
-    - USE_ITEM: Use specific item
+    - ✅ KILL: Kill N of NPC template
+    - ✅ COLLECT: Collect N of item template
+    - ✅ DELIVER: Bring item to NPC
+    - ✅ VISIT: Enter a specific room
+    - ✅ INTERACT: Use command in room (trigger-based)
+    - ✅ ESCORT: Keep NPC alive to destination
+    - ✅ DEFEND: Prevent NPCs from reaching location
+    - ✅ TALK: Speak to NPC
+    - ✅ USE_ITEM: Use specific item
 
 - Quest Rewards:
-    - Experience points
-    - Items (via ItemSystem.give_item())
-    - Effects (via EffectSystem.apply_effect())
-    - Flags (player and room)
+    - ✅ Experience points
+    - ✅ Items (via ItemSystem.give_item())
+    - ✅ Effects (via EffectSystem.apply_effect())
+    - ✅ Flags (player and room)
     - Currency (future)
     - Reputation (future)
 
-### NPC Dialogue System
+### NPC Dialogue System ✅
 
 - Dialogue Data Structures:
-    - DialogueTree: Complete dialogue for an NPC
-    - DialogueNode: A node with text, options, conditions, actions
-    - DialogueOption: Player response with conditions and quest integration
-    - Variable substitution: {player.name}, {quest.progress}
+    - ✅ DialogueTree: Complete dialogue for an NPC
+    - ✅ DialogueNode: A node with text, options, conditions, actions
+    - ✅ DialogueOption: Player response with conditions and quest integration
+    - ✅ Variable substitution: {player.name}, {quest.progress}
 
 - Dialogue Flow:
-    - `talk <npc>` command initiates dialogue
-    - Numbered option selection (1, 2, 3...)
-    - Condition evaluation for available options
-    - Context-sensitive entry points based on quest status
-    - Quest accept/turn-in integration
+    - ✅ `talk <npc>` command initiates dialogue
+    - ✅ Numbered option selection (1, 2, 3...)
+    - ✅ Condition evaluation for available options
+    - ✅ Context-sensitive entry points based on quest status
+    - ✅ Quest accept/turn-in integration
 
-### Player Commands
+### Player Commands ✅
 
-- `talk <npc>`: Initiate dialogue with NPC
-- `1`, `2`, `3`...: Select dialogue option by number
-- `bye`, `farewell`: End dialogue
-- `journal`, `quests`, `quest log`: View quest journal
-- `quest <name>`: View specific quest details
-- `abandon <quest>`: Abandon a quest
+- ✅ `talk <npc>`: Initiate dialogue with NPC
+- ✅ `1`, `2`, `3`...: Select dialogue option by number
+- ✅ `bye`, `farewell`: End dialogue
+- ✅ `journal`, `quests`, `quest log`: View quest journal
+- ✅ `quest <name>`: View specific quest details
+- ✅ `abandon <quest>`: Abandon a quest
 
-### Engine Integration
+### Engine Integration ✅
 
-- Combat System hooks: on_npc_killed → KILL objectives
-- Item System hooks: on_item_acquired → COLLECT objectives
-- Movement hooks: on_room_entered → VISIT objectives
-- CommandRouter: Dialogue state handling before command dispatch
+- ✅ Combat System hooks: on_npc_killed → KILL objectives
+- ✅ Item System hooks: on_item_acquired → COLLECT objectives
+- ✅ Movement hooks: on_room_entered → VISIT objectives
+- ✅ CommandRouter: Dialogue state handling before command dispatch
 
 ### YAML Content System (Phase X.3) ✅
 
@@ -481,16 +471,27 @@ Before adding big systems, make the core loop solid.
 - ✅ `on_accept_actions`, `on_complete_actions`, `on_turn_in_actions` trigger integration
 - ✅ `_execute_quest_actions()` helper for quest-triggered behaviors
 
-### Sample Content
+### Sample Content ✅
 
 - ✅ `wisp_investigation` - Exploration-focused starter quest (VISIT, TALK objectives)
 - ✅ `goblin_threat` - Combat-focused follow-up quest (KILL, COLLECT objectives)
 - ✅ `wandering_merchant` dialogue tree with quest integration and context-sensitive greetings
 - ✅ `ethereal_mystery` quest chain linking the two starter quests with bonus rewards
 
+### Code Reconciliation (Phase X.R) ✅
+
+- ✅ Removed orphaned `look_helpers.py` module
+- ✅ Removed 3 unused functions from `load_yaml.py`
+- ✅ Updated ARCHITECTURE.md with Game Systems section (3.4)
+- ✅ Verified single time management system (TimeEventManager only)
+- ✅ Verified single event dispatcher (EventDispatcher only)
+- ✅ Verified single command router (CommandRouter only)
+- ✅ Verified single trigger system (TriggerSystem only)
+- ✅ Clean behavior hierarchy with proper `@behavior` decorator registration
+
 ### Future Considerations
 
-- Reputation system with faction standings
+- Reputation system with faction standings (implemented in Phase 10.3)
 - Dynamic quest generation based on world state
 - Party quests with shared objectives
 
@@ -622,54 +623,54 @@ Before adding big systems, make the core loop solid.
 - Session handling for mobile reconnect
 - Multiple connections per player
 
-## Phase 7 - Accounts, auth, and security **COMPLETE**
+## Phase 7 - Accounts, auth, and security **COMPLETE** ✅
 
 **Goals**: Move from "just a player_id" to real accounts.
 
-### Implementation Complete
+### Implementation Complete ✅
 
-**Database Schema**
--  `user_accounts` table: username, email, password_hash, role, active_character_id
--  `refresh_tokens` table: token rotation for session management
--  `security_events` table: audit log for logins, logouts, role changes
--  `players.account_id` foreign key linking characters to accounts
+**Database Schema** ✅
+-  ✅ `user_accounts` table: username, email, password_hash, role, active_character_id
+-  ✅ `refresh_tokens` table: token rotation for session management
+-  ✅ `security_events` table: audit log for logins, logouts, role changes
+-  ✅ `players.account_id` foreign key linking characters to accounts
 
-**AuthSystem (systems/auth.py)**
--  UserRole enum: PLAYER, MODERATOR, GAME_MASTER, ADMIN
--  Permission enum: granular permissions (MODIFY_STATS, SPAWN_ITEM, etc.)
--  JWT-based authentication with 1-hour access tokens
--  Refresh token rotation with 7-day expiry
--  Argon2 password hashing via passlib
--  `requires_role()` and `requires_permission()` decorators
+**AuthSystem (systems/auth.py)** ✅
+-  ✅ UserRole enum: PLAYER, MODERATOR, GAME_MASTER, ADMIN
+-  ✅ Permission enum: granular permissions (MODIFY_STATS, SPAWN_ITEM, etc.)
+-  ✅ JWT-based authentication with 1-hour access tokens
+-  ✅ Refresh token rotation with 7-day expiry
+-  ✅ Argon2 password hashing via passlib
+-  ✅ `requires_role()` and `requires_permission()` decorators
 
-**HTTP Endpoints**
--  POST `/auth/register` - Create new account
--  POST `/auth/login` - Get access + refresh tokens
--  POST `/auth/refresh` - Rotate tokens
--  POST `/auth/logout` - Revoke refresh token
--  GET `/auth/me` - Get current user info
+**HTTP Endpoints** ✅
+-  ✅ POST `/auth/register` - Create new account
+-  ✅ POST `/auth/login` - Get access + refresh tokens
+-  ✅ POST `/auth/refresh` - Rotate tokens
+-  ✅ POST `/auth/logout` - Revoke refresh token
+-  ✅ GET `/auth/me` - Get current user info
 
-**Character Management**
--  POST `/characters` - Create character (max 3 per account)
--  GET `/characters` - List account's characters
--  POST `/characters/{id}/select` - Set active character
--  DELETE `/characters/{id}` - Delete character
+**Character Management** ✅
+-  ✅ POST `/characters` - Create character (max 3 per account)
+-  ✅ GET `/characters` - List account's characters
+-  ✅ POST `/characters/{id}/select` - Set active character
+-  ✅ DELETE `/characters/{id}` - Delete character
 
-**WebSocket Authentication**
--  `/ws/game/auth?token=<access_token>` - Authenticated endpoint
--  Verifies JWT and loads active character
--  Sets auth_info in context for permission checks
--  Legacy `/ws/game?player_id=` still works (deprecated)
+**WebSocket Authentication** ✅
+-  ✅ `/ws/game/auth?token=<access_token>` - Authenticated endpoint
+-  ✅ Verifies JWT and loads active character
+-  ✅ Sets auth_info in context for permission checks
+-  ✅ Legacy `/ws/game?player_id=` still works (deprecated)
 
-**Permission Enforcement**
--  Admin commands (heal, hurt) require GAME_MASTER role
--  `_check_permission()` method in WorldEngine
--  Denied commands return error message
+**Permission Enforcement** ✅
+-  ✅ Admin commands (heal, hurt) require GAME_MASTER role
+-  ✅ `_check_permission()` method in WorldEngine
+-  ✅ Denied commands return error message
 
-**Client Updates**
--  Login/Register UI with httpx
--  Authenticated WebSocket connection flow
--  Legacy mode toggle for backward compatibility
+**Client Updates** ✅
+-  ✅ Login/Register UI with httpx
+-  ✅ Authenticated WebSocket connection flow
+-  ✅ Legacy mode toggle for backward compatibility
 
 ## Phase 8 - Admin & content tools **COMPLETE**
 
@@ -791,86 +792,267 @@ Before adding big systems, make the core loop solid.
 
 - ✅ Added `structlog==25.3.0` to requirements.txt
 
-## Phase 9 - Classes & Abilities
+## Phase 9 - Classes & Abilities **COMPLETE** ✅
 
 **Goals**: Extensible character class system with unique abilities, resource management, and progression paths.
 
-### Class System Architecture
+**Status:** ✅ **9a-9h All Complete** | ⬜ 9i-9j (Future Enhancement)
 
-- ClassTemplate dataclass:
-    - `class_id`, `name`, `description`
-    - `base_stats` - Starting stat modifiers
-    - `stat_growth` - Per-level stat gains
-    - `resource_type` - Primary resource (mana, rage, energy, focus)
-    - `abilities` - List of ability IDs unlocked by class
-    - `passive_effects` - Always-active class bonuses
+### Phase 9a - Domain Models & Database ✅
 
-- YAML-driven class definitions:
-    - `world_data/classes/` directory
-    - Easy to add new classes without code changes
+- ✅ **Core Dataclasses** (backend/app/engine/world.py):
+    - ✅ `ResourceDef`: Defines resource pools (mana, rage, energy) with regen mechanics
+    - ✅ `StatGrowth`: Tracks stat scaling per level with milestone bonuses
+    - ✅ `ResourcePool`: Runtime state for character resources
+    - ✅ `AbilitySlot`: Equipped ability with cooldown tracking
+    - ✅ `CharacterSheet`: Character class, level, experience, learned abilities, resources
 
-### Ability System
+- ✅ **Enhanced WorldPlayer**:
+    - ✅ Optional `character_sheet: CharacterSheet | None` field
+    - ✅ Helper methods: has_character_sheet(), get_class_id(), get_resource_pool(), etc.
 
-- AbilityTemplate dataclass:
-    - `ability_id`, `name`, `description`
-    - `resource_cost` - Cost to use
-    - `cooldown` - Seconds between uses
-    - `cast_time` - Channel/cast duration (0 = instant)
-    - `range` - self, target, room, area
-    - `effects` - List of effects to apply
-    - `requirements` - Level, class, equipment, etc.
+- ✅ **Database Migration**:
+    - ✅ Backward-compatible with existing player data
+    - ✅ Phase 9a migration script ready
 
-- Ability Types:
-    - Active: Explicitly triggered by player command
-    - Passive: Always active, modifies stats or triggers on events
-    - Reactive: Triggers on specific conditions (on_hit, on_kill, etc.)
+### Phase 9b - Content Files & Loaders ✅
 
-- Ability effects:
-    - Damage (direct, DoT)
-    - Healing (direct, HoT)
-    - Buff/Debuff application
-    - Movement (teleport, dash)
-    - Summon (temporary NPCs)
-    - Custom script hooks
+- ✅ **YAML Loaders** (backend/app/engine/systems/abilities.py):
+    - ✅ `ClassTemplate` dataclass with base_stats, stat_growth, resources, abilities
+    - ✅ `AbilityTemplate` dataclass with cooldown, effects, scaling, targeting
+    - ✅ `load_classes_from_yaml()` with error handling
+    - ✅ `load_abilities_from_yaml()` with duplicate ID detection
 
-### Resource System
+- ✅ **Example Content**:
+    - ✅ 3 Classes: warrior.yaml, mage.yaml, rogue.yaml (stat-based specialization)
+    - ✅ 15 Abilities: 3 core + 2 warrior + 5 mage + 5 rogue
+    - ✅ Schema files: `_schema.yaml` for content creators
 
-- Resource types:
-    - Mana: Regenerates over time
-    - Rage: Builds from combat, decays out of combat
-    - Energy: Fast regen, low max
-    - Focus: Builds from specific actions
+### Phase 9c - ClassSystem Runtime Manager ✅
 
-- ResourceManager integration with EffectSystem:
-    - Regen rates modified by stats/effects
-    - Resource costs modified by talents/gear
+- ✅ **Implemented `ClassSystem` in `app/engine/systems/classes.py`**:
+    - ✅ `__init__()` - Initialize templates and behavior registry
+    - ✅ `load_content()` - Load YAML classes and abilities
+    - ✅ `get_class()` - Retrieve class by ID
+    - ✅ `get_ability()` - Retrieve ability by ID
+    - ✅ `register_behavior()` - Register behavior functions
+    - ✅ `get_behavior()` - Retrieve registered behavior
+    - ✅ `_register_core_behaviors()` - Register 24 built-in behaviors
+    - ✅ `reload_behaviors()` - Hot-reload custom behaviors
 
-### Talent/Specialization Trees (Future)
+- ✅ **Integrated into `WorldEngine` and `GameContext`**:
+    - ✅ ClassSystem instance created in engine
+    - ✅ Content loaded at startup
 
-- Talent points earned on level-up
-- Specialization paths within each class
-- Talent effects: ability upgrades, new passives, stat bonuses
+### Phase 9d - Core Ability Behaviors ✅
 
-### Commands
+- ✅ **Behavior Infrastructure** (backend/app/engine/systems/ability_behaviors/):
+    - ✅ `BehaviorResult` dataclass: success, damage_dealt, targets_hit, effects_applied, cooldown_applied
+    - ✅ Package structure with `__init__.py`, `core.py`, `custom.py`, `utility.py`
 
-- `abilities` / `skills`: List available abilities
-- `use <ability>` / `cast <ability>`: Activate an ability
-- `use <ability> <target>`: Targeted abilities
-- `class`: View current class info and progression
+- ✅ **11 Core Behaviors** (core.py):
+    - ✅ melee_attack, power_attack, rally (passive), aoe_attack, stun_effect
+    - ✅ mana_regen, fireball, polymorph, backstab, evasion (passive), damage_boost
 
-### YAML Content
+- ✅ **5 Custom Behaviors** (custom.py):
+    - ✅ Warrior: whirlwind_attack, shield_bash
+    - ✅ Mage: inferno, arcane_missiles
+    - ✅ Rogue: shadow_clone
 
-- `world_data/classes/warrior.yaml`, `mage.yaml`, `rogue.yaml`, etc.
-- `world_data/abilities/` directory organized by class
+- ✅ **8 Utility Behaviors** (utility.py):
+    - ✅ create_light, darkness, unlock_door, unlock_container, detect_magic, true_sight, teleport, create_passage
 
-### Database Extensions
+- ✅ **Behavior Registration**:
+    - ✅ All 24 behaviors registered in ClassSystem._register_core_behaviors()
+    - ✅ Each behavior handles hit/miss, damage calculation, stat scaling
+    - ✅ Server imports and starts correctly
 
-- `players.class_id` - Selected class
-- `players.ability_cooldowns` (JSON) - Active cooldown tracking
-- `players.resource_current` - Current resource value
-- `class_templates` table (optional, can be YAML-only)
+### Phase 9e - Ability Executor & Validation ✅
 
-## Phase 10 - Niceties & polish
+- ✅ **Implemented `AbilityExecutor` in `app/engine/systems/abilities.py`**:
+    - ✅ `execute_ability()` - Main entry point with full async support
+    - ✅ `_validate_ability_use()` - Check learned, level, resources, cooldown, GCD
+    - ✅ `_resolve_targets()` - Interpret target_type and resolve targets
+    - ✅ `_apply_cooldowns()` - Set personal cooldown + GCD
+    - ✅ `get_ability_cooldown()` - Query remaining cooldown
+    - ✅ `get_gcd_remaining()` - Query remaining GCD
+    - ✅ `clear_cooldown()` / `clear_gcd()` - Admin debug methods
+
+- ✅ **Cooldown/GCD Logic**:
+    - ✅ Personal cooldown per ability (tracked independently)
+    - ✅ Global cooldown by category (shared across abilities)
+    - ✅ Full validation pipeline (all paths tested)
+    - ✅ Integrated into `WorldEngine`
+
+### Phase 9f - Commands & Router Integration ✅
+
+- ✅ **Commands Added** (backend/app/engine/engine.py):
+    - ✅ `cast <ability_name> [target]` - Execute ability
+    - ✅ `ability <ability_name> [target]` - Alias for cast
+    - ✅ `abilities` / `skills` - List equipped abilities and cooldowns
+    - ✅ `resources` - Show current resource pools
+
+- ✅ **Command Handler Implementation**:
+    - ✅ Case-insensitive ability name matching
+    - ✅ Target resolution by name in current room
+    - ✅ Error messages for validation failures
+    - ✅ Full integration with routing system
+
+### Phase 9g - Admin API Endpoints ✅
+
+- ✅ **Endpoints in `app/routes/admin.py`**:
+    - ✅ `GET /api/admin/classes` - List all classes with metadata
+    - ✅ `GET /api/admin/abilities` - List all abilities with metadata
+    - ✅ `POST /api/admin/classes/reload` - Hot-reload classes, abilities, and behaviors
+
+- ✅ **Admin Functionality**:
+    - ✅ Hot-reload YAML without server restart
+    - ✅ Return counts of loaded classes/abilities
+    - ✅ Error handling and validation
+    - ✅ Permission checks (GAME_MASTER+)
+
+### Phase 9h - WebSocket Protocol & Events ✅
+
+- ✅ **Event Types** (backend/app/engine/systems/events.py):
+    - ✅ `ability_cast` - Broadcast when ability used
+    - ✅ `ability_error` - Send when validation fails
+    - ✅ `ability_cast_complete` - After behavior executes
+    - ✅ `cooldown_update` - Remaining cooldown for ability
+    - ✅ `resource_update` - Current/max resource amounts
+
+- ✅ **Event Implementation**:
+    - ✅ Events emitted from AbilityExecutor
+    - ✅ Broadcast to room (combat) or player (personal)
+    - ✅ Full payload with damage, targets, effects
+    - ✅ Integrated with EventDispatcher
+
+### Phase 9i - Persistence & Offline Regen ⬜
+
+- [ ] `save_player_resources()` - Serialize pools to player.data JSON (deferred to Phase 9j)
+- [ ] `restore_player_resources()` - Deserialize from JSON (deferred to Phase 9j)
+- [ ] Offline regen calculation (time_offline × regen_rate) (deferred to Phase 9j)
+- [ ] Integrate into disconnect/reconnect handlers (deferred to Phase 9j)
+
+### Phase 9j - Polish & Testing ⬜
+
+- [ ] Unit tests: ClassSystem, AbilityExecutor, resources, targeting (future)
+- [ ] Integration tests: end-to-end ability casting flow (future)
+- [ ] Documentation: ARCHITECTURE.md updates, content creator guide (future)
+- [ ] Performance profiling (future)
+
+### Phase 10 - Socializing and worldbuilding ✅ COMPLETE
+
+**Phase 10.1: Groups, Tells, Follow** ✅ COMPLETE
+- ✅ GroupSystem with O(1) lookups and auto-disband
+- ✅ Group/tell/follow/yell commands with full subcommands
+- ✅ Event routing for group/tell/follow scopes
+- ✅ 80+ comprehensive tests
+- ✅ Integration documentation
+
+**Phase 10.2: Persistent Clans** ✅ COMPLETE
+- ✅ Database migration with clans and clan_members tables
+- ✅ Clan and ClanMember ORM models with relationships
+- ✅ ClanSystem with async DB loading, CRUD operations
+- ✅ Rank hierarchy (leader > officer > member > initiate)
+- ✅ Clan commands (create, invite, join, leave, promote, members, info, disband)
+- ✅ Clan message event routing to all members
+- ✅ WorldEngine integration with async initialization
+- ✅ 50+ comprehensive tests
+
+**Phase 10.3: Factions with Reputation** ✅ COMPLETE
+- ✅ Database migration with factions and faction_npc_members tables
+- ✅ Faction and FactionNPCMember ORM models
+- ✅ FactionSystem with YAML loading, reputation tracking, alignment tiers
+- ✅ O(1) NPC faction lookups and behavior changes
+- ✅ Faction commands (list, info, join, leave, standing)
+- ✅ 4 faction YAML definitions (Silver Sanctum, Shadow Syndicate, Arcane Collective, Primal Circle)
+- ✅ Faction message event routing to all members
+- ✅ WorldEngine integration with YAML loading at startup
+- ✅ 45+ comprehensive tests
+
+### Phase 11 - Light and Vision System ✅ COMPLETE
+
+**Goals**: Dynamic lighting system with visibility-based gameplay, environmental atmosphere, and light-dependent triggers.
+
+**Phase 11.1: Core Light Calculation System** ✅
+- ✅ LightingSystem class with 0-100 light scale
+- ✅ 5 visibility levels: NONE (0-10), MINIMAL (11-25), PARTIAL (26-50), NORMAL (51-75), ENHANCED (76-100)
+- ✅ Database migration k3l4m5n6o7p8_phase11_light_system.py
+- ✅ Room.lighting_override field for room-specific light levels
+- ✅ ItemTemplate light fields: provides_light, light_intensity, light_duration
+- ✅ AMBIENT_LIGHTING_VALUES mapping: pitch_black(0), dark(10), dim(20), shadowed(35), normal(60), bright(85), prismatic(90)
+- ✅ TIME_IMMUNE_BIOMES: underground, ethereal, void, planar
+
+**Phase 11.2: Visibility Filtering** ✅
+- ✅ Modified _look() command with light level checks
+- ✅ Modified _look_at_target() requiring minimum light
+- ✅ Entity filtering based on visibility thresholds
+- ✅ Admin lightlevel debugging command showing:
+  - Base ambient lighting from area
+  - Time-of-day modifier calculation
+  - Active light sources (spells/items)
+  - Darkness penalties
+  - Final effective light level
+
+**Phase 11.3: System Integration** ✅
+- Spell Integration:
+  - ✅ create_light_behavior() calls lighting_system.update_light_source()
+  - ✅ darkness_behavior() applies negative light intensity
+  - ✅ Light/darkness spells affect room lighting
+- Time Integration:
+  - ✅ Time-of-day modifiers: Night(-20), Dawn/Dusk(-10), Day(0)
+  - ✅ recalculate_all_rooms() triggered on time period changes
+  - ✅ Batch updates during dawn/dusk transitions
+- Item Light Sources:
+  - ✅ Equip/unequip handlers activate/deactivate light sources
+  - ✅ 4 sample light items: Torch (35, 30min), Lantern (45, permanent), Glowstone (50, permanent, +1 INT), Candle (20, 15min)
+  - ✅ Duration tracking and automatic expiration
+
+**Phase 11.4: Environmental Content** ✅
+- Areas Created:
+  - ✅ Dark Caves (ambient: dim, biome: underground, danger: 3)
+  - ✅ Sunlit Meadow (ambient: bright, biome: grassland, danger: 1)
+- Rooms Created (9 total):
+  - ✅ Cave rooms: entrance(40), tunnel(5), bioluminescent chamber(65), deep cave(0)
+  - ✅ Meadow rooms: center(95), shaded grove(70), open field(default), eastern rise(90), flower garden(default)
+- ✅ All content loaded into database
+- ✅ Demonstrates full range of lighting values (0-95)
+
+**Phase 11.5: Trigger Conditions and Events** ✅
+- New Trigger Conditions:
+  - ✅ light_level: Check room light with comparison operators
+  - ✅ visibility_level: Check specific visibility threshold (none/minimal/partial/normal/enhanced)
+- New Trigger Actions:
+  - ✅ stumble_in_darkness: Damage player in low light with room notification
+- Sample Triggers:
+  - ✅ darkness_stumble.yaml: Damage when entering very dark rooms
+  - ✅ bright_light_secret.yaml: Reveal hidden passage in enhanced light
+  - ✅ shadow_spawn_darkness.yaml: Spawn hostile NPCs in darkness
+  - ✅ light_dependent_desc.yaml: Change room description based on light
+
+**Testing and Validation** ✅
+- ✅ Comprehensive test suite (test_phase11.py)
+- ✅ 26/26 tests passing (100% pass rate)
+- ✅ Tests cover: light calculation, time integration, light sources, visibility filtering, item properties, environmental content, trigger integration
+
+### Phase 12 - Abilities Audit
+Ensure test engine is working
+Make sure every ability produced does what it claims to do
+
+### Phase Y - Player quality of life
+In-game documentation: listing all commands, player role, etc
+Stub client tweaks
+
+### Phase 13 - Cybersecurity Audit
+Ensure the engine server and database are protected from malicious actors, especially with regards to text sent to the server from the client
+
+### Phase 14 - Knobs and Levers: comprehensive In-game commands and API Routes documentation
+User-focused documentation for in-game commands and API routes for development
+
+### Phase 15 - Mechanic's Log: comprehensive guide for modders
+Modder-focused guide to easily extending the engine codebase
+
+## Phase Z - Backlogged Niceties & polish
 
 - Rate limiting & abuse protection (spam commands, chat).
     - Localization hooks in text output.

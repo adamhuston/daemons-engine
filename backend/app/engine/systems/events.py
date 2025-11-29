@@ -165,6 +165,8 @@ class EventDispatcher:
         Handles:
         - player-scoped messages (direct to one player)
         - room-scoped messages (to all players in a room)
+        - group-scoped messages (to all members in a group)
+        - tell-scoped messages (to sender and recipient only)
         - all-scoped messages (broadcast to everyone)
         
         Args:
@@ -219,6 +221,107 @@ class EventDispatcher:
                     wire_event["player_id"] = pid
                     await q.put(wire_event)
             
+            elif scope == "group":
+                group_id = ev.get("group_id")
+                if not group_id or not self.ctx.group_system:
+                    continue
+                
+                group = self.ctx.group_system.get_group(group_id)
+                if not group:
+                    continue
+                
+                # Send to all group members
+                for pid in group.members:
+                    q = self.ctx._listeners.get(pid)
+                    if q is None:
+                        continue
+                    
+                    wire_event = {
+                        k: v
+                        for k, v in ev.items()
+                        if k not in ("scope", "exclude")
+                    }
+                    wire_event["player_id"] = pid
+                    await q.put(wire_event)
+            
+            elif scope == "tell":
+                sender_id = ev.get("sender_id")
+                recipient_id = ev.get("recipient_id")
+                
+                if not sender_id or not recipient_id:
+                    continue
+                
+                # Send to sender
+                q = self.ctx._listeners.get(sender_id)
+                if q is not None:
+                    wire_event = {
+                        k: v
+                        for k, v in ev.items()
+                        if k not in ("scope", "exclude")
+                    }
+                    wire_event["player_id"] = sender_id
+                    await q.put(wire_event)
+                
+                # Send to recipient
+                q = self.ctx._listeners.get(recipient_id)
+                if q is not None:
+                    wire_event = {
+                        k: v
+                        for k, v in ev.items()
+                        if k not in ("scope", "exclude")
+                    }
+                    wire_event["player_id"] = recipient_id
+                    await q.put(wire_event)
+            
+            elif scope == "clan":
+                clan_id = ev.get("clan_id")
+                if not clan_id or not self.ctx.clan_system:
+                    continue
+                
+                clan = self.ctx.clan_system.clans.get(clan_id)
+                if not clan:
+                    continue
+                
+                # Send to all clan members
+                for pid in clan.members:
+                    q = self.ctx._listeners.get(pid)
+                    if q is None:
+                        continue
+                    
+                    wire_event = {
+                        k: v
+                        for k, v in ev.items()
+                        if k not in ("scope", "exclude")
+                    }
+                    wire_event["player_id"] = pid
+                    await q.put(wire_event)
+            
+            elif scope == "faction":
+                faction_id = ev.get("faction_id")
+                if not faction_id or not self.ctx.faction_system:
+                    continue
+                
+                # Get all players in faction
+                standing_dict = self.ctx.faction_system.player_standings
+                faction_members = {
+                    pid for (pid, fid), standing in standing_dict.items()
+                    if fid == faction_id and standing.joined_at is not None
+                }
+                
+                # Send to all faction members who are online
+                for pid in faction_members:
+                    q = self.ctx._listeners.get(pid)
+                    if q is None:
+                        continue
+                    
+                    wire_event = {
+                        k: v
+                        for k, v in ev.items()
+                        if k not in ("scope", "exclude")
+                    }
+                    wire_event["player_id"] = pid
+                    await q.put(wire_event)
+            
             elif scope == "all":
                 exclude = set(ev.get("exclude", []))
                 for pid, q in self.ctx._listeners.items():
@@ -231,6 +334,7 @@ class EventDispatcher:
                     }
                     wire_event["player_id"] = pid
                     await q.put(wire_event)
+
     
     def ability_cast(
         self,
@@ -412,6 +516,153 @@ class EventDispatcher:
             "ability_name": ability_name,
         }
         return ev
+    
+    # ---------- Social Events ----------
+    
+    def group_message(
+        self,
+        group_id: str,
+        sender_id: "PlayerId",
+        sender_name: str,
+        text: str,
+    ) -> Event:
+        """
+        Create a group message event.
+        
+        Args:
+            group_id: The group ID
+            sender_id: The sender's player ID
+            sender_name: The sender's player name
+            text: The message text
+        
+        Returns:
+            A group_message event dict
+        """
+        ev: Event = {
+            "type": "group_message",
+            "scope": "group",
+            "group_id": group_id,
+            "sender_id": sender_id,
+            "sender_name": sender_name,
+            "text": text,
+        }
+        return ev
+    
+    def tell_message(
+        self,
+        sender_id: "PlayerId",
+        sender_name: str,
+        recipient_id: "PlayerId",
+        text: str,
+    ) -> Event:
+        """
+        Create a tell/private message event.
+        
+        Args:
+            sender_id: The sender's player ID
+            sender_name: The sender's player name
+            recipient_id: The recipient's player ID
+            text: The message text
+        
+        Returns:
+            A tell_message event dict (routed to sender and recipient only)
+        """
+        ev: Event = {
+            "type": "tell_message",
+            "scope": "tell",
+            "sender_id": sender_id,
+            "sender_name": sender_name,
+            "recipient_id": recipient_id,
+            "text": text,
+        }
+        return ev
+    
+    def follow_event(
+        self,
+        follower_id: "PlayerId",
+        follower_name: str,
+        followed_id: "PlayerId",
+        action: str,  # "started_following" or "stopped_following"
+    ) -> Event:
+        """
+        Create a follow event.
+        
+        Args:
+            follower_id: The player starting/stopping to follow
+            follower_name: The follower's player name
+            followed_id: The player being followed
+            action: "started_following" or "stopped_following"
+        
+        Returns:
+            A follow_event dict
+        """
+        ev: Event = {
+            "type": "follow_event",
+            "scope": "player",
+            "follower_id": follower_id,
+            "follower_name": follower_name,
+            "followed_id": followed_id,
+            "action": action,
+        }
+        return ev
+    
+    def clan_message(
+        self,
+        clan_id: int,
+        sender_id: "PlayerId",
+        sender_name: str,
+        text: str,
+    ) -> Event:
+        """
+        Create a clan message event.
+        
+        Args:
+            clan_id: The clan ID
+            sender_id: The sender's player ID
+            sender_name: The sender's player name
+            text: The message text
+        
+        Returns:
+            A clan_message event dict
+        """
+        ev: Event = {
+            "type": "clan_message",
+            "scope": "clan",
+            "clan_id": clan_id,
+            "sender_id": sender_id,
+            "sender_name": sender_name,
+            "text": text,
+        }
+        return ev
+    
+    def faction_message(
+        self,
+        faction_id: str,
+        sender_id: "PlayerId",
+        sender_name: str,
+        text: str,
+    ) -> Event:
+        """
+        Create a faction message event.
+        
+        Args:
+            faction_id: The faction ID
+            sender_id: The sender's player ID
+            sender_name: The sender's player name
+            text: The message text
+        
+        Returns:
+            A faction_message event dict
+        """
+        ev: Event = {
+            "type": "faction_message",
+            "scope": "faction",
+            "faction_id": faction_id,
+            "sender_id": sender_id,
+            "sender_name": sender_name,
+            "text": text,
+        }
+        return ev
 
     # ---------- Helpers ----------
     
@@ -421,3 +672,4 @@ class EventDispatcher:
         if not room:
             return set()
         return {eid for eid in room.entities if eid in self.ctx.world.players}
+

@@ -81,6 +81,16 @@ async def lifespan(app: FastAPI):
     await engine_instance.class_system.load_content(class_dir)
     logger.info("Loaded character classes and abilities from world_data")
     
+    # 4a2) Load clans from database into ClanSystem (Phase 10.2)
+    await engine_instance.clan_system.load_clans_from_db()
+    logger.info("Loaded clans from database into ClanSystem")
+    
+    # 4a3) Load factions from YAML into FactionSystem (Phase 10.3)
+    from pathlib import Path
+    factions_dir = Path(__file__).parent.parent / "world_data" / "factions"
+    await engine_instance.faction_system.load_factions_from_yaml(str(factions_dir))
+    logger.info("Loaded factions from YAML into FactionSystem")
+    
     # 4b) Create auth system (Phase 7)
     auth_system = AuthSystem(db_session_factory=AsyncSessionLocal)
     app.state.auth_system = auth_system

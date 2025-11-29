@@ -60,7 +60,7 @@ async def create_light_behavior(
         caster: The entity casting the ability
         target: Target (self or room)
         ability_template: AbilityTemplate from ClassSystem
-        combat_system: CombatSystem instance
+        combat_system: CombatSystem instance (has .context with lighting_system)
         **context: Additional context
     
     Returns:
@@ -70,6 +70,14 @@ async def create_light_behavior(
         light_level = ability_template.metadata.get("light_level", 50)  # 0-100 brightness
         duration = ability_template.metadata.get("duration", 300.0)  # 5 minutes default
         effect_radius = ability_template.metadata.get("radius", 1)  # Room radius
+        
+        # Get the lighting system from combat_system context
+        lighting_system = getattr(combat_system, 'context', None)
+        if lighting_system:
+            lighting_system = getattr(lighting_system, 'lighting_system', None)
+        
+        # Get caster's room
+        room_id = getattr(caster, 'room_id', None)
         
         # For personal light (e.g., light orb), track on caster
         if ability_template.target_type == "self":
@@ -82,6 +90,18 @@ async def create_light_behavior(
                 'start_time': context.get('current_time', 0)
             }
             
+            # Update lighting system if available
+            if lighting_system and room_id:
+                import time
+                expires_at = time.time() + duration
+                lighting_system.update_light_source(
+                    room_id=room_id,
+                    source_id=f"spell_light_{caster.id}",
+                    source_type="spell",
+                    intensity=light_level,
+                    expires_at=expires_at
+                )
+            
             return UtilityResult(
                 success=True,
                 message=f"{caster.name} creates a sphere of light!",
@@ -92,19 +112,28 @@ async def create_light_behavior(
         
         # For room-wide light (e.g., daylight), track on room/area
         elif ability_template.target_type == "room":
-            # In full implementation, this would update room lighting state
-            # For now, we track which areas have active light effects
             if not hasattr(caster, 'last_used_light_effects'):
                 caster.last_used_light_effects = {}
             
-            # Assuming caster has location info
-            room_key = f"{caster.location}" if hasattr(caster, 'location') else "unknown"
+            room_key = room_id if room_id else "unknown"
             caster.last_used_light_effects[room_key] = {
                 'level': light_level,
                 'duration': duration,
                 'caster': caster.id,
                 'radius': effect_radius
             }
+            
+            # Update lighting system if available
+            if lighting_system and room_id:
+                import time
+                expires_at = time.time() + duration
+                lighting_system.update_light_source(
+                    room_id=room_id,
+                    source_id=f"spell_daylight_{caster.id}_{int(time.time())}",
+                    source_type="spell",
+                    intensity=light_level,
+                    expires_at=expires_at
+                )
             
             return UtilityResult(
                 success=True,
@@ -148,7 +177,7 @@ async def darkness_behavior(
         caster: The entity casting the ability
         target: Target area
         ability_template: AbilityTemplate from ClassSystem
-        combat_system: CombatSystem instance
+        combat_system: CombatSystem instance (has .context with lighting_system)
         **context: Additional context
     
     Returns:
@@ -158,6 +187,14 @@ async def darkness_behavior(
         darkness_level = ability_template.metadata.get("darkness_level", 75)  # 0-100 opacity
         duration = ability_template.metadata.get("duration", 180.0)  # 3 minutes default
         
+        # Get the lighting system from combat_system context
+        lighting_system = getattr(combat_system, 'context', None)
+        if lighting_system:
+            lighting_system = getattr(lighting_system, 'lighting_system', None)
+        
+        # Get caster's room
+        room_id = getattr(caster, 'room_id', None)
+        
         if not hasattr(caster, 'active_effects'):
             caster.active_effects = {}
         
@@ -166,6 +203,20 @@ async def darkness_behavior(
             'duration': duration,
             'start_time': context.get('current_time', 0)
         }
+        
+        # Update lighting system if available - darkness uses negative intensity
+        if lighting_system and room_id:
+            import time
+            expires_at = time.time() + duration
+            # Use the dedicated method for darkness effects
+            from ..lighting import DarknessEffect
+            lighting_system.update_light_source(
+                room_id=room_id,
+                source_id=f"spell_darkness_{caster.id}",
+                source_type="spell",
+                intensity=-darkness_level,  # Negative intensity for darkness
+                expires_at=expires_at
+            )
         
         return UtilityResult(
             success=True,

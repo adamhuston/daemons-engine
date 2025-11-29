@@ -79,6 +79,7 @@ async def load_world(session: AsyncSession) -> World:
             area_id=r.area_id,
             on_enter_effect=r.on_enter_effect,
             on_exit_effect=r.on_exit_effect,
+            lighting_override=getattr(r, 'lighting_override', None),
         )
     
     # Update the global emoji cache with any new types discovered
@@ -204,6 +205,10 @@ async def load_world(session: AsyncSession) -> World:
             damage_max=t.damage_max,
             attack_speed=t.attack_speed,
             damage_type=t.damage_type,
+            # Phase 11: Light source properties
+            provides_light=bool(t.provides_light),
+            light_intensity=t.light_intensity,
+            light_duration=t.light_duration,
         )
 
     # ----- Load item instances (Phase 3) -----

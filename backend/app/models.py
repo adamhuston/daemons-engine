@@ -1,5 +1,5 @@
 # backend/app/models.py
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import String, ForeignKey, JSON, Integer, Float, Text, MetaData, Boolean
 
 
@@ -55,6 +55,11 @@ class Room(Base):
     on_enter_effect: Mapped[str | None] = mapped_column(String, nullable=True)
     on_exit_effect: Mapped[str | None] = mapped_column(String, nullable=True)
     
+    # Phase 11: Lighting system
+    # Per-room lighting override (overrides area ambient_lighting)
+    # Example: deep cave room in forest area = "pitch_black"
+    lighting_override: Mapped[str | None] = mapped_column(String, nullable=True)
+    
     # YAML content management
     # True = managed by YAML files, False = created/modified via API
     yaml_managed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
@@ -92,9 +97,10 @@ class Player(Base):
     data: Mapped[dict] = mapped_column(JSON, default=dict)
     
     # Quest system (Phase X)
-    player_flags: Mapped[dict] = mapped_column(JSON, default=dict)       # Persistent player flags for quests
+    player_flags: Mapped[dict] = mapped_column(JSON, default=dict)       # Persistent player flags for quests and social (Phase 10.1: group_id, followers, following, ignored_players, last_tell_from)
     quest_progress: Mapped[dict] = mapped_column(JSON, default=dict)     # quest_id -> QuestProgress dict
     completed_quests: Mapped[list] = mapped_column(JSON, default=list)   # List of completed quest IDs
+
 
 
 class Area(Base):
@@ -176,6 +182,11 @@ class ItemTemplate(Base):
     damage_max: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     attack_speed: Mapped[float] = mapped_column(Float, nullable=False, server_default="2.0")  # seconds per swing
     damage_type: Mapped[str] = mapped_column(String, nullable=False, server_default="physical")  # physical, magic, fire, etc.
+    
+    # Phase 11: Light source properties (torches, lanterns, glowing items)
+    provides_light: Mapped[bool] = mapped_column(Integer, nullable=False, server_default="0")  # Whether item emits light
+    light_intensity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")  # Light contribution (0-50)
+    light_duration: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Duration in seconds (None = permanent)
     
     # Flavor and metadata
     flavor_text: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -463,4 +474,91 @@ class ServerMetric(Base):
     timestamp: Mapped[float] = mapped_column(Float, nullable=False, index=True)  # Unix timestamp
     metric_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # players_online, tick_duration, etc.
     value: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class Clan(Base):
+    """
+    Persistent player clan/guild system (Phase 10.2).
+    
+    Represents a long-term player organization with:
+    - Leader and member hierarchy
+    - Experience and leveling
+    - Persistent storage across restarts
+    """
+    __tablename__ = "clans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    leader_id: Mapped[str] = mapped_column(String, ForeignKey("players.id"), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    level: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    experience: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[float] = mapped_column(Float, nullable=False)
+    
+    # Relationships
+    leader: Mapped["Player"] = relationship("Player", foreign_keys=[leader_id])
+    members: Mapped[list["ClanMember"]] = relationship("ClanMember", back_populates="clan", cascade="all, delete-orphan")
+
+
+class ClanMember(Base):
+    """
+    Tracks a player's membership in a clan with rank and contribution points.
+    
+    Rank hierarchy: leader > officer > member > initiate
+    Contribution points track player's value to clan for leveling.
+    """
+    __tablename__ = "clan_members"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    clan_id: Mapped[str] = mapped_column(String, ForeignKey("clans.id", ondelete="CASCADE"), nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(String, ForeignKey("players.id"), nullable=False, index=True)
+    rank: Mapped[str] = mapped_column(String, nullable=False, index=True)  # leader|officer|member|initiate
+    joined_at: Mapped[float] = mapped_column(Float, nullable=False)
+    contribution_points: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    
+    # Relationships
+    clan: Mapped["Clan"] = relationship("Clan", back_populates="members")
+    player: Mapped["Player"] = relationship("Player")
     extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # Additional context
+
+
+class Faction(Base):
+    """
+    NPC-owned factions that players can join and gain reputation with (Phase 10.3).
+    
+    Represents organizations, guilds, religions, or governments in the world.
+    Players can gain/lose standing based on actions and quests.
+    NPC faction members will have modified behavior based on player standing.
+    """
+    __tablename__ = "factions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    color: Mapped[str] = mapped_column(String, nullable=False, server_default="#FFFFFF")
+    emblem: Mapped[str | None] = mapped_column(String, nullable=True)
+    player_joinable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1", index=True)
+    max_members: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    require_level: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    created_at: Mapped[float] = mapped_column(Float, nullable=False)
+    
+    # Relationships
+    npc_members: Mapped[list["FactionNPCMember"]] = relationship("FactionNPCMember", back_populates="faction", cascade="all, delete-orphan")
+
+
+class FactionNPCMember(Base):
+    """
+    Links NPC templates to factions for quick O(1) faction lookups.
+    
+    Used to determine:
+    - Which faction an NPC belongs to
+    - Whether an NPC should attack a player based on faction standing
+    - NPC dialogue/greeting variations based on player standing
+    """
+    __tablename__ = "faction_npc_members"
+
+    faction_id: Mapped[str] = mapped_column(String, ForeignKey("factions.id", ondelete="CASCADE"), nullable=False, primary_key=True, index=True)
+    npc_template_id: Mapped[str] = mapped_column(String, nullable=False, primary_key=True, index=True)
+    
+    # Relationships
+    faction: Mapped["Faction"] = relationship("Faction", back_populates="npc_members")

@@ -676,6 +676,9 @@ class TriggerSystem:
         self.condition_handlers["has_effect"] = self._condition_has_effect
         self.condition_handlers["entity_present"] = self._condition_entity_present
         self.condition_handlers["player_count"] = self._condition_player_count
+        # Phase 11 conditions - Light and Vision
+        self.condition_handlers["light_level"] = self._condition_light_level
+        self.condition_handlers["visibility_level"] = self._condition_visibility_level
     
     def _condition_flag_set(self, ctx: TriggerContext, params: Dict[str, Any]) -> bool:
         """
@@ -860,6 +863,55 @@ class TriggerSystem:
         
         return self._compare(player_count, operator, value)
     
+    def _condition_light_level(self, ctx: TriggerContext, params: Dict[str, Any]) -> bool:
+        """
+        Check if the room's light level meets a comparison.
+        
+        Params:
+            operator: Comparison operator (">=", "<=", ">", "<", "==", "!=")
+            value: Light level to compare against (0-100)
+        """
+        room = ctx.get_room()
+        if not room:
+            return False
+        
+        # Get lighting system from context
+        lighting_system = getattr(self.ctx, 'lighting_system', None)
+        if not lighting_system:
+            return False
+        
+        operator = params.get("operator", ">=")
+        value = params.get("value", 0)
+        
+        # Get current light level for room
+        current_light = lighting_system.calculate_room_light(room)
+        
+        return self._compare(current_light, operator, value)
+    
+    def _condition_visibility_level(self, ctx: TriggerContext, params: Dict[str, Any]) -> bool:
+        """
+        Check if the room's visibility level matches a specific level.
+        
+        Params:
+            level: Visibility level name ("none", "minimal", "partial", "normal", "enhanced")
+        """
+        room = ctx.get_room()
+        if not room:
+            return False
+        
+        # Get lighting system from context
+        lighting_system = getattr(self.ctx, 'lighting_system', None)
+        if not lighting_system:
+            return False
+        
+        expected_level = params.get("level", "normal").lower()
+        
+        # Calculate current light and get visibility level
+        current_light = lighting_system.calculate_room_light(room)
+        visibility = lighting_system.get_visibility_level(current_light)
+        
+        return visibility.value == expected_level
+    
     def _compare(self, actual: float, operator: str, expected: float) -> bool:
         """Helper to perform numeric comparison."""
         if operator == ">=":
@@ -898,6 +950,14 @@ class TriggerSystem:
         self.action_handlers["set_description"] = self._action_set_description
         self.action_handlers["reset_description"] = self._action_reset_description
         self.action_handlers["spawn_item"] = self._action_spawn_item
+        self.action_handlers["despawn_item"] = self._action_despawn_item
+        self.action_handlers["give_item"] = self._action_give_item
+        self.action_handlers["take_item"] = self._action_take_item
+        self.action_handlers["enable_trigger"] = self._action_enable_trigger
+        self.action_handlers["disable_trigger"] = self._action_disable_trigger
+        self.action_handlers["fire_trigger"] = self._action_fire_trigger
+        # Phase 11 actions - Darkness Events
+        self.action_handlers["stumble_in_darkness"] = self._action_stumble_in_darkness
         self.action_handlers["despawn_item"] = self._action_despawn_item
         self.action_handlers["give_item"] = self._action_give_item
         self.action_handlers["take_item"] = self._action_take_item
@@ -1590,6 +1650,73 @@ class TriggerSystem:
         
         # Execute actions
         return self.execute_actions(target_trigger.actions, ctx)
+
+    # ---------- Phase 11: Darkness Events ----------
+    
+    def _action_stumble_in_darkness(
+        self,
+        ctx: TriggerContext,
+        params: Dict[str, Any],
+    ) -> List[Event]:
+        """
+        Cause the player to stumble in darkness, taking minor damage.
+        
+        Params:
+            damage_min: Minimum damage (default: 1)
+            damage_max: Maximum damage (default: 5)
+            message: Custom message (optional, supports substitution)
+        
+        Only triggers if the room has low light (< 26, i.e., PARTIAL or worse).
+        """
+        import random
+        
+        player = ctx.get_player()
+        room = ctx.get_room()
+        if not player or not room:
+            return []
+        
+        # Check light level
+        lighting_system = getattr(self.ctx, 'lighting_system', None)
+        if lighting_system:
+            current_light = lighting_system.calculate_room_light(room)
+            # Only stumble in PARTIAL or worse visibility (< 26)
+            if current_light >= 26:
+                return []
+        
+        damage_min = params.get("damage_min", 1)
+        damage_max = params.get("damage_max", 5)
+        damage = random.randint(damage_min, damage_max)
+        
+        # Apply damage
+        player.hp = max(0, player.hp - damage)
+        
+        # Default message
+        default_message = "You stumble in the darkness and hurt yourself!"
+        message = params.get("message", default_message)
+        message = self.substitute_variables(message, ctx)
+        
+        events = [
+            {
+                "type": "message",
+                "player_id": ctx.player_id,
+                "text": f"{message} (-{damage} HP)",
+                "style": "combat",
+            }
+        ]
+        
+        # Notify room if player takes serious damage
+        if damage >= 3:
+            room_message = f"{player.name} stumbles and cries out in pain!"
+            for entity_id in room.entities:
+                if entity_id != ctx.player_id and entity_id in ctx.world.players:
+                    events.append({
+                        "type": "message",
+                        "player_id": entity_id,
+                        "text": room_message,
+                        "style": "narrative",
+                    })
+        
+        return events
 
     # ---------- Phase 6: Trigger State Persistence ----------
     
