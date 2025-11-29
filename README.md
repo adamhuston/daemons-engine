@@ -1,8 +1,12 @@
-# Modern MUD Engine
+# Daemon
 
-Headless game engine for real-time, text-based multiplayer worlds.
+**A modern MUD engine.**
 
-Python/FastAPI backend exposing a WebSocket API. Handles game state, persistence, and authentication—bring your own frontend.
+Headless game engine for real-time, text-based multiplayer worlds. Python/FastAPI backend exposing a WebSocket API. Handles game state, persistence, and authentication—bring your own frontend.
+
+**Ecosystem (planned):**
+- **Daemonwright** — Visual content management for Daemon worlds
+- **Scry** — Cross-platform game client
 
 ## Architecture Highlights
 
@@ -75,8 +79,6 @@ room_type: ethereal
 exits:
   north: room_1_2_1
 ```
-
-*Planned: MME Content Management System for visual world editing.*
 
 ### Behavior Composition
 NPCs load behavior modules by name from YAML templates:
