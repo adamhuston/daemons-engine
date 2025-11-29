@@ -2,7 +2,8 @@
 import asyncio
 import time
 import uuid
-from typing import Dict, List, Any, Callable, Awaitable
+import logging
+from typing import Dict, List, Any, Callable, Awaitable, Optional
 
 from .world import (
     World, WorldRoom, Direction, PlayerId, RoomId, AreaId, get_room_emoji, 
@@ -10,16 +11,21 @@ from .world import (
     WorldArea,
     Targetable, TargetableType, WorldItem, ItemId,
     CombatPhase, CombatState, CombatResult, WeaponStats,
-    get_xp_for_next_level, LEVEL_UP_STAT_GAINS
+    get_xp_for_next_level, LEVEL_UP_STAT_GAINS, ResourcePool
 )
 from .behaviors import (
     BehaviorContext, BehaviorResult, get_behavior_instances
 )
 from .systems import GameContext, TimeEventManager, EventDispatcher, CombatSystem, EffectSystem, CommandRouter, TriggerSystem, TriggerContext, QuestSystem, StateTracker, ENTITY_PLAYER, ENTITY_ROOM, ENTITY_NPC, ENTITY_ITEM, ENTITY_TRIGGER
+from .systems.classes import ClassSystem
+from .systems.abilities import AbilityExecutor
 
 
 
 Event = dict[str, Any]
+
+# Module logger for persistence and debug info
+logger = logging.getLogger(__name__)
 
 
 class WorldEngine:
@@ -67,6 +73,12 @@ class WorldEngine:
         self.ctx.trigger_system = self.trigger_system
         self.quest_system = QuestSystem(self.ctx)
         self.ctx.quest_system = self.quest_system
+        
+        # Phase 9: Character classes and abilities system
+        self.class_system = ClassSystem(self.ctx)
+        self.ctx.class_system = self.class_system
+        self.ability_executor = AbilityExecutor(self.ctx)
+        self.ctx.ability_executor = self.ability_executor
         
         # Phase 6: State persistence tracker
         if db_session_factory:
@@ -399,6 +411,133 @@ class WorldEngine:
             usage="<message>"
         )
         
+        self.command_router.register_handler(
+            primary_name="kick",
+            handler=self._kick_command_handler,
+            names=["kick"],
+            category="admin",
+            description="[Mod] Kick a player from the game",
+            usage="<player_name> [reason]"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="mute",
+            handler=self._mute_handler,
+            names=["mute"],
+            category="admin",
+            description="[Mod] Mute a player",
+            usage="<player_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="unmute",
+            handler=self._unmute_handler,
+            names=["unmute"],
+            category="admin",
+            description="[Mod] Unmute a player",
+            usage="<player_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="warn",
+            handler=self._warn_handler,
+            names=["warn"],
+            category="admin",
+            description="[Mod] Warn a player",
+            usage="<player_name> <reason>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="revive",
+            handler=self._revive_handler,
+            names=["revive"],
+            category="admin",
+            description="[GM] Revive a dead player",
+            usage="<player_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="invis",
+            handler=self._invis_handler,
+            names=["invis", "invisible"],
+            category="admin",
+            description="[Mod] Make a player invisible",
+            usage="[player_name]"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="visible",
+            handler=self._visible_handler,
+            names=["visible", "vis"],
+            category="admin",
+            description="[Mod] Make a player visible",
+            usage="[player_name]"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="reload",
+            handler=self._reload_handler,
+            names=["reload"],
+            category="admin",
+            description="[Admin] Reload game content from YAML",
+            usage="[content_type]"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="ban",
+            handler=self._ban_command_handler,
+            names=["ban"],
+            category="admin",
+            description="[Admin] Ban a player account",
+            usage="<player_name> <reason>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="unban",
+            handler=self._unban_command_handler,
+            names=["unban"],
+            category="admin",
+            description="[Admin] Unban a player account",
+            usage="<player_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="setstat",
+            handler=self._setstat_handler,
+            names=["setstat"],
+            category="admin",
+            description="[GM] Set a player's stat",
+            usage="<player_name> <stat> <value>"
+        )
+        
+        # Phase 9: Ability commands
+        self.command_router.register_handler(
+            primary_name="cast",
+            handler=self._cast_handler,
+            names=["cast", "c"],
+            category="abilities",
+            description="Cast an ability",
+            usage="<ability_name> [target_name]"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="abilities",
+            handler=self._abilities_handler,
+            names=["abilities", "skills", "ab"],
+            category="abilities",
+            description="View your learned abilities",
+            usage=""
+        )
+        
+        self.command_router.register_handler(
+            primary_name="resources",
+            handler=self._resources_handler,
+            names=["resources", "mana", "energy", "rage"],
+            category="character",
+            description="View your character resources",
+            usage=""
+        )
+        
         # Quit command - graceful disconnect
         self.command_router.register_handler(
             primary_name="quit",
@@ -480,6 +619,22 @@ class WorldEngine:
     def _show_effects_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """Adapter for effects command."""
         return self._show_effects(player_id)
+
+    # Phase 9: Ability command handlers
+    
+    def _cast_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Adapter for cast ability command."""
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Cast which ability?")]
+        return self._cast_ability(player_id, args)
+    
+    def _abilities_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Adapter for abilities/skills command."""
+        return self._show_abilities(player_id)
+    
+    def _resources_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Adapter for resources command."""
+        return self._show_resources(player_id)
 
     def _heal_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """Adapter for heal command. Requires GAME_MASTER role."""
@@ -892,6 +1047,458 @@ class WorldEngine:
                 })
         
         events.append(self._msg_to_player(player_id, f"Broadcast sent to {len(events)-1} player(s)."))
+        return events
+
+    def _kick_command_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Mod] Kick a player from the game."""
+        if not self._check_permission(player_id, "KICK_PLAYER"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Kick whom? Usage: kick <player_name> [reason]")]
+        
+        parts = args.strip().split(maxsplit=1)
+        target_name = parts[0].lower()
+        reason = parts[1] if len(parts) > 1 else "Kicked by administrator"
+        
+        # Find target player
+        target = None
+        for p in self.world.players.values():
+            if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                target = p
+                break
+        
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{parts[0]}' not found.")]
+        
+        if target.id == player_id:
+            return [self._msg_to_player(player_id, "You cannot kick yourself.")]
+        
+        if not target.is_connected:
+            return [self._msg_to_player(player_id, f"{target.name} is not connected.")]
+        
+        # Kick the player
+        target.is_connected = False
+        
+        events = [self._msg_to_player(player_id, f"Kicked {target.name}: {reason}")]
+        
+        # Notify the kicked player
+        if target.id in self._listeners:
+            events.append({
+                "type": "kicked",
+                "scope": "player",
+                "player_id": target.id,
+                "text": f"You have been kicked: {reason}"
+            })
+        
+        # Broadcast to room
+        room = self.world.rooms.get(target.room_id)
+        if room:
+            for p_id in room.players:
+                if p_id != target.id:
+                    events.append(self._msg_to_player(p_id, f"{target.name} has been kicked from the game."))
+        
+        return events
+
+    def _mute_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Mod] Mute a player (prevent speaking)."""
+        if not self._check_permission(player_id, "KICK_PLAYER"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Mute whom? Usage: mute <player_name>")]
+        
+        target_name = args.strip().lower()
+        target = None
+        for p in self.world.players.values():
+            if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                target = p
+                break
+        
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{args.strip()}' not found.")]
+        
+        # Set mute flag
+        if not target.data:
+            target.data = {}
+        target.data['muted'] = True
+        
+        events = [self._msg_to_player(player_id, f"Muted {target.name}.")]
+        
+        if target.id in self._listeners:
+            events.append(self._msg_to_player(target.id, "You have been muted and cannot speak."))
+        
+        return events
+
+    def _unmute_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Mod] Unmute a player."""
+        if not self._check_permission(player_id, "KICK_PLAYER"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Unmute whom? Usage: unmute <player_name>")]
+        
+        target_name = args.strip().lower()
+        target = None
+        for p in self.world.players.values():
+            if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                target = p
+                break
+        
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{args.strip()}' not found.")]
+        
+        # Clear mute flag
+        if target.data:
+            target.data.pop('muted', None)
+        
+        events = [self._msg_to_player(player_id, f"Unmuted {target.name}.")]
+        
+        if target.id in self._listeners:
+            events.append(self._msg_to_player(target.id, "You have been unmuted."))
+        
+        return events
+
+    def _warn_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Mod] Warn a player."""
+        if not self._check_permission(player_id, "KICK_PLAYER"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Warn whom? Usage: warn <player_name> <reason>")]
+        
+        parts = args.strip().split(maxsplit=1)
+        target_name = parts[0].lower()
+        reason = parts[1] if len(parts) > 1 else "Behavior violation"
+        
+        target = None
+        for p in self.world.players.values():
+            if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                target = p
+                break
+        
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{parts[0]}' not found.")]
+        
+        # Track warnings
+        if not target.data:
+            target.data = {}
+        warn_count = target.data.get('warn_count', 0) + 1
+        target.data['warn_count'] = warn_count
+        
+        events = [self._msg_to_player(player_id, f"Warned {target.name} ({warn_count} warning(s)): {reason}")]
+        
+        if target.id in self._listeners:
+            events.append(self._msg_to_player(target.id, f"⚠️ WARNING from admin: {reason}"))
+        
+        return events
+
+    def _revive_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[GM] Revive a dead player."""
+        if not self._check_permission(player_id, "MODIFY_STATS"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Revive whom? Usage: revive <player_name>")]
+        
+        target_name = args.strip().lower()
+        target = None
+        for p in self.world.players.values():
+            if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                target = p
+                break
+        
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{args.strip()}' not found.")]
+        
+        if target.is_alive():
+            return [self._msg_to_player(player_id, f"{target.name} is already alive.")]
+        
+        # Revive the player
+        target.current_health = target.max_health
+        target.current_energy = target.max_energy
+        target.is_connected = True
+        
+        events = [self._msg_to_player(player_id, f"Revived {target.name}.")]
+        
+        if target.id in self._listeners:
+            events.append(self._msg_to_player(target.id, "You have been revived by divine intervention!"))
+            events.append({
+                "type": "stat_update",
+                "scope": "player",
+                "player_id": target.id,
+                "payload": {"current_health": target.max_health, "max_health": target.max_health}
+            })
+        
+        # Notify room
+        room = self.world.rooms.get(target.room_id)
+        if room:
+            for p_id in room.players:
+                if p_id != target.id:
+                    events.append(self._msg_to_player(p_id, f"✨ {target.name} has been revived!"))
+        
+        return events
+
+    def _invis_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Mod] Make a player invisible (admin mode)."""
+        if not self._check_permission(player_id, "KICK_PLAYER"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        # If no args, apply to self
+        target = None
+        if args and args.strip():
+            target_name = args.strip().lower()
+            for p in self.world.players.values():
+                if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                    target = p
+                    break
+            if not target:
+                return [self._msg_to_player(player_id, f"Player '{args.strip()}' not found.")]
+        else:
+            target = self.world.players.get(player_id)
+        
+        if not target:
+            return [self._msg_to_player(player_id, "Invalid target.")]
+        
+        # Set invisibility flag
+        if not target.data:
+            target.data = {}
+        target.data['invisible'] = True
+        
+        events = []
+        if target.id == player_id:
+            events.append(self._msg_to_player(player_id, "You fade from view."))
+        else:
+            events.append(self._msg_to_player(player_id, f"{target.name} has been made invisible."))
+            if target.id in self._listeners:
+                events.append(self._msg_to_player(target.id, "You have been made invisible."))
+        
+        return events
+
+    def _visible_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Mod] Make a player visible (remove invisibility)."""
+        if not self._check_permission(player_id, "KICK_PLAYER"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        # If no args, apply to self
+        target = None
+        if args and args.strip():
+            target_name = args.strip().lower()
+            for p in self.world.players.values():
+                if p.name.lower() == target_name or p.name.lower().startswith(target_name):
+                    target = p
+                    break
+            if not target:
+                return [self._msg_to_player(player_id, f"Player '{args.strip()}' not found.")]
+        else:
+            target = self.world.players.get(player_id)
+        
+        if not target:
+            return [self._msg_to_player(player_id, "Invalid target.")]
+        
+        # Clear invisibility flag
+        if target.data:
+            target.data.pop('invisible', None)
+        
+        events = []
+        if target.id == player_id:
+            events.append(self._msg_to_player(player_id, "You become visible."))
+        else:
+            events.append(self._msg_to_player(player_id, f"{target.name} has been made visible."))
+            if target.id in self._listeners:
+                events.append(self._msg_to_player(target.id, "You have been made visible."))
+        
+        return events
+
+    def _reload_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Admin] Reload game content from YAML files."""
+        if not self._check_permission(player_id, "SERVER_COMMANDS"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        content_type = args.strip().lower() if args and args.strip() else "all"
+        
+        # Valid content types
+        valid_types = ["all", "abilities", "items", "npcs", "rooms", "areas", "classes"]
+        
+        if content_type not in valid_types:
+            return [self._msg_to_player(player_id, f"Invalid content type. Valid: {', '.join(valid_types)}")]
+        
+        # Attempt to reload content
+        try:
+            if hasattr(self, 'content_reloader'):
+                result = self.content_reloader.reload(content_type)
+                events = [self._msg_to_player(player_id, f"Reloaded {content_type}: {result}")]
+            else:
+                events = [self._msg_to_player(player_id, "Content reload system not available.")]
+        except Exception as e:
+            events = [self._msg_to_player(player_id, f"Reload failed: {str(e)}")]
+        
+        return events
+
+    def _ban_command_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Admin] Ban a player account."""
+        if not self._check_permission(player_id, "MANAGE_ACCOUNTS"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        parts = args.strip().split(maxsplit=1)
+        if len(parts) < 2:
+            return [self._msg_to_player(player_id, "Usage: ban <player_name> <reason>")]
+        
+        target_name = parts[0]
+        ban_reason = parts[1]
+        
+        # Find target player
+        target = self._find_player_by_name(target_name)
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{target_name}' not found.")]
+        
+        # Get admin player
+        admin_player = self.world.players.get(player_id)
+        if not admin_player:
+            return [self._msg_to_player(player_id, "Admin player not found.")]
+        
+        # Ban the account
+        target.is_connected = False
+        
+        # Mark account as banned in player.data (for in-game tracking)
+        if not target.data:
+            target.data = {}
+        target.data['banned'] = True
+        target.data['ban_reason'] = ban_reason
+        target.data['banned_by'] = admin_player.name
+        
+        events = [
+            self._msg_to_player(player_id, f"🚫 Banned {target.name} for: {ban_reason}"),
+            self._msg_to_room(target.room_id, f"⚠️ {target.name} has been banned from the game.")
+        ]
+        
+        # Notify target if still connected
+        if target.id in self._listeners:
+            events.append(self._msg_to_player(target.id, f"You have been banned: {ban_reason}"))
+        
+        return events
+
+    def _unban_command_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[Admin] Unban a player account."""
+        if not self._check_permission(player_id, "MANAGE_ACCOUNTS"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        target_name = args.strip()
+        if not target_name:
+            return [self._msg_to_player(player_id, "Usage: unban <player_name>")]
+        
+        # Find target player (by name in world)
+        target = self._find_player_by_name(target_name)
+        if not target:
+            # Player not currently online, but we can still unban them by finding via database
+            # For now, we'll just note that offline unbanning requires the REST API
+            return [self._msg_to_player(player_id, f"Player '{target_name}' not found online. Use REST API for offline unbanning.")]
+        
+        # Unban the account
+        if not target.data:
+            target.data = {}
+        
+        old_reason = target.data.get('ban_reason', 'Unknown')
+        target.data.pop('banned', None)
+        target.data.pop('ban_reason', None)
+        target.data.pop('banned_by', None)
+        
+        # Get admin player
+        admin_player = self.world.players.get(player_id)
+        if not admin_player:
+            return [self._msg_to_player(player_id, "Admin player not found.")]
+        
+        events = [
+            self._msg_to_player(player_id, f"✅ Unbanned {target.name} (was banned for: {old_reason})"),
+            self._msg_to_room(target.room_id, f"✅ {target.name} has been unbanned.")
+        ]
+        
+        if target.id in self._listeners:
+            events.append(self._msg_to_player(target.id, "You have been unbanned!"))
+        
+        return events
+
+    def _setstat_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """[GM] Set a player's stat to a specific value."""
+        if not self._check_permission(player_id, "MODIFY_STATS"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
+        parts = args.strip().split()
+        if len(parts) < 3:
+            return [self._msg_to_player(player_id, "Usage: setstat <player_name> <stat> <value>")]
+        
+        target_name = parts[0]
+        stat_name = parts[1].lower()
+        
+        try:
+            stat_value = int(parts[2])
+        except ValueError:
+            return [self._msg_to_player(player_id, "Value must be a number.")]
+        
+        # Find target player
+        target = self._find_player_by_name(target_name)
+        if not target:
+            return [self._msg_to_player(player_id, f"Player '{target_name}' not found.")]
+        
+        # Valid stats that can be modified
+        valid_stats = {
+            "hp": "current_health",
+            "health": "current_health",
+            "max_hp": "max_health",
+            "max_health": "max_health",
+            "mana": "current_energy",
+            "energy": "current_energy",
+            "max_mana": "max_energy",
+            "max_energy": "max_energy",
+            "level": "level",
+            "armor": "armor_class",
+            "armor_class": "armor_class",
+            "strength": "strength",
+            "str": "strength",
+            "dexterity": "dexterity",
+            "dex": "dexterity",
+            "intelligence": "intelligence",
+            "int": "intelligence",
+            "vitality": "vitality",
+            "vit": "vitality",
+            "experience": "experience",
+            "xp": "experience",
+        }
+        
+        if stat_name not in valid_stats:
+            valid_names = ", ".join(sorted(set(valid_stats.keys())))
+            return [self._msg_to_player(player_id, f"Unknown stat: {stat_name}. Valid: {valid_names}")]
+        
+        attr_name = valid_stats[stat_name]
+        
+        # Validate value ranges for certain stats
+        if "max_" in attr_name and stat_value < 1:
+            return [self._msg_to_player(player_id, f"{stat_name} must be at least 1.")]
+        
+        if "current_" in attr_name or attr_name == "armor_class":
+            max_attr = attr_name.replace("current_", "max_")
+            max_value = getattr(target, max_attr, 100)
+            if stat_value < 0:
+                stat_value = 0
+            elif stat_value > max_value:
+                stat_value = max_value
+                return [self._msg_to_player(player_id, f"Capped {stat_name} at {max_value}.")]
+        
+        # Set the stat
+        old_value = getattr(target, attr_name)
+        setattr(target, attr_name, stat_value)
+        
+        # Format stat name for display
+        display_stat = stat_name.replace("_", " ").title()
+        
+        events = [
+            self._msg_to_player(player_id, f"✓ Set {target.name}'s {display_stat} from {old_value} to {stat_value}"),
+        ]
+        
+        # Notify target if online
+        if target.id in self._listeners:
+            events.append(self._msg_to_player(target.id, f"[Admin] Your {display_stat} has been set to {stat_value}."))
+        
         return events
 
     def _quit_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
@@ -1846,6 +2453,39 @@ class WorldEngine:
                 except Exception as e:
                     print(f"[Phase6] Error restoring effects for {player_id}: {e}")
             
+            # Phase 9i: Restore character resources with offline regen
+            if was_in_stasis and self._db_session_factory:
+                try:
+                    async with self._db_session_factory() as session:
+                        from sqlalchemy import select
+                        from ..models import Player as DBPlayer
+                        
+                        stmt = select(DBPlayer).where(DBPlayer.id == player_id)
+                        result = await session.execute(stmt)
+                        db_player = result.scalar_one_or_none()
+                        
+                        if db_player and db_player.data:
+                            # Restore resources and apply offline regen
+                            self._restore_player_resources(player, db_player.data)
+                            
+                            # Emit resource update events to notify client
+                            if player.character_sheet:
+                                resources_payload = {}
+                                for rid in player.character_sheet.resource_pools.keys():
+                                    pool = player.character_sheet.resource_pools[rid]
+                                    resources_payload[rid] = {
+                                        "current": pool.current,
+                                        "max": pool.max,
+                                        "percent": (pool.current / pool.max * 100) if pool.max > 0 else 0
+                                    }
+                                if resources_payload:
+                                    resource_event = self.event_dispatcher.resource_update(
+                                        player_id, resources_payload
+                                    )
+                                    await self._dispatch_events([resource_event])
+                except Exception as e:
+                    logger.error(f"[Phase9i] Error restoring resources for {player_id}: {e}", exc_info=True)
+            
             # Broadcast awakening message if coming out of stasis
             if was_in_stasis:
                 room = self.world.rooms.get(player.room_id)
@@ -1917,7 +2557,22 @@ class WorldEngine:
                 quest_progress_data[quest_id] = progress
         
         async with self._db_session_factory() as session:
-            # Update player stats in database (including quest data)
+            # Serialize character sheet resources to JSON-compatible format (Phase 9i)
+            resources_data = {}
+            if player.character_sheet and player.character_sheet.resource_pools:
+                for resource_id, pool in player.character_sheet.resource_pools.items():
+                    resources_data[resource_id] = {
+                        "current": pool.current,
+                        "max": pool.max,
+                        "last_regen_tick": getattr(pool, "last_regen_tick", time.time()),
+                    }
+            
+            # Serialize character sheet abilities to JSON-compatible format (Phase 9i)
+            learned_abilities_list = []
+            if player.character_sheet:
+                learned_abilities_list = list(player.character_sheet.learned_abilities)
+            
+            # Update player stats in database (including quest data and character sheet)
             player_stmt = (
                 update(DBPlayer)
                 .where(DBPlayer.id == player_id)
@@ -1931,6 +2586,8 @@ class WorldEngine:
                     player_flags=player.player_flags,
                     quest_progress=quest_progress_data,
                     completed_quests=list(player.completed_quests),
+                    # Phase 9: Character sheet persistence
+                    data=self._serialize_player_data(player, resources_data, learned_abilities_list),
                 )
             )
             await session.execute(player_stmt)
@@ -1970,6 +2627,106 @@ class WorldEngine:
             
             await session.commit()
             print(f"[Persistence] Saved stats, inventory, and quest progress for player {player.name} (ID: {player_id})")
+    
+    def _serialize_player_data(
+        self,
+        player: WorldPlayer,
+        resources_data: dict,
+        learned_abilities_list: list
+    ) -> dict:
+        """
+        Serialize player data including character sheet for JSON storage.
+        
+        Args:
+            player: The WorldPlayer instance
+            resources_data: Serialized resource pools
+            learned_abilities_list: List of learned ability IDs
+        
+        Returns:
+            Dictionary ready for JSON serialization
+        """
+        data = {}
+        
+        # Store character sheet data
+        if player.character_sheet:
+            data["class_id"] = player.character_sheet.class_id
+            data["learned_abilities"] = learned_abilities_list
+            data["resource_pools"] = resources_data
+            if player.character_sheet.ability_loadout:
+                # Serialize ability slots
+                loadout = []
+                for slot in player.character_sheet.ability_loadout:
+                    loadout.append({
+                        "slot_id": slot.slot_id,
+                        "ability_id": slot.ability_id,
+                        "last_used_at": slot.last_used_at,
+                        "learned_at": slot.learned_at,
+                    })
+                data["ability_loadout"] = loadout
+        
+        return data
+    
+    def _restore_player_resources(self, player: WorldPlayer, player_data: dict) -> None:
+        """
+        Restore player resources from persisted data and apply offline regen.
+        
+        Args:
+            player: The WorldPlayer to restore
+            player_data: The data dict from database
+        """
+        if not player.character_sheet:
+            return  # No character sheet
+        
+        class_id = player_data.get("class_id")
+        if not class_id:
+            return  # No class data
+        
+        # Get class template for resource definitions
+        class_template = self.class_system.get_class(class_id)
+        if not class_template:
+            logger.warning(f"Could not find class template for {class_id}")
+            return
+        
+        # Restore resources with offline regen
+        now = time.time()
+        saved_resources = player_data.get("resource_pools", {})
+        
+        for resource_id, resource_def in (class_template.resources or {}).items():
+            saved = saved_resources.get(resource_id, {})
+            
+            # Get last regen time (when player disconnected)
+            last_regen_tick = saved.get("last_regen_tick", now)
+            time_offline = max(0, now - last_regen_tick)
+            
+            # Calculate offline regen
+            # Use regen_rate from resource definition
+            regen_per_second = resource_def.regen_rate if hasattr(resource_def, 'regen_rate') else 0.1
+            regen_amount = int(time_offline * regen_per_second)
+            
+            # Restore or create resource pool
+            max_amount = resource_def.max_amount if hasattr(resource_def, 'max_amount') else 100
+            
+            if resource_id in player.character_sheet.resource_pools:
+                pool = player.character_sheet.resource_pools[resource_id]
+                # Restore saved current value
+                pool.current = saved.get("current", pool.max)
+                # Apply offline regen
+                pool.current = min(pool.max, pool.current + regen_amount)
+            else:
+                # Create new pool
+                pool = ResourcePool(
+                    resource_id=resource_id,
+                    current=min(max_amount, saved.get("current", max_amount) + regen_amount),
+                    max=max_amount,
+                    regen_per_second=regen_per_second
+                )
+                player.character_sheet.resource_pools[resource_id] = pool
+            
+            if regen_amount > 0:
+                logger.info(
+                    f"{player.name} regenerated {regen_amount} {resource_id} "
+                    f"during {time_offline:.1f}s offline"
+                )
     
     async def player_disconnect(self, player_id: PlayerId) -> None:
         """
@@ -4206,3 +4963,228 @@ class WorldEngine:
             ]
         
         return [self._msg_to_player(player_id, f"You can't give items to that.")]
+
+    # ========== Phase 9: Ability Commands ==========
+    
+    def _cast_ability(self, player_id: PlayerId, args: str) -> List[Event]:
+        """
+        Cast an ability.
+        
+        Args:
+            player_id: The caster
+            args: "ability_name [target_name]"
+            
+        Returns:
+            List of events
+        """
+        events: List[Event] = []
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        # Parse ability name and optional target
+        parts = args.split(maxsplit=1)
+        ability_id = parts[0].lower()
+        target_name = parts[1] if len(parts) > 1 else ""
+        
+        # Get ability template
+        ability = self.class_system.get_ability(ability_id)
+        if not ability:
+            return [self._msg_to_player(player_id, f"Unknown ability: {ability_id}")]
+        
+        # Resolve target if needed
+        target_entity = None
+        if target_name:
+            target_entity = self._find_target(player_id, target_name)
+            if not target_entity:
+                return [self._msg_to_player(player_id, f"'{target_name}' not found.")]
+        
+        # Execute ability via AbilityExecutor
+        # Note: This is synchronous; Phase 9h will add async event support
+        result = self._execute_ability_sync(player_id, ability_id, target_entity)
+        
+        if result.success:
+            events.append(self._msg_to_player(player_id, result.message))
+            
+            # Notify room of ability cast
+            room = self.world.rooms.get(player.room_id)
+            if room:
+                events.append(self._msg_to_room(
+                    room.id,
+                    f"{player.name} casts {ability.name}!",
+                    exclude={player_id}
+                ))
+            
+            # Notify targets
+            for target_id in result.targets_hit:
+                if target_id != player_id:
+                    events.append(self._msg_to_player(
+                        target_id,
+                        f"{player.name} casts {ability.name} on you!"
+                    ))
+        else:
+            events.append(self._msg_to_player(
+                player_id,
+                f"Cannot cast {ability_id}: {result.error}"
+            ))
+        
+        return events
+    
+    def _execute_ability_sync(
+        self,
+        player_id: PlayerId,
+        ability_id: str,
+        target_entity: Optional[WorldEntity] = None
+    ) -> Any:
+        """
+        Synchronous wrapper for ability execution.
+        
+        This is a temporary wrapper for Phase 9f. Phase 9h will make this async
+        and emit proper events to all connected players.
+        
+        Args:
+            player_id: The caster
+            ability_id: The ability to cast
+            target_entity: Optional target
+            
+        Returns:
+            AbilityExecutionResult from ability_executor.execute_ability()
+        """
+        player = self.world.players.get(player_id)
+        if not player:
+            from app.engine.systems.abilities import AbilityExecutionResult
+            return AbilityExecutionResult(
+                success=False,
+                ability_id=ability_id,
+                caster_id=player_id,
+                message="",
+                error="Player not found"
+            )
+        
+        # For now, we'll use a blocking call to the ability executor
+        # This will be properly async in Phase 9h
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're already in an async context, we can't use run_until_complete
+                # This is a limitation of the sync wrapper - Phase 9h will fix this
+                from app.engine.systems.abilities import AbilityExecutionResult
+                return AbilityExecutionResult(
+                    success=False,
+                    ability_id=ability_id,
+                    caster_id=player_id,
+                    message="",
+                    error="Ability system not ready for async execution"
+                )
+            else:
+                # We're in sync context, can run async function
+                result = loop.run_until_complete(
+                    self.ability_executor.execute_ability(
+                        player,
+                        ability_id,
+                        target_entity=target_entity
+                    )
+                )
+                return result
+        except Exception as e:
+            from app.engine.systems.abilities import AbilityExecutionResult
+            import logging
+            logging.error(f"Error executing ability: {e}", exc_info=True)
+            return AbilityExecutionResult(
+                success=False,
+                ability_id=ability_id,
+                caster_id=player_id,
+                message="",
+                error=f"Ability execution error: {str(e)}"
+            )
+    
+    def _show_abilities(self, player_id: PlayerId) -> List[Event]:
+        """
+        Show the player's learned abilities and their status.
+        
+        Args:
+            player_id: The player
+            
+        Returns:
+            List of events
+        """
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        if not player.has_character_sheet():
+            return [self._msg_to_player(
+                player_id,
+                "You haven't chosen a class yet."
+            )]
+        
+        learned = player.get_learned_abilities()
+        if not learned:
+            return [self._msg_to_player(
+                player_id,
+                "You haven't learned any abilities yet."
+            )]
+        
+        lines = ["═══ Your Abilities ═══"]
+        lines.append("")
+        
+        for ability_id in sorted(learned):
+            ability = self.class_system.get_ability(ability_id)
+            if not ability:
+                continue
+            
+            # Get cooldown status
+            cooldown = self.ability_executor.get_ability_cooldown(player_id, ability_id)
+            cooldown_str = f" [CD: {cooldown:.1f}s]" if cooldown > 0 else ""
+            
+            lines.append(f"{ability.name}{cooldown_str}")
+            lines.append(f"  {ability.description}")
+            
+            # Show costs if any
+            if ability.costs:
+                costs_str = ", ".join(f"{k}: {v}" for k, v in ability.costs.items())
+                lines.append(f"  Cost: {costs_str}")
+            
+            lines.append("")
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+    
+    def _show_resources(self, player_id: PlayerId) -> List[Event]:
+        """
+        Show the player's character resources (mana, rage, energy, etc).
+        
+        Args:
+            player_id: The player
+            
+        Returns:
+            List of events
+        """
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        if not player.has_character_sheet():
+            return [self._msg_to_player(
+                player_id,
+                "You haven't chosen a class yet."
+            )]
+        
+        pools = player.character_sheet.resource_pools
+        if not pools:
+            return [self._msg_to_player(
+                player_id,
+                "You have no active resources."
+            )]
+        
+        lines = ["═══ Your Resources ═══"]
+        lines.append("")
+        
+        for resource_id, pool in sorted(pools.items()):
+            pct = int((pool.current / pool.max) * 100) if pool.max > 0 else 0
+            bar = "█" * (pct // 10) + "░" * (10 - pct // 10)
+            lines.append(f"{pool.resource_id.title()}: {pool.current}/{pool.max} [{bar}] {pct}%")
+        
+        lines.append("")
+        
+        return [self._msg_to_player(player_id, "\n".join(lines))]

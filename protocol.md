@@ -167,6 +167,168 @@ All messages are JSON objects sent as text frames.
 4. Player respawned at area entry point with full health
 5. Player receives resurrection message and room description
 
+### Ability-Related Events (Phase 9)
+
+#### ability_cast Event
+```json
+{
+  "type": "ability_cast",
+  "caster_id": "uuid-string",
+  "ability_id": "slash",
+  "ability_name": "Slash",
+  "target_ids": ["enemy-uuid-1", "enemy-uuid-2"]
+}
+```
+
+**Fields:**
+- `type`: Always `"ability_cast"`
+- `caster_id`: UUID of the player casting the ability
+- `ability_id`: The ability identifier
+- `ability_name`: Human-readable ability name
+- `target_ids`: List of affected target UUIDs (optional, may be empty for self-targeted abilities)
+
+**When Sent:**
+- Immediately when an ability cast begins
+- Broadcast to all players in the caster's room
+- Appears on clients in combat/action logs
+
+#### ability_error Event
+```json
+{
+  "type": "ability_error",
+  "player_id": "uuid-string",
+  "ability_id": "slash",
+  "ability_name": "Slash",
+  "error": "Not enough mana"
+}
+```
+
+**Fields:**
+- `type`: Always `"ability_error"`
+- `player_id`: UUID of the player who attempted the ability
+- `ability_id`: The ability identifier
+- `ability_name`: Human-readable ability name
+- `error`: Reason the ability failed
+
+**When Sent:**
+- When ability execution fails validation (insufficient resources, on cooldown, etc.)
+- Sent only to the caster
+- Clients should display as error message in combat log
+
+**Common Error Scenarios:**
+- "Not enough mana" - Insufficient resource cost
+- "Ability is on cooldown (X.Xs remaining)" - Cooldown not expired
+- "No valid target found" - Required target not in range/visible
+- "Ability not learned" - Player hasn't unlocked this ability
+
+#### ability_cast_complete Event
+```json
+{
+  "type": "ability_cast_complete",
+  "player_id": "uuid-string",
+  "ability_id": "slash",
+  "ability_name": "Slash",
+  "payload": {
+    "success": true,
+    "message": "You slash the enemy for 25 damage!",
+    "damage_dealt": 25,
+    "targets_hit": 1
+  }
+}
+```
+
+**Fields:**
+- `type`: Always `"ability_cast_complete"`
+- `player_id`: UUID of the caster
+- `ability_id`: The ability identifier
+- `ability_name`: Human-readable ability name
+- `payload.success`: Whether the ability executed successfully
+- `payload.message`: Result message (flavor text)
+- `payload.damage_dealt`: Total damage dealt (optional)
+- `payload.targets_hit`: Number of targets affected (optional)
+
+**When Sent:**
+- After ability behavior completes
+- Contains detailed outcome information
+- Broadcast to all players in the caster's room
+
+#### cooldown_update Event
+```json
+{
+  "type": "cooldown_update",
+  "player_id": "uuid-string",
+  "ability_id": "slash",
+  "cooldown_remaining": 6.5
+}
+```
+
+**Fields:**
+- `type`: Always `"cooldown_update"`
+- `player_id`: UUID of the caster
+- `ability_id`: The ability identifier
+- `cooldown_remaining`: Seconds remaining on cooldown
+
+**When Sent:**
+- Immediately after an ability is cast
+- Sent only to the caster
+- Clients should update ability UI cooldown indicators
+
+#### resource_update Event
+```json
+{
+  "type": "resource_update",
+  "player_id": "uuid-string",
+  "payload": {
+    "mana": {
+      "current": 40,
+      "max": 50,
+      "percent": 80
+    },
+    "energy": {
+      "current": 45,
+      "max": 100,
+      "percent": 45
+    }
+  }
+}
+```
+
+**Fields:**
+- `type`: Always `"resource_update"`
+- `player_id`: UUID of the player whose resources changed
+- `payload`: Object mapping resource_id → {current, max, percent}
+
+**When Sent:**
+- When a player's abilities/resources are modified (mana spent, stamina regenerated, etc.)
+- Sent only to the affected player
+- Clients should update resource bars
+
+**Resource Types:**
+- `mana` - Magical resource for spellcasting abilities
+- `energy` - Physical resource for physical abilities
+- `stamina` - Endurance resource
+
+#### ability_learned Event
+```json
+{
+  "type": "ability_learned",
+  "player_id": "uuid-string",
+  "ability_id": "power_attack",
+  "ability_name": "Power Attack"
+}
+```
+
+**Fields:**
+- `type`: Always `"ability_learned"`
+- `player_id`: UUID of the player who learned the ability
+- `ability_id`: The ability identifier
+- `ability_name`: Human-readable ability name
+
+**When Sent:**
+- When a player learns a new ability (leveling, questing, class selection)
+- Sent only to the player who learned it
+- Clients should update ability list/learnt abilities UI
+
 ## Event Scoping
 
 The server uses internal scoping to determine which players receive which events:

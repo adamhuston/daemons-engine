@@ -75,7 +75,13 @@ async def lifespan(app: FastAPI):
     app.state.world_engine = engine_instance
     app.state.engine_task = asyncio.create_task(engine_instance.game_loop())
     
-    # 4a) Create auth system (Phase 7)
+    # 4a) Load class/ability content into ClassSystem (Phase 9c)
+    from pathlib import Path
+    class_dir = Path(__file__).parent.parent / "world_data"
+    await engine_instance.class_system.load_content(class_dir)
+    logger.info("Loaded character classes and abilities from world_data")
+    
+    # 4b) Create auth system (Phase 7)
     auth_system = AuthSystem(db_session_factory=AsyncSessionLocal)
     app.state.auth_system = auth_system
     engine_instance.ctx.auth_system = auth_system
@@ -184,6 +190,61 @@ def get_world_engine() -> WorldEngine:
 @app.get("/")
 async def root():
     return {"message": "💀 Hello, Dungeon! 💀"}
+
+
+@app.get("/metrics", include_in_schema=False)
+async def public_metrics(request: Request):
+    """
+    Public Prometheus metrics endpoint for monitoring.
+    
+    Returns metrics in Prometheus text exposition format.
+    No authentication required (metrics are generally non-sensitive).
+    
+    Metrics tracked:
+    - Players online, total, in combat
+    - NPCs alive and total
+    - Rooms and occupied rooms
+    - Combat statistics
+    - Command processing
+    - Server uptime
+    """
+    from app.metrics import update_world_metrics, REGISTRY
+    from starlette.responses import Response
+    
+    # Get engine instance if available
+    engine_instance = getattr(request.app.state, "world_engine", None)
+    if engine_instance:
+        # Update metrics with current world state
+        world = engine_instance.world
+        online_players = sum(1 for p in world.players.values() if p.is_connected)
+        alive_npcs = sum(1 for npc in world.npcs.values() if npc.current_health > 0)
+        total_npcs = len(world.npcs)
+        total_rooms = len(world.rooms)
+        occupied_rooms = len([r for r in world.rooms.values() if r.entities])
+        
+        # Update the metrics
+        from app.metrics import (
+            players_online, npcs_alive, npcs_total, 
+            rooms_total, rooms_occupied, areas_total
+        )
+        players_online.set(online_players)
+        npcs_alive.set(alive_npcs)
+        npcs_total.set(total_npcs)
+        rooms_total.set(total_rooms)
+        rooms_occupied.set(occupied_rooms)
+        areas_total.set(len(world.areas))
+    
+    # Generate Prometheus exposition format
+    from prometheus_client import generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
+    from prometheus_client import REGISTRY as prometheus_registry
+    
+    metrics_content = generate_latest(prometheus_registry)
+    
+    return Response(
+        content=metrics_content,
+        media_type=CONTENT_TYPE_LATEST,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 
 @app.get("/players")

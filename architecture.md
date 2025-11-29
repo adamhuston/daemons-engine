@@ -316,13 +316,29 @@ The game engine uses modular systems for different domains:
   - PerformanceLogger for timing metrics
   - JSON output for production, pretty output for dev
 
-- **ClassSystem** (`classes.py`): **(Phase 9 - Planned)**
-  - ClassTemplate dataclass with base stats, stat growth, abilities
-  - AbilityTemplate dataclass with costs, cooldowns, effects
-  - Resource types: mana, rage, energy, focus
+- **ClassSystem** (`classes.py`): **(Phase 9)**
+  - ClassTemplate dataclass with base stats, stat growth, abilities, resources
+  - AbilityTemplate dataclass with costs, cooldowns, effects, behavior
+  - Resource types: mana, rage, energy, focus (customizable per class)
   - Active, passive, and reactive ability types
   - YAML-driven class and ability definitions
   - Integration with EffectSystem for ability effects
+  - Hot-reload infrastructure for live class/ability updates
+  
+- **Persistence Layer** (`engine.py` methods): **(Phase 9i)**
+  - `save_player_stats()` - Persist character sheet, resources, abilities to database
+  - `_serialize_player_data()` - Serialize CharacterSheet to JSON format for Player.data column
+  - `_restore_player_resources()` - Restore resources on login with offline regen calculation
+  - Offline regen: `regen_amount = time_offline * regen_rate`
+  - Auto-called on player disconnect (save) and reconnect (restore + regen)
+  - Resources stored in Player.data JSON column under "resource_pools"
+  
+- **AbilityExecutor** (`abilities.py`): **(Phase 9e)**
+  - Validates ability use (learned, level, resources, cooldown, GCD)
+  - Resolves targets (single, AoE, self-targeted)
+  - Executes behavior function from registry
+  - Tracks cooldowns and GCD per player
+  - Emits WebSocket events (ability_cast, ability_error, ability_cast_complete, cooldown_update, resource_update)
 
 ### 3.5 Admin Routes
 

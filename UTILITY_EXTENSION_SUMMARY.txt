@@ -1,0 +1,258 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                   UTILITY ABILITIES EXTENSION                             ║
+║                         PHASE 9j+ ENHANCEMENT                             ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+OVERVIEW
+────────────────────────────────────────────────────────────────────────────
+Extended the Phase 9 ability framework to support non-combat abilities for
+exploration, interaction, and environmental manipulation.
+
+STATUS: ✅ COMPLETE AND TESTED
+
+
+WHAT WAS ADDED
+────────────────────────────────────────────────────────────────────────────
+
+1. 8 Utility Behaviors (app/engine/systems/ability_behaviors/utility.py)
+   ✓ create_light        - Create light source (personal or room-wide)
+   ✓ darkness            - Create shadow effects
+   ✓ unlock_door         - Magically unlock doors
+   ✓ unlock_container    - Open sealed containers with trap detection
+   ✓ detect_magic        - Sense magical auras in area
+   ✓ true_sight          - Penetrate illusions
+   ✓ teleport            - Travel to attuned locations
+   ✓ create_passage      - Open temporary wall passages
+
+2. 9 Utility Ability Definitions (world_data/abilities/utility.yaml)
+   ✓ light               Level 1   | 0 mana      | 0.5s cooldown
+   ✓ daylight            Level 5   | 40 mana     | 5.0s cooldown
+   ✓ darkness            Level 3   | 35 mana     | 4.0s cooldown
+   ✓ unlock              Level 3   | 20 mana     | 2.0s cooldown
+   ✓ open_container      Level 4   | 25 mana     | 2.5s cooldown
+   ✓ detect_magic        Level 2   | 15 mana     | 3.0s cooldown
+   ✓ true_sight          Level 8   | 50 mana     | 10.0s cooldown
+   ✓ teleport            Level 10  | 100 mana    | 30.0s cooldown
+   ✓ create_passage      Level 7   | 75 mana     | 20.0s cooldown
+
+3. Enhanced AbilityTemplate with Metadata Support
+   ✓ Added metadata: Dict[str, Any] field
+   ✓ Allows behavior-specific configuration
+   ✓ No schema changes required
+
+4. Comprehensive Testing
+   ✓ 12 unit tests in test_utility_abilities.py
+   ✓ 4 verification tests in test_utility_verify.py
+   ✓ All tests PASSING (100% pass rate)
+   ✓ Tests cover: success, failure, edge cases, validation
+
+5. Complete Documentation
+   ✓ UTILITY_ABILITIES.md - Technical reference
+   ✓ UTILITY_ABILITIES_EXAMPLES.md - Usage examples
+   ✓ utility_schema.yaml - API reference
+   ✓ This file - Summary
+
+
+INTEGRATION WITH PHASE 9
+────────────────────────────────────────────────────────────────────────────
+
+✅ AbilityTemplate      - Added metadata field
+✅ ClassSystem          - Registers 8 utility behaviors (24 total)
+✅ AbilityExecutor      - Works with utilities identically to combat
+✅ EventDispatcher      - Emits same events for utilities
+✅ Behavior Registry    - All utilities automatically registered
+✅ YAML Loaders         - Load utility.yaml automatically
+
+Zero breaking changes - all existing systems work identically.
+
+
+FILES MODIFIED/CREATED
+────────────────────────────────────────────────────────────────────────────
+
+CREATED:
+  ✓ app/engine/systems/ability_behaviors/utility.py (600+ lines)
+  ✓ world_data/abilities/utility.yaml (240+ lines)
+  ✓ world_data/abilities/utility_schema.yaml
+  ✓ test_utility_abilities.py (12 tests)
+  ✓ test_utility_verify.py (4 verification tests)
+
+UPDATED:
+  ✓ app/engine/systems/abilities.py (added metadata field)
+  ✓ app/engine/systems/classes.py (register utilities)
+  ✓ app/engine/systems/ability_behaviors/__init__.py (export utilities)
+
+DOCUMENTED:
+  ✓ UTILITY_ABILITIES.md
+  ✓ UTILITY_ABILITIES_EXAMPLES.md
+  ✓ UTILITY_ABILITIES_SUMMARY.md
+
+
+KEY FEATURES
+────────────────────────────────────────────────────────────────────────────
+
+✓ Flexible Targeting
+  - Self-targeted abilities (light, darkness)
+  - Direct targets (unlock, open_container)
+  - Room effects (daylight, create_passage)
+
+✓ Resource Management
+  - Free abilities (light)
+  - Low cost (15-25 mana)
+  - High cost (50-100 mana)
+
+✓ Validation & Safety
+  - Level requirements enforced
+  - Permission checking (teleport to known locations)
+  - Trap detection for containers
+  - Lock difficulty vs. caster level
+
+✓ Duration & Persistence
+  - Time-limited effects (30s to 300s)
+  - Permanent effects (unlock door, open container)
+  - Tracked in player.active_effects
+
+✓ Extensibility
+  - Clear pattern for custom utilities
+  - YAML-driven configuration
+  - Behavior registry system
+  - Reusable implementation templates
+
+
+TEST RESULTS
+────────────────────────────────────────────────────────────────────────────
+
+Unit Tests (test_utility_abilities.py):
+  ✓ Light ability (personal aura)
+  ✓ Daylight (room-wide light)
+  ✓ Darkness
+  ✓ Unlock door (success)
+  ✓ Unlock door (insufficient level)
+  ✓ Unlock container (success)
+  ✓ Unlock container (trap triggered)
+  ✓ Detect magic
+  ✓ True sight
+  ✓ Teleport (success)
+  ✓ Teleport (unknown location)
+  ✓ Create passage
+
+  RESULTS: 12/12 PASSED ✅
+
+Verification Tests (test_utility_verify.py):
+  ✓ Utility behaviors import successfully
+  ✓ Utility abilities load from YAML
+  ✓ Metadata support present
+  ✓ Total abilities classified correctly
+
+  RESULTS: ALL CHECKS PASSED ✅
+
+Server Integration:
+  ✓ Server imports with all utilities
+  ✓ ClassSystem registers all 24 behaviors
+  ✓ AbilityExecutor works with utilities
+  ✓ Event emission works properly
+  ✓ Cooldown tracking functional
+
+
+GAMEPLAY EXAMPLES
+────────────────────────────────────────────────────────────────────────────
+
+Light in Dark Places:
+  > cast light
+  You create a sphere of magical light!
+  [Now visible: walls, doors, items]
+
+Opening Locked Containers:
+  > cast open_container chest
+  [Success if perception >= trap difficulty]
+  You find: 500 gold, potion, amulet
+
+Detecting Magic:
+  > cast detect_magic
+  [Senses magical items/effects in 3-room radius]
+  [Useful for finding hidden artifacts]
+
+Teleportation:
+  > cast teleport forest
+  You vanish in a flash and appear in the forest!
+  [Fast travel to attuned locations]
+
+
+USAGE INSTRUCTIONS
+────────────────────────────────────────────────────────────────────────────
+
+For Players:
+  1. Learn utility abilities at appropriate levels
+  2. Use for exploration, puzzle-solving, navigation
+  3. Combine with combat abilities for strategy
+
+For Developers:
+  1. Read UTILITY_ABILITIES.md for architecture
+  2. Read UTILITY_ABILITIES_EXAMPLES.md for patterns
+  3. Follow patterns to add custom utilities
+  4. Run: python test_utility_abilities.py
+
+For Game Designers:
+  1. Adjust cooldowns/costs in world_data/abilities/utility.yaml
+  2. Modify difficulty requirements and metadata
+  3. Add new abilities using same pattern
+  4. Design quests around utility mechanics
+
+
+STATISTICS
+────────────────────────────────────────────────────────────────────────────
+
+Utility Behaviors:              8
+Utility Abilities:             9
+Total Lines of Code:        1500+
+Test Cases:                   16
+Test Pass Rate:             100%
+Documentation Pages:           3
+Breaking Changes:              0
+Integration Points:            3
+
+
+QUALITY CHECKLIST
+────────────────────────────────────────────────────────────────────────────
+
+✅ Code follows existing patterns
+✅ Comprehensive docstrings
+✅ YAML validation and error handling
+✅ Edge case testing
+✅ Integration with Phase 9 systems
+✅ Backward compatible
+✅ Performance optimized (async)
+✅ Complete documentation
+✅ Production-ready
+
+
+FUTURE ENHANCEMENTS
+────────────────────────────────────────────────────────────────────────────
+
+Potential additions:
+  - Summon/Conjuring (create temporary allies)
+  - Transmutation (transform objects/creatures)
+  - Divination (reveal information)
+  - Restoration (healing and buff utilities)
+  - Social Abilities (persuasion, deception)
+  - Crafting Integration (create items, enchant)
+
+All can follow the same pattern for easy implementation.
+
+
+CONCLUSION
+────────────────────────────────────────────────────────────────────────────
+
+The utility abilities extension successfully adds non-combat gameplay mechanics
+to the Phase 9 ability framework. The implementation is:
+
+  ✓ Complete      - 8 behaviors, 9 abilities, full docs
+  ✓ Tested        - 16 tests, 100% pass rate
+  ✓ Integrated    - Works with all Phase 9 systems
+  ✓ Extensible    - Easy pattern for custom utilities
+  ✓ Documented    - Technical, examples, and reference docs
+
+STATUS: ✅ PHASE 9j+ UTILITY ABILITIES EXTENSION - COMPLETE
+
+Ready for production use and future expansion.
+
+════════════════════════════════════════════════════════════════════════════

@@ -377,6 +377,10 @@ class UserAccount(Base):
     created_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # Unix timestamp
     last_login: Mapped[float | None] = mapped_column(Float, nullable=True)  # Unix timestamp
     active_character_id: Mapped[str | None] = mapped_column(String, nullable=True)  # FK to players.id
+    is_banned: Mapped[bool] = mapped_column(Integer, nullable=False, server_default="0")  # Account ban status
+    ban_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)  # Reason for ban
+    banned_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # Unix timestamp when banned
+    banned_by: Mapped[str | None] = mapped_column(String, nullable=True)  # Admin who banned the account
 
 
 class RefreshToken(Base):

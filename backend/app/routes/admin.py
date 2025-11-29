@@ -15,6 +15,7 @@ All endpoints require appropriate roles (MODERATOR, GAME_MASTER, or ADMIN).
 
 import asyncio
 import time
+import uuid
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, asdict
@@ -26,7 +27,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import UserAccount, Player, Room
+from app.models import UserAccount, Player, Room, SecurityEvent
 from app.engine.systems.auth import (
     AuthSystem, UserRole, Permission, ROLE_PERMISSIONS,
     verify_access_token, SecurityEventType
@@ -320,6 +321,19 @@ class SpawnItemRequest(BaseModel):
     quantity: int = Field(1, ge=1, le=99, description="Quantity to spawn")
 
 
+class MoveNpcRequest(BaseModel):
+    """Request to move an NPC to a different room."""
+    target_room_id: str = Field(..., description="Target room ID")
+    reason: str = Field("", description="Optional reason for the move")
+
+
+class MoveItemRequest(BaseModel):
+    """Request to move an item to a different location."""
+    target_room_id: Optional[str] = Field(None, description="Target room ID (if on ground)")
+    target_player_id: Optional[str] = Field(None, description="Target player ID (if giving to player)")
+    target_container_id: Optional[str] = Field(None, description="Target container ID (if putting in container)")
+
+
 class BroadcastRequest(BaseModel):
     """Request to broadcast a message to all players."""
     message: str = Field(..., min_length=1, max_length=1000)
@@ -374,6 +388,163 @@ class RoomExitUpdate(BaseModel):
         False, 
         description="If true, also create/remove reverse exits in target rooms"
     )
+
+
+# ============================================================================
+# Trigger/Quest Request/Response Models
+# ============================================================================
+
+class TriggerStateResponse(BaseModel):
+    """Response showing current state of a trigger."""
+    trigger_id: str
+    room_id: str
+    event: str
+    enabled: bool
+    fire_count: int
+    last_fired_at: Optional[float]
+    cooldown: float
+    max_fires: int
+    command_pattern: Optional[str] = None
+    timer_interval: Optional[float] = None
+
+
+class FireTriggerRequest(BaseModel):
+    """Request to manually fire a trigger."""
+    room_id: str = Field(..., description="Room containing the trigger")
+    trigger_id: str = Field(..., description="Trigger ID to fire")
+    player_id: Optional[str] = Field(None, description="Player to use for trigger context (optional)")
+
+
+class ModifyTriggerRequest(BaseModel):
+    """Request to modify trigger state."""
+    room_id: str = Field(..., description="Room containing the trigger")
+    trigger_id: str = Field(..., description="Trigger ID to modify")
+    action: str = Field(..., description="Action: enable, disable, reset")
+
+
+class RoomTriggersResponse(BaseModel):
+    """Response listing all triggers in a room."""
+    room_id: str
+    room_name: str
+    trigger_count: int
+    triggers: list[TriggerStateResponse]
+
+
+class QuestProgressResponse(BaseModel):
+    """Response showing player's quest progress."""
+    quest_id: str
+    status: str
+    objective_progress: dict[str, int]
+    accepted_at: Optional[float]
+    completed_at: Optional[float]
+    turned_in_at: Optional[float]
+    expires_at: Optional[float]
+    completion_count: int
+
+
+class PlayerQuestsResponse(BaseModel):
+    """Response showing all of a player's quests."""
+    player_id: str
+    player_name: str
+    in_progress_count: int
+    completed_count: int
+    quests: list[QuestProgressResponse]
+
+
+class ModifyQuestRequest(BaseModel):
+    """Request to modify player's quest state."""
+    player_id: str = Field(..., description="Player ID")
+    quest_id: str = Field(..., description="Quest ID")
+    action: str = Field(..., description="Action: give, complete, reset, abandon, turn_in")
+
+
+class QuestTemplateResponse(BaseModel):
+    """Response showing a quest template."""
+    quest_id: str
+    name: str
+    description: str
+    category: str
+    repeatable: bool
+    level_requirement: int
+    objective_count: int
+
+
+class QuestTemplatesResponse(BaseModel):
+    """Response listing all quest templates."""
+    total_quests: int
+    quests: list[QuestTemplateResponse]
+
+
+# ============================================================================
+# Account Management Request/Response Models
+# ============================================================================
+
+class AccountDetailResponse(BaseModel):
+    """Response showing a user account's details."""
+    id: str
+    username: str
+    email: Optional[str]
+    role: str
+    is_active: bool
+    is_banned: bool
+    ban_reason: Optional[str]
+    banned_at: Optional[float]
+    banned_by: Optional[str]
+    created_at: Optional[float]
+    last_login: Optional[float]
+    active_character_id: Optional[str]
+
+
+class AccountSummary(BaseModel):
+    """Brief summary of an account."""
+    id: str
+    username: str
+    role: str
+    is_banned: bool
+    is_active: bool
+    last_login: Optional[float]
+
+
+class AccountListResponse(BaseModel):
+    """Response listing accounts with filtering."""
+    total_accounts: int
+    filtered_count: int
+    accounts: list[AccountSummary]
+
+
+class SetRoleRequest(BaseModel):
+    """Request to change an account's role."""
+    new_role: str = Field(..., description="New role: player, moderator, game_master, admin")
+    reason: str = Field("", description="Optional reason for role change")
+
+
+class BanAccountRequest(BaseModel):
+    """Request to ban an account."""
+    reason: str = Field(..., min_length=1, max_length=500, description="Reason for ban")
+    kick_player: bool = Field(True, description="Kick player if currently online")
+
+
+class UnbanAccountRequest(BaseModel):
+    """Request to unban an account."""
+    reason: str = Field("", description="Optional reason for unbanning")
+
+
+class SecurityEventResponse(BaseModel):
+    """Response showing a security event."""
+    id: str
+    event_type: str
+    ip_address: Optional[str]
+    user_agent: Optional[str]
+    details: Optional[dict]
+    timestamp: float
+
+
+class SecurityEventsListResponse(BaseModel):
+    """Response listing security events for an account."""
+    account_id: str
+    account_username: str
+    total_events: int
+    events: list[SecurityEventResponse]
 
 
 class MaintenanceStatusResponse(BaseModel):
@@ -1837,6 +2008,207 @@ async def give_item_to_player(
     }
 
 
+@router.post("/players/{player_id}/effect")
+async def apply_effect_to_player(
+    player_id: str,
+    request: Request,
+    effect_request: ApplyEffectRequest,
+    admin: dict = Depends(require_permission(Permission.MODIFY_STATS))
+):
+    """
+    Apply a temporary effect (buff/debuff) to a player.
+    Requires: MODIFY_STATS permission (GAME_MASTER+)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    player = world.players.get(player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    # Import Effect class
+    from app.engine.world import Effect
+    import uuid
+    import time
+    
+    # Determine effect type based on name (convention: "buff_" prefix for buffs, "debuff_" for debuffs, "dot_" for damage, "hot_" for healing)
+    effect_type = "buff"
+    if effect_request.effect_name.startswith("debuff_"):
+        effect_type = "debuff"
+    elif effect_request.effect_name.startswith("dot_"):
+        effect_type = "dot"
+    elif effect_request.effect_name.startswith("hot_"):
+        effect_type = "hot"
+    
+    # Create effect instance
+    effect_id = str(uuid.uuid4())
+    effect = Effect(
+        effect_id=effect_id,
+        name=effect_request.effect_name.replace("buff_", "").replace("debuff_", "").replace("dot_", "").replace("hot_", "").replace("_", " ").title(),
+        effect_type=effect_type,
+        duration=effect_request.duration,
+        applied_at=time.time(),
+        magnitude=effect_request.magnitude if effect_request.magnitude > 0 else 0,
+        interval=1.0 if effect_request.magnitude > 0 else 0.0,  # Tick every 1 second if periodic
+    )
+    
+    # Apply effect to player
+    player.apply_effect(effect)
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="apply_effect",
+        target_type="player",
+        target_id=player_id,
+        details={
+            "effect_name": effect_request.effect_name,
+            "effect_type": effect_type,
+            "duration": effect_request.duration,
+            "magnitude": effect_request.magnitude
+        },
+        success=True
+    )
+    
+    # Notify player
+    if player.id in engine._listeners:
+        await engine._listeners[player.id].put({
+            "type": "message",
+            "text": f"You are afflicted with {effect.name} for {effect_request.duration} seconds."
+        })
+    
+    return {
+        "success": True,
+        "message": f"Applied {effect.name} to {player.name}",
+        "effect_id": effect_id,
+        "effect_type": effect_type,
+        "duration": effect_request.duration
+    }
+
+
+@router.post("/players/{player_id}/kill")
+async def kill_player(
+    player_id: str,
+    request: Request,
+    admin: dict = Depends(require_permission(Permission.MODIFY_STATS))
+):
+    """
+    Instantly kill a player, triggering the death handler.
+    Requires: MODIFY_STATS permission (GAME_MASTER+)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    player = world.players.get(player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    if not player.is_alive():
+        raise HTTPException(status_code=400, detail="Player is already dead")
+    
+    # Set health to 0
+    player.current_health = 0
+    
+    # Get room for broadcast
+    room = world.rooms.get(player.room_id)
+    
+    # Notify player
+    if player.id in engine._listeners:
+        await engine._listeners[player.id].put({
+            "type": "message",
+            "text": "You have been slain by divine judgment."
+        })
+    
+    # Broadcast to room
+    if room:
+        for other_id in room.players:
+            if other_id != player_id and other_id in engine._listeners:
+                await engine._listeners[other_id].put({
+                    "type": "message",
+                    "text": f"💀 {player.name} has been slain by divine judgment!"
+                })
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="kill_player",
+        target_type="player",
+        target_id=player_id,
+        details={"reason": "Admin judgment"},
+        success=True
+    )
+    
+    logger.info(
+        "Player killed by admin",
+        admin_id=admin.get("sub"),
+        player_id=player_id
+    )
+    
+    return {
+        "success": True,
+        "message": f"Killed {player.name}",
+        "player_id": player_id
+    }
+
+
+@router.post("/players/{player_id}/message")
+async def send_message_to_player(
+    player_id: str,
+    request: Request,
+    message_request: BroadcastRequest,
+    admin: dict = Depends(require_permission(Permission.KICK_PLAYER))
+):
+    """
+    Send a direct message to a player.
+    Requires: KICK_PLAYER permission (MODERATOR+)
+    
+    This sends a message directly to the player, appearing as from the sender name.
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    player = world.players.get(player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    if not player.is_connected:
+        raise HTTPException(status_code=400, detail="Player is not connected")
+    
+    # Notify player
+    if player.id in engine._listeners:
+        await engine._listeners[player.id].put({
+            "type": "message",
+            "text": f"[{message_request.sender_name}]: {message_request.message}"
+        })
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="send_message",
+        target_type="player",
+        target_id=player_id,
+        details={"message": message_request.message},
+        success=True
+    )
+    
+    logger.info(
+        "Message sent to player",
+        admin_id=admin.get("sub"),
+        player_id=player_id,
+        sender=message_request.sender_name
+    )
+    
+    return {
+        "success": True,
+        "message": f"Message sent to {player.name}",
+        "sender": message_request.sender_name,
+        "recipient": player_id
+    }
+
+
 # ============================================================================
 # Spawn/Despawn Endpoints
 # ============================================================================
@@ -2035,6 +2407,1140 @@ async def despawn_item(
         "message": f"Despawned {item_name}",
         "item_id": item_id
     }
+
+
+@router.post("/npcs/{npc_id}/move")
+async def move_npc(
+    npc_id: str,
+    request: Request,
+    move_request: MoveNpcRequest,
+    admin: dict = Depends(require_permission(Permission.SPAWN_NPC))
+):
+    """
+    Move an NPC to a different room.
+    Requires: SPAWN_NPC permission (GAME_MASTER+)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    npc = world.npcs.get(npc_id)
+    if not npc:
+        raise HTTPException(status_code=404, detail="NPC not found")
+    
+    target_room = world.rooms.get(move_request.target_room_id)
+    if not target_room:
+        raise HTTPException(status_code=404, detail="Target room not found")
+    
+    # Get old room
+    old_room = world.rooms.get(npc.room_id)
+    old_room_id = old_room.id if old_room else None
+    
+    # Move NPC
+    if old_room:
+        old_room.entities.discard(npc_id)
+    npc.room_id = target_room.id
+    target_room.entities.add(npc_id)
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="move_npc",
+        target_type="npc",
+        target_id=npc_id,
+        details={
+            "from_room": old_room_id,
+            "to_room": target_room.id,
+            "reason": move_request.reason
+        },
+        success=True
+    )
+    
+    # Notify players in old room
+    if old_room:
+        for pid in [eid for eid in old_room.entities if eid in world.players]:
+            if pid in engine._listeners:
+                await engine._listeners[pid].put({
+                    "type": "message",
+                    "text": f"{npc.name} vanishes in a shimmer of light."
+                })
+    
+    # Notify players in new room
+    for pid in [eid for eid in target_room.entities if eid in world.players]:
+        if pid in engine._listeners:
+            await engine._listeners[pid].put({
+                "type": "message",
+                "text": f"{npc.name} materializes before you!"
+            })
+    
+    return {
+        "success": True,
+        "message": f"Moved {npc.name} to {target_room.name}",
+        "npc_id": npc_id,
+        "from_room": old_room_id,
+        "to_room": target_room.id
+    }
+
+
+@router.post("/items/{item_id}/move")
+async def move_item(
+    item_id: str,
+    request: Request,
+    move_request: MoveItemRequest,
+    admin: dict = Depends(require_permission(Permission.SPAWN_ITEM))
+):
+    """
+    Move an item to a different location (room, player inventory, or container).
+    Requires: SPAWN_ITEM permission (GAME_MASTER+)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    item = world.items.get(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    # Must specify exactly one target location
+    targets_specified = sum([
+        move_request.target_room_id is not None,
+        move_request.target_player_id is not None,
+        move_request.target_container_id is not None
+    ])
+    
+    if targets_specified != 1:
+        raise HTTPException(
+            status_code=400, 
+            detail="Must specify exactly one target: target_room_id, target_player_id, or target_container_id"
+        )
+    
+    # Track old location
+    old_room_id = item.room_id
+    old_player_id = item.player_id
+    old_container_id = item.container_id
+    
+    # Move to room
+    if move_request.target_room_id:
+        target_room = world.rooms.get(move_request.target_room_id)
+        if not target_room:
+            raise HTTPException(status_code=404, detail="Target room not found")
+        
+        # Remove from old location
+        if old_room_id:
+            room = world.rooms.get(old_room_id)
+            if room:
+                room.items.discard(item_id)
+        if old_player_id:
+            # Remove from player inventory tracking if we implement it
+            pass
+        if old_container_id:
+            # Remove from container contents if applicable
+            if old_container_id in world.container_contents:
+                world.container_contents[old_container_id].discard(item_id)
+        
+        # Add to new location
+        item.room_id = move_request.target_room_id
+        item.player_id = None
+        item.container_id = None
+        target_room.items.add(item_id)
+        
+        # Notify players in new room
+        for pid in [eid for eid in target_room.entities if eid in world.players]:
+            if pid in engine._listeners:
+                qty_text = f"{item.quantity}x " if item.quantity > 1 else ""
+                await engine._listeners[pid].put({
+                    "type": "message",
+                    "text": f"{qty_text}{item.name} materializes on the ground."
+                })
+        
+        message = f"Moved {item.name} to {target_room.name}"
+    
+    # Move to player inventory
+    elif move_request.target_player_id:
+        target_player = world.players.get(move_request.target_player_id)
+        if not target_player:
+            raise HTTPException(status_code=404, detail="Target player not found")
+        
+        # Remove from old location
+        if old_room_id:
+            room = world.rooms.get(old_room_id)
+            if room:
+                room.items.discard(item_id)
+        if old_container_id:
+            if old_container_id in world.container_contents:
+                world.container_contents[old_container_id].discard(item_id)
+        
+        # Add to player inventory
+        item.room_id = None
+        item.player_id = move_request.target_player_id
+        item.container_id = None
+        
+        # Notify target player
+        if move_request.target_player_id in engine._listeners:
+            qty_text = f"{item.quantity}x " if item.quantity > 1 else ""
+            await engine._listeners[move_request.target_player_id].put({
+                "type": "message",
+                "text": f"You received {qty_text}{item.name}."
+            })
+        
+        # Notify old room if item was there
+        if old_room_id:
+            room = world.rooms.get(old_room_id)
+            if room:
+                for pid in [eid for eid in room.entities if eid in world.players]:
+                    if pid != move_request.target_player_id and pid in engine._listeners:
+                        await engine._listeners[pid].put({
+                            "type": "message",
+                            "text": f"{item.name} is taken."
+                        })
+        
+        message = f"Moved {item.name} to {target_player.name}'s inventory"
+    
+    # Move to container
+    else:  # move_request.target_container_id
+        target_container = world.items.get(move_request.target_container_id)
+        if not target_container:
+            raise HTTPException(status_code=404, detail="Target container not found")
+        
+        # Remove from old location
+        if old_room_id:
+            room = world.rooms.get(old_room_id)
+            if room:
+                room.items.discard(item_id)
+        if old_player_id:
+            pass  # Would need inventory tracking
+        if old_container_id:
+            if old_container_id in world.container_contents:
+                world.container_contents[old_container_id].discard(item_id)
+        
+        # Add to container
+        item.room_id = None
+        item.player_id = None
+        item.container_id = move_request.target_container_id
+        
+        # Update container contents index
+        if move_request.target_container_id not in world.container_contents:
+            world.container_contents[move_request.target_container_id] = set()
+        world.container_contents[move_request.target_container_id].add(item_id)
+        
+        message = f"Moved {item.name} into {target_container.name}"
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="move_item",
+        target_type="item",
+        target_id=item_id,
+        details={
+            "from_room": old_room_id,
+            "from_player": old_player_id,
+            "from_container": old_container_id,
+            "to_room": move_request.target_room_id,
+            "to_player": move_request.target_player_id,
+            "to_container": move_request.target_container_id
+        },
+        success=True
+    )
+    
+    return {
+        "success": True,
+        "message": message,
+        "item_id": item_id
+    }
+
+
+# ============================================================================
+# Trigger Management Endpoints
+# ============================================================================
+
+@router.get("/triggers/rooms/{room_id}", response_model=RoomTriggersResponse)
+async def get_room_triggers(
+    room_id: str,
+    request: Request,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS))
+):
+    """
+    Get all triggers in a specific room with their current state.
+    Requires: GAME_MASTER+ (SERVER_COMMANDS)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    room = world.rooms.get(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    triggers_list: list[TriggerStateResponse] = []
+    
+    if hasattr(room, 'triggers'):
+        for trigger in room.triggers:
+            state = engine.trigger_system._get_state(room, trigger.id)
+            triggers_list.append(TriggerStateResponse(
+                trigger_id=trigger.id,
+                room_id=room_id,
+                event=trigger.event,
+                enabled=trigger.enabled,
+                fire_count=state.fire_count if state else 0,
+                last_fired_at=state.last_fired_at if state else None,
+                cooldown=trigger.cooldown,
+                max_fires=trigger.max_fires,
+                command_pattern=trigger.command_pattern,
+                timer_interval=trigger.timer_interval
+            ))
+    
+    return RoomTriggersResponse(
+        room_id=room_id,
+        room_name=room.name,
+        trigger_count=len(triggers_list),
+        triggers=triggers_list
+    )
+
+
+@router.post("/triggers/{trigger_id}/fire")
+async def fire_trigger(
+    trigger_id: str,
+    request: Request,
+    fire_request: FireTriggerRequest,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS))
+):
+    """
+    Manually fire a trigger immediately.
+    Requires: GAME_MASTER+ (SERVER_COMMANDS)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    room = world.rooms.get(fire_request.room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if not hasattr(room, 'triggers'):
+        raise HTTPException(status_code=400, detail="Room has no triggers")
+    
+    # Find the trigger
+    trigger = None
+    for t in room.triggers:
+        if t.id == trigger_id:
+            trigger = t
+            break
+    
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Trigger not found")
+    
+    if not trigger.enabled:
+        raise HTTPException(status_code=400, detail="Trigger is disabled")
+    
+    # Use provided player or pick one from room
+    player_id = fire_request.player_id or ""
+    if not player_id:
+        for entity_id in room.entities:
+            if entity_id in world.players:
+                player_id = entity_id
+                break
+    
+    # Create trigger context and fire
+    from app.engine.systems.triggers import TriggerContext
+    trigger_ctx = TriggerContext(
+        player_id=player_id,
+        room_id=fire_request.room_id,
+        world=world,
+        event_type=trigger.event
+    )
+    
+    events = engine.trigger_system.execute_actions(trigger.actions, trigger_ctx)
+    
+    # Update state
+    state = engine.trigger_system._get_or_create_state(room, trigger_id)
+    state.fire_count += 1
+    state.last_fired_at = time.time()
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="fire_trigger",
+        target_type="trigger",
+        target_id=trigger_id,
+        details={"room_id": fire_request.room_id, "fire_count": state.fire_count},
+        success=True
+    )
+    
+    return {
+        "success": True,
+        "message": f"Fired trigger {trigger_id}",
+        "trigger_id": trigger_id,
+        "fire_count": state.fire_count,
+        "actions_executed": len(trigger.actions)
+    }
+
+
+@router.post("/triggers/{trigger_id}/enable")
+async def enable_trigger(
+    trigger_id: str,
+    request: Request,
+    modify_request: ModifyTriggerRequest,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS))
+):
+    """
+    Enable a disabled trigger.
+    Requires: GAME_MASTER+ (SERVER_COMMANDS)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    room = world.rooms.get(modify_request.room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if not hasattr(room, 'triggers'):
+        raise HTTPException(status_code=400, detail="Room has no triggers")
+    
+    trigger = None
+    for t in room.triggers:
+        if t.id == trigger_id:
+            trigger = t
+            break
+    
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Trigger not found")
+    
+    trigger.enabled = True
+    state = engine.trigger_system._get_or_create_state(room, trigger_id)
+    state.enabled = True
+    
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="enable_trigger",
+        target_type="trigger",
+        target_id=trigger_id,
+        details={"room_id": modify_request.room_id},
+        success=True
+    )
+    
+    return {
+        "success": True,
+        "message": f"Enabled trigger {trigger_id}",
+        "trigger_id": trigger_id,
+        "enabled": True
+    }
+
+
+@router.post("/triggers/{trigger_id}/disable")
+async def disable_trigger(
+    trigger_id: str,
+    request: Request,
+    modify_request: ModifyTriggerRequest,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS))
+):
+    """
+    Disable a trigger (prevent it from firing).
+    Requires: GAME_MASTER+ (SERVER_COMMANDS)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    room = world.rooms.get(modify_request.room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if not hasattr(room, 'triggers'):
+        raise HTTPException(status_code=400, detail="Room has no triggers")
+    
+    trigger = None
+    for t in room.triggers:
+        if t.id == trigger_id:
+            trigger = t
+            break
+    
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Trigger not found")
+    
+    trigger.enabled = False
+    state = engine.trigger_system._get_or_create_state(room, trigger_id)
+    state.enabled = False
+    
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="disable_trigger",
+        target_type="trigger",
+        target_id=trigger_id,
+        details={"room_id": modify_request.room_id},
+        success=True
+    )
+    
+    return {
+        "success": True,
+        "message": f"Disabled trigger {trigger_id}",
+        "trigger_id": trigger_id,
+        "enabled": False
+    }
+
+
+@router.post("/triggers/{trigger_id}/reset")
+async def reset_trigger(
+    trigger_id: str,
+    request: Request,
+    modify_request: ModifyTriggerRequest,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS))
+):
+    """
+    Reset a trigger's fire count and cooldown.
+    Requires: GAME_MASTER+ (SERVER_COMMANDS)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    room = world.rooms.get(modify_request.room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if not hasattr(room, 'triggers'):
+        raise HTTPException(status_code=400, detail="Room has no triggers")
+    
+    trigger = None
+    for t in room.triggers:
+        if t.id == trigger_id:
+            trigger = t
+            break
+    
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Trigger not found")
+    
+    state = engine.trigger_system._get_or_create_state(room, trigger_id)
+    old_fire_count = state.fire_count
+    state.fire_count = 0
+    state.last_fired_at = None
+    
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="reset_trigger",
+        target_type="trigger",
+        target_id=trigger_id,
+        details={"room_id": modify_request.room_id, "old_fire_count": old_fire_count},
+        success=True
+    )
+    
+    return {
+        "success": True,
+        "message": f"Reset trigger {trigger_id}",
+        "trigger_id": trigger_id,
+        "old_fire_count": old_fire_count,
+        "new_fire_count": 0
+    }
+
+
+# ============================================================================
+# Quest Management Endpoints
+# ============================================================================
+
+@router.get("/quests/templates", response_model=QuestTemplatesResponse)
+async def get_quest_templates(
+    request: Request,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS))
+):
+    """
+    Get all available quest templates.
+    Requires: GAME_MASTER+ (SERVER_COMMANDS)
+    """
+    engine = get_engine_from_request(request)
+    
+    quests_list: list[QuestTemplateResponse] = []
+    for quest_id, template in engine.quest_system.templates.items():
+        quests_list.append(QuestTemplateResponse(
+            quest_id=quest_id,
+            name=template.name,
+            description=template.description,
+            category=template.category,
+            repeatable=template.repeatable,
+            level_requirement=template.level_requirement,
+            objective_count=len(template.objectives)
+        ))
+    
+    return QuestTemplatesResponse(
+        total_quests=len(quests_list),
+        quests=quests_list
+    )
+
+
+@router.get("/quests/progress/{player_id}", response_model=PlayerQuestsResponse)
+async def get_player_quests(
+    player_id: str,
+    request: Request,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS))
+):
+    """
+    Get a player's quest progress.
+    Requires: GAME_MASTER+ (SERVER_COMMANDS)
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    player = world.players.get(player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    quests_list: list[QuestProgressResponse] = []
+    in_progress_count = 0
+    completed_count = 0
+    
+    for quest_id, progress in player.quest_progress.items():
+        in_progress_count += 1
+        quests_list.append(QuestProgressResponse(
+            quest_id=quest_id,
+            status=progress.status.value,
+            objective_progress=progress.objective_progress,
+            accepted_at=progress.accepted_at,
+            completed_at=progress.completed_at,
+            turned_in_at=progress.turned_in_at,
+            expires_at=progress.expires_at,
+            completion_count=progress.completion_count
+        ))
+    
+    completed_count = len(player.completed_quests)
+    
+    return PlayerQuestsResponse(
+        player_id=player_id,
+        player_name=player.name,
+        in_progress_count=in_progress_count,
+        completed_count=completed_count,
+        quests=quests_list
+    )
+
+
+@router.post("/quests/modify")
+async def modify_player_quest(
+    request: Request,
+    modify_request: ModifyQuestRequest,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS))
+):
+    """
+    Modify a player's quest state (give, complete, reset, abandon, turn_in).
+    Requires: GAME_MASTER+ (SERVER_COMMANDS)
+    
+    Actions:
+    - give: Grant a quest to a player
+    - complete: Mark all objectives as complete
+    - turn_in: Turn in a completed quest
+    - reset: Reset quest progress to accept again
+    - abandon: Remove quest from player's progress
+    """
+    engine = get_engine_from_request(request)
+    world = engine.world
+    
+    player = world.players.get(modify_request.player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    template = engine.quest_system.templates.get(modify_request.quest_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Quest template not found")
+    
+    action = modify_request.action.lower()
+    result_message = ""
+    
+    if action == "give":
+        # Give/accept quest to player
+        from app.engine.systems.quests import QuestStatus
+        if modify_request.quest_id in player.quest_progress:
+            raise HTTPException(status_code=400, detail="Player already has this quest")
+        
+        events = engine.quest_system.accept_quest(
+            modify_request.player_id,
+            modify_request.quest_id
+        )
+        result_message = f"Gave quest {template.name} to {player.name}"
+        
+    elif action == "complete":
+        # Mark all objectives as complete
+        from app.engine.systems.quests import QuestStatus
+        progress = player.quest_progress.get(modify_request.quest_id)
+        if not progress:
+            raise HTTPException(status_code=400, detail="Player does not have this quest")
+        
+        # Complete all required objectives
+        for objective in template.objectives:
+            if not objective.optional:
+                progress.objective_progress[objective.id] = objective.required_count
+        
+        progress.status = QuestStatus.COMPLETED
+        progress.completed_at = time.time()
+        result_message = f"Completed all objectives for {template.name}"
+        
+    elif action == "turn_in":
+        # Turn in quest for rewards
+        progress = player.quest_progress.get(modify_request.quest_id)
+        if not progress:
+            raise HTTPException(status_code=400, detail="Player does not have this quest")
+        
+        from app.engine.systems.quests import QuestStatus
+        if progress.status != QuestStatus.COMPLETED:
+            # Auto-complete first
+            for objective in template.objectives:
+                if not objective.optional:
+                    progress.objective_progress[objective.id] = objective.required_count
+            progress.status = QuestStatus.COMPLETED
+        
+        events = engine.quest_system.turn_in_quest(
+            modify_request.player_id,
+            modify_request.quest_id
+        )
+        result_message = f"Turned in quest {template.name} for {player.name}"
+        
+    elif action == "reset":
+        # Reset quest progress
+        if modify_request.quest_id not in player.quest_progress:
+            raise HTTPException(status_code=400, detail="Player does not have this quest")
+        
+        progress = player.quest_progress[modify_request.quest_id]
+        progress.objective_progress = {obj.id: 0 for obj in template.objectives}
+        from app.engine.systems.quests import QuestStatus
+        progress.status = QuestStatus.ACCEPTED
+        result_message = f"Reset quest progress for {template.name}"
+        
+    elif action == "abandon":
+        # Remove quest from player
+        if modify_request.quest_id not in player.quest_progress:
+            raise HTTPException(status_code=400, detail="Player does not have this quest")
+        
+        del player.quest_progress[modify_request.quest_id]
+        result_message = f"Abandoned quest {template.name} for {player.name}"
+        
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type=f"quest_{action}",
+        target_type="quest",
+        target_id=modify_request.quest_id,
+        details={"player_id": modify_request.player_id, "quest_name": template.name},
+        success=True
+    )
+    
+    return {
+        "success": True,
+        "message": result_message,
+        "action": action,
+        "quest_id": modify_request.quest_id,
+        "player_id": modify_request.player_id,
+        "quest_name": template.name
+    }
+
+
+# ============================================================================
+# Account Management Endpoints
+# ============================================================================
+
+@router.get("/accounts", response_model=AccountListResponse)
+async def list_accounts(
+    request: Request,
+    role: Optional[str] = None,
+    banned_only: bool = False,
+    admin: dict = Depends(require_permission(Permission.MANAGE_ACCOUNTS))
+):
+    """
+    List all user accounts with optional filtering.
+    Requires: ADMIN (MANAGE_ACCOUNTS permission)
+    
+    Query parameters:
+    - role: Filter by role (player, moderator, game_master, admin)
+    - banned_only: If true, show only banned accounts
+    """
+    session = get_session()
+    
+    try:
+        # Base query
+        query = select(UserAccount)
+        
+        # Apply filters
+        if role:
+            query = query.where(UserAccount.role == role.lower())
+        
+        if banned_only:
+            query = query.where(UserAccount.is_banned == 1)
+        
+        # Execute query
+        result = session.execute(query)
+        accounts = result.scalars().all()
+        
+        # Count total without filters
+        total_query = select(func.count(UserAccount.id))
+        total_result = session.execute(total_query)
+        total_count = total_result.scalar()
+        
+        # Build response
+        account_summaries = [
+            AccountSummary(
+                id=acc.id,
+                username=acc.username,
+                role=acc.role,
+                is_banned=bool(acc.is_banned),
+                is_active=bool(acc.is_active),
+                last_login=acc.last_login
+            )
+            for acc in accounts
+        ]
+        
+        return AccountListResponse(
+            total_accounts=total_count,
+            filtered_count=len(accounts),
+            accounts=account_summaries
+        )
+    finally:
+        session.close()
+
+
+@router.get("/accounts/{account_id}", response_model=AccountDetailResponse)
+async def get_account_details(
+    account_id: str,
+    request: Request,
+    admin: dict = Depends(require_permission(Permission.MANAGE_ACCOUNTS))
+):
+    """
+    Get detailed information about a specific account.
+    Requires: ADMIN (MANAGE_ACCOUNTS permission)
+    """
+    session = get_session()
+    
+    try:
+        account = session.get(UserAccount, account_id)
+        if not account:
+            raise HTTPException(status_code=404, detail="Account not found")
+        
+        return AccountDetailResponse(
+            id=account.id,
+            username=account.username,
+            email=account.email,
+            role=account.role,
+            is_active=bool(account.is_active),
+            is_banned=bool(account.is_banned),
+            ban_reason=account.ban_reason,
+            banned_at=account.banned_at,
+            banned_by=account.banned_by,
+            created_at=account.created_at,
+            last_login=account.last_login,
+            active_character_id=account.active_character_id
+        )
+    finally:
+        session.close()
+
+
+@router.put("/accounts/{account_id}/role")
+async def set_account_role(
+    account_id: str,
+    request: Request,
+    role_request: SetRoleRequest,
+    admin: dict = Depends(require_permission(Permission.MANAGE_ROLES)),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Change an account's role.
+    Requires: ADMIN (MANAGE_ROLES permission)
+    
+    Valid roles: player, moderator, game_master, admin
+    """
+    # Validate role
+    valid_roles = [r.value for r in UserRole]
+    if role_request.new_role.lower() not in valid_roles:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid role. Valid roles: {', '.join(valid_roles)}"
+        )
+    
+    account = session.get(UserAccount, account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    old_role = account.role
+    account.role = role_request.new_role.lower()
+    
+    # Log security event
+    from app.engine.systems.auth import SecurityEventType
+    security_event = SecurityEvent(
+        id=str(uuid.uuid4()),
+        account_id=account_id,
+        event_type=SecurityEventType.ROLE_CHANGED.value,
+        details={
+            "old_role": old_role,
+            "new_role": account.role,
+            "changed_by": admin.get("sub", "unknown"),
+            "reason": role_request.reason
+        },
+        timestamp=time.time()
+    )
+    session.add(security_event)
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="set_account_role",
+        target_type="account",
+        target_id=account_id,
+        details={
+            "username": account.username,
+            "old_role": old_role,
+            "new_role": account.role,
+            "reason": role_request.reason
+        },
+        success=True
+    )
+    
+    session.commit()
+    
+    logger.info(
+        "Account role changed",
+        admin_id=admin.get("sub"),
+        account_id=account_id,
+        old_role=old_role,
+        new_role=account.role
+    )
+    
+    return {
+        "success": True,
+        "message": f"Changed {account.username}'s role from {old_role} to {account.role}",
+        "account_id": account_id,
+        "username": account.username,
+        "old_role": old_role,
+        "new_role": account.role
+    }
+
+
+@router.post("/accounts/{account_id}/ban")
+async def ban_account(
+    account_id: str,
+    request: Request,
+    ban_request: BanAccountRequest,
+    admin: dict = Depends(require_permission(Permission.MANAGE_ACCOUNTS)),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Ban an account from the game.
+    Requires: ADMIN (MANAGE_ACCOUNTS permission)
+    
+    This prevents the account from logging in and optionally kicks online players.
+    """
+    account = session.get(UserAccount, account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    if account.is_banned:
+        raise HTTPException(status_code=400, detail="Account is already banned")
+    
+    # Ban the account
+    account.is_banned = True
+    account.ban_reason = ban_request.reason
+    account.banned_at = time.time()
+    account.banned_by = admin.get("sub", "unknown")
+    
+    # Log security event
+    from app.engine.systems.auth import SecurityEventType
+    security_event = SecurityEvent(
+        id=str(uuid.uuid4()),
+        account_id=account_id,
+        event_type=SecurityEventType.ACCOUNT_BANNED.value,
+        details={
+            "reason": ban_request.reason,
+            "banned_by": admin.get("sub", "unknown"),
+            "banned_by_username": admin.get("username", "unknown")
+        },
+        timestamp=time.time()
+    )
+    session.add(security_event)
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="ban_account",
+        target_type="account",
+        target_id=account_id,
+        details={
+            "username": account.username,
+            "reason": ban_request.reason
+        },
+        success=True
+    )
+    
+    # Kick online players if requested
+    kicked_players = []
+    if ban_request.kick_player:
+        engine = get_engine_from_request(request)
+        world = engine.world
+        
+        # Find and disconnect all players on this account
+        for player_id, player in world.players.items():
+            # Check if player's account matches (via owner_account_id or similar)
+            # For now, we'll check if the player is connected and matches the account
+            if hasattr(player, 'account_id') and player.account_id == account_id:
+                if player.is_connected:
+                    player.is_connected = False
+                    kicked_players.append(player.name)
+                    
+                    # Notify other players
+                    if player.id in engine._listeners:
+                        await engine._listeners[player.id].put({
+                            "type": "system",
+                            "text": "Your account has been banned by an administrator."
+                        })
+    
+    session.commit()
+    
+    logger.info(
+        "Account banned",
+        admin_id=admin.get("sub"),
+        account_id=account_id,
+        reason=ban_request.reason,
+        kicked_players=kicked_players
+    )
+    
+    return {
+        "success": True,
+        "message": f"Banned account {account.username}",
+        "account_id": account_id,
+        "username": account.username,
+        "reason": ban_request.reason,
+        "kicked_players": kicked_players
+    }
+
+
+@router.post("/accounts/{account_id}/unban")
+async def unban_account(
+    account_id: str,
+    request: Request,
+    unban_request: UnbanAccountRequest,
+    admin: dict = Depends(require_permission(Permission.MANAGE_ACCOUNTS)),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Unban an account, allowing it to log in again.
+    Requires: ADMIN (MANAGE_ACCOUNTS permission)
+    """
+    account = session.get(UserAccount, account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    if not account.is_banned:
+        raise HTTPException(status_code=400, detail="Account is not banned")
+    
+    old_ban_reason = account.ban_reason
+    account.is_banned = False
+    account.ban_reason = None
+    
+    # Log security event
+    from app.engine.systems.auth import SecurityEventType
+    security_event = SecurityEvent(
+        id=str(uuid.uuid4()),
+        account_id=account_id,
+        event_type=SecurityEventType.ACCOUNT_UNBANNED.value,
+        details={
+            "old_ban_reason": old_ban_reason,
+            "unban_reason": unban_request.reason,
+            "unbanned_by": admin.get("sub", "unknown"),
+            "unbanned_by_username": admin.get("username", "unknown")
+        },
+        timestamp=time.time()
+    )
+    session.add(security_event)
+    
+    # Audit log
+    admin_audit.log_action(
+        admin_id=admin.get("sub", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action_type="unban_account",
+        target_type="account",
+        target_id=account_id,
+        details={
+            "username": account.username,
+            "old_ban_reason": old_ban_reason,
+            "unban_reason": unban_request.reason
+        },
+        success=True
+    )
+    
+    session.commit()
+    
+    logger.info(
+        "Account unbanned",
+        admin_id=admin.get("sub"),
+        account_id=account_id,
+        reason=unban_request.reason
+    )
+    
+    return {
+        "success": True,
+        "message": f"Unbanned account {account.username}",
+        "account_id": account_id,
+        "username": account.username,
+        "old_ban_reason": old_ban_reason
+    }
+
+
+@router.get("/accounts/{account_id}/security-events", response_model=SecurityEventsListResponse)
+async def get_security_events(
+    account_id: str,
+    request: Request,
+    event_type: Optional[str] = None,
+    limit: int = 100,
+    admin: dict = Depends(require_permission(Permission.VIEW_LOGS))
+):
+    """
+    Get security events for an account.
+    Requires: ADMIN (VIEW_LOGS permission)
+    
+    Query parameters:
+    - event_type: Filter by event type (login_success, account_banned, role_changed, etc.)
+    - limit: Maximum number of events to return (default: 100, max: 500)
+    """
+    if limit < 1 or limit > 500:
+        limit = 100
+    
+    session = get_session()
+    
+    try:
+        # Verify account exists
+        account = session.get(UserAccount, account_id)
+        if not account:
+            raise HTTPException(status_code=404, detail="Account not found")
+        
+        # Query security events
+        query = select(SecurityEvent).where(SecurityEvent.account_id == account_id)
+        
+        if event_type:
+            query = query.where(SecurityEvent.event_type == event_type)
+        
+        # Order by timestamp descending (most recent first)
+        query = query.order_by(SecurityEvent.timestamp.desc()).limit(limit)
+        
+        result = session.execute(query)
+        events = result.scalars().all()
+        
+        # Build response
+        event_responses = [
+            SecurityEventResponse(
+                id=event.id,
+                event_type=event.event_type,
+                ip_address=event.ip_address,
+                user_agent=event.user_agent,
+                details=event.details,
+                timestamp=event.timestamp
+            )
+            for event in events
+        ]
+        
+        return SecurityEventsListResponse(
+            account_id=account_id,
+            account_username=account.username,
+            total_events=len(events),
+            events=event_responses
+        )
+    finally:
+        session.close()
 
 
 # ============================================================================
@@ -2675,3 +4181,108 @@ async def validate_content(
         "files_invalid": sum(1 for r in results if not r["is_valid"]),
         "results": results
     }
+
+
+@router.get("/classes")
+async def get_classes(
+    request: Request,
+    admin: dict = Depends(get_current_admin)
+) -> dict:
+    """
+    Get all loaded character classes.
+    Requires: MODERATOR role or higher.
+    """
+    try:
+        engine = get_engine_from_request(request)
+        classes = engine.class_system.get_available_classes()
+        
+        # Serialize ClassTemplate objects to dictionaries
+        classes_data = []
+        for cls in classes:
+            classes_data.append({
+                "class_id": cls.class_id,
+                "name": cls.name,
+                "description": cls.description,
+                "base_stats": cls.base_stats.model_dump() if cls.base_stats else None,
+                "stat_growth": cls.stat_growth.model_dump() if cls.stat_growth else None,
+                "resources": {rid: rd.model_dump() for rid, rd in cls.resources.items()} if cls.resources else {},
+                "available_abilities": cls.available_abilities,
+                "skill_tree": cls.skill_tree if hasattr(cls, 'skill_tree') else None
+            })
+        
+        return {
+            "success": True,
+            "detail": f"Retrieved {len(classes_data)} classes",
+            "count": len(classes_data),
+            "classes": classes_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving classes: {str(e)}")
+
+
+@router.get("/abilities")
+async def get_abilities(
+    request: Request,
+    admin: dict = Depends(get_current_admin)
+) -> dict:
+    """
+    Get all loaded abilities.
+    Requires: MODERATOR role or higher.
+    """
+    try:
+        engine = get_engine_from_request(request)
+        abilities = engine.class_system.get_available_abilities()
+        
+        # Serialize AbilityTemplate objects to dictionaries
+        abilities_data = []
+        for ability in abilities:
+            abilities_data.append({
+                "ability_id": ability.ability_id,
+                "name": ability.name,
+                "description": ability.description,
+                "ability_type": ability.ability_type,
+                "costs": ability.costs.model_dump() if ability.costs else None,
+                "cooldown_seconds": ability.cooldown_seconds,
+                "gcd_seconds": ability.gcd_seconds,
+                "target_mode": ability.target_mode,
+                "behavior": ability.behavior
+            })
+        
+        return {
+            "success": True,
+            "detail": f"Retrieved {len(abilities_data)} abilities",
+            "count": len(abilities_data),
+            "abilities": abilities_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving abilities: {str(e)}")
+
+
+@router.post("/classes/reload")
+async def reload_classes(
+    request: Request,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS))
+) -> dict:
+    """
+    Hot-reload character classes and abilities from YAML files.
+    Requires: GAME_MASTER role or higher (via Permission.SERVER_COMMANDS).
+    """
+    try:
+        engine = get_engine_from_request(request)
+        
+        # Load content from YAML
+        await engine.class_system.load_content()
+        
+        # Get updated counts
+        classes = engine.class_system.get_available_classes()
+        abilities = engine.class_system.get_available_abilities()
+        
+        return {
+            "success": True,
+            "detail": "Classes and abilities reloaded successfully",
+            "classes_loaded": len(classes),
+            "abilities_loaded": len(abilities),
+            "behavior_count": len(engine.class_system.behavior_registry)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reloading classes: {str(e)}")

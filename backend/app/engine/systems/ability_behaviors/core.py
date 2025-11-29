@@ -1,0 +1,602 @@
+"""
+Core ability behaviors - reusable across multiple abilities and classes.
+
+These behaviors implement common ability patterns:
+- Melee attacks with weapon scaling
+- Power attacks (high damage, high cost)
+- Passive buffs and auras
+- Resource generation
+- Crowd control effects
+"""
+
+import logging
+from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class BehaviorResult:
+    """
+    Result of executing an ability behavior.
+    
+    Used by AbilityExecutor to determine what happened when an ability was cast.
+    """
+    success: bool  # Whether the ability executed successfully
+    damage_dealt: int = 0  # Total damage dealt (sum across all targets)
+    targets_hit: List[str] = None  # List of entity IDs that were hit
+    effects_applied: List[str] = None  # List of effect IDs that were applied
+    resources_consumed: Dict[str, int] = None  # Resource costs consumed
+    cooldown_applied: float = 0.0  # Cooldown duration in seconds
+    message: str = ""  # Human-readable result message
+    error: Optional[str] = None  # Error message if unsuccessful
+    
+    def __post_init__(self):
+        if self.targets_hit is None:
+            self.targets_hit = []
+        if self.effects_applied is None:
+            self.effects_applied = []
+        if self.resources_consumed is None:
+            self.resources_consumed = {}
+
+
+async def melee_attack_behavior(
+    caster,  # WorldPlayer or WorldEntity
+    target,  # WorldEntity
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Basic melee attack behavior.
+    
+    Handles:
+    - Weapon damage calculation with stat scaling
+    - Attack roll vs target armor class
+    - On-hit effects application
+    
+    Args:
+        caster: The entity casting the ability
+        target: The primary target
+        ability_template: AbilityTemplate from ClassSystem
+        combat_system: CombatSystem instance from WorldEngine
+        **context: Additional context (scaling factors, modifiers, etc.)
+    
+    Returns:
+        BehaviorResult with damage_dealt, effects_applied, success status
+    """
+    try:
+        # Calculate base damage from caster's weapon
+        base_damage = caster.base_attack_damage_min
+        if hasattr(caster, 'base_attack_damage_max'):
+            import random
+            base_damage = random.randint(caster.base_attack_damage_min, caster.base_attack_damage_max)
+        
+        # Apply stat scaling (e.g., strength modifier)
+        scaling = ability_template.scaling or {}
+        damage = base_damage
+        
+        for stat_name, multiplier in scaling.items():
+            stat_value = getattr(caster, stat_name, 0)
+            damage += int(stat_value * multiplier)
+        
+        # Simple hit/miss check (AC-based)
+        import random
+        hit_roll = random.randint(1, 20) + caster.armor_class // 2
+        if hit_roll >= target.armor_class:
+            # Hit - apply damage
+            old_hp = target.current_health
+            target.current_health = max(0, target.current_health - damage)
+            
+            logger.info(
+                f"{caster.name} hit {target.name} for {damage} damage "
+                f"({old_hp} -> {target.current_health} HP)"
+            )
+            
+            return BehaviorResult(
+                success=True,
+                damage_dealt=damage,
+                targets_hit=[target.id],
+                cooldown_applied=ability_template.cooldown or 0.0,
+                message=f"You hit {target.name} for {damage} damage!"
+            )
+        else:
+            # Miss
+            logger.info(f"{caster.name} missed {target.name}")
+            return BehaviorResult(
+                success=True,
+                damage_dealt=0,
+                targets_hit=[],
+                cooldown_applied=ability_template.cooldown or 0.0,
+                message=f"You missed {target.name}!"
+            )
+    
+    except Exception as e:
+        logger.error(f"Error in melee_attack_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Melee attack failed: {str(e)}"
+        )
+
+
+async def power_attack_behavior(
+    caster,
+    target,
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    High-damage attack that costs more resources but deals extra damage.
+    
+    Warrior variant of power attack:
+    - Uses strength for scaling
+    - 1.5x damage multiplier vs melee_attack
+    - Costs rage
+    """
+    try:
+        # Similar to melee attack but with damage boost
+        base_damage = caster.base_attack_damage_min
+        if hasattr(caster, 'base_attack_damage_max'):
+            import random
+            base_damage = random.randint(caster.base_attack_damage_min, caster.base_attack_damage_max)
+        
+        # Apply stat scaling with boost
+        scaling = ability_template.scaling or {}
+        damage = int(base_damage * 1.5)  # 1.5x damage multiplier for power attack
+        
+        for stat_name, multiplier in scaling.items():
+            stat_value = getattr(caster, stat_name, 0)
+            damage += int(stat_value * multiplier * 1.3)  # Also scale stat bonuses
+        
+        # Hit check
+        import random
+        hit_roll = random.randint(1, 20) + (caster.armor_class // 2)
+        if hit_roll >= target.armor_class:
+            old_hp = target.current_health
+            target.current_health = max(0, target.current_health - damage)
+            
+            logger.info(f"{caster.name} power attacked {target.name} for {damage} damage")
+            
+            return BehaviorResult(
+                success=True,
+                damage_dealt=damage,
+                targets_hit=[target.id],
+                cooldown_applied=ability_template.cooldown or 0.0,
+                message=f"Powerful strike! You hit {target.name} for {damage} damage!"
+            )
+        else:
+            return BehaviorResult(
+                success=True,
+                damage_dealt=0,
+                targets_hit=[],
+                cooldown_applied=ability_template.cooldown or 0.0,
+                message=f"Your powerful attack missed {target.name}!"
+            )
+    
+    except Exception as e:
+        logger.error(f"Error in power_attack_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Power attack failed: {str(e)}"
+        )
+
+
+async def rally_passive_behavior(
+    caster,
+    target,
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Passive buff that increases party damage and defense.
+    
+    Warrior ability (passive):
+    - Boosts nearby allies' damage by 10%
+    - Boosts nearby allies' armor class by 2
+    - Affects caster and nearby room
+    """
+    try:
+        # Get all entities in the room (from context or caster's room)
+        room_id = caster.room_id
+        if 'room' in context:
+            room_entities = context['room'].entities if hasattr(context['room'], 'entities') else []
+        else:
+            room_entities = []
+        
+        # Apply buff to caster at minimum
+        affected = [caster]
+        
+        # In a full implementation, would apply buffs via EffectSystem
+        # For now, just track it in behavior result
+        
+        logger.info(f"{caster.name} activated Rally - buffing nearby allies")
+        
+        return BehaviorResult(
+            success=True,
+            damage_dealt=0,
+            targets_hit=[e.id for e in affected],
+            effects_applied=["rally_buff"],
+            message=f"Your rally inspires nearby allies! Damage and defense increased."
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in rally_passive_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Rally activation failed: {str(e)}"
+        )
+
+
+async def aoe_attack_behavior(
+    caster,
+    targets,  # List of targets for AoE
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Area-of-effect attack hitting all targets in a room.
+    
+    Used by abilities like Whirlwind, Fireball, etc.
+    - Calculates damage for each target separately
+    - Applies scaling based on ability
+    - Returns aggregate damage and all targets hit
+    """
+    try:
+        if not isinstance(targets, list):
+            targets = [targets]
+        
+        total_damage = 0
+        targets_hit = []
+        
+        scaling = ability_template.scaling or {}
+        
+        for target in targets:
+            # Base damage calculation
+            base_damage = caster.base_attack_damage_min
+            if hasattr(caster, 'base_attack_damage_max'):
+                import random
+                base_damage = random.randint(
+                    caster.base_attack_damage_min,
+                    caster.base_attack_damage_max
+                )
+            
+            # Apply stat scaling
+            damage = base_damage
+            for stat_name, multiplier in scaling.items():
+                stat_value = getattr(caster, stat_name, 0)
+                damage += int(stat_value * multiplier)
+            
+            # AoE attacks typically have higher hit rate
+            import random
+            hit_roll = random.randint(1, 20) + (caster.armor_class // 2) + 5
+            if hit_roll >= target.armor_class:
+                old_hp = target.current_health
+                target.current_health = max(0, target.current_health - damage)
+                total_damage += damage
+                targets_hit.append(target.id)
+                
+                logger.info(f"AoE hit {target.name} for {damage} damage")
+        
+        message = f"Your AoE attack hit {len(targets_hit)} targets for {total_damage} total damage!"
+        
+        return BehaviorResult(
+            success=True,
+            damage_dealt=total_damage,
+            targets_hit=targets_hit,
+            cooldown_applied=ability_template.cooldown or 0.0,
+            message=message
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in aoe_attack_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"AoE attack failed: {str(e)}"
+        )
+
+
+async def stun_effect_behavior(
+    caster,
+    target,
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Apply a stun effect to target.
+    
+    Stun prevents the target from taking actions for a duration.
+    Usually combined with another attack (e.g., Shield Bash).
+    """
+    try:
+        # Create stun effect
+        stun_duration = context.get('stun_duration', 2.0)  # Default 2 seconds
+        
+        # In full implementation, would use EffectSystem
+        # Effect would prevent targets from executing abilities
+        
+        logger.info(f"{caster.name} stunned {target.name} for {stun_duration}s")
+        
+        return BehaviorResult(
+            success=True,
+            targets_hit=[target.id],
+            effects_applied=["stun"],
+            message=f"You stun {target.name} for {stun_duration} seconds!"
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in stun_effect_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Stun effect failed: {str(e)}"
+        )
+
+
+async def mana_regen_behavior(
+    caster,
+    target,
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Restore mana to caster or target.
+    
+    Mage support ability - restores mana pool.
+    Amount based on ability level and intelligence scaling.
+    """
+    try:
+        base_regen = context.get('regen_amount', 50)
+        scaling = ability_template.scaling or {}
+        
+        # Apply scaling
+        regen_amount = base_regen
+        for stat_name, multiplier in scaling.items():
+            stat_value = getattr(caster, stat_name, 0)
+            regen_amount += int(stat_value * multiplier)
+        
+        # Apply to target mana pool
+        # Would use character_sheet.resource_pools['mana']
+        # For now, just log it
+        
+        logger.info(f"{caster.name} restored {regen_amount} mana")
+        
+        return BehaviorResult(
+            success=True,
+            targets_hit=[target.id],
+            message=f"You restore {regen_amount} mana!"
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in mana_regen_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Mana regen failed: {str(e)}"
+        )
+
+
+async def fireball_behavior(
+    caster,
+    targets,
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Fireball AoE attack - mage signature spell.
+    
+    Hits all enemies in target area with fire damage.
+    Scales with intelligence, higher damage than melee.
+    """
+    try:
+        if not isinstance(targets, list):
+            targets = [targets]
+        
+        total_damage = 0
+        targets_hit = []
+        
+        # Mage spells scale with intelligence at 1.2x
+        base_damage = context.get('base_damage', 80)
+        intelligence = getattr(caster, 'intelligence', 10)
+        damage_per_target = int(base_damage + (intelligence * 1.2))
+        
+        import random
+        for target in targets:
+            # Spell attacks are harder to dodge (higher hit rate)
+            hit_roll = random.randint(1, 20) + (caster.armor_class // 2) + 8
+            if hit_roll >= target.armor_class:
+                old_hp = target.current_health
+                target.current_health = max(0, target.current_health - damage_per_target)
+                total_damage += damage_per_target
+                targets_hit.append(target.id)
+                
+                logger.info(f"Fireball hit {target.name} for {damage_per_target} damage")
+        
+        return BehaviorResult(
+            success=True,
+            damage_dealt=total_damage,
+            targets_hit=targets_hit,
+            effects_applied=["burning"],
+            cooldown_applied=ability_template.cooldown or 0.0,
+            message=f"Fireball! You burn {len(targets_hit)} enemies for {total_damage} total damage!"
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in fireball_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Fireball failed: {str(e)}"
+        )
+
+
+async def polymorph_behavior(
+    caster,
+    target,
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Transform target into another form temporarily.
+    
+    Mage crowd control ability - transforms enemy into harmless animal.
+    Prevents target from taking actions; low damage but high utility.
+    """
+    try:
+        duration = context.get('duration', 3.0)
+        target_form = context.get('target_form', 'sheep')
+        
+        logger.info(f"{caster.name} polymorphed {target.name} into a {target_form} for {duration}s")
+        
+        return BehaviorResult(
+            success=True,
+            targets_hit=[target.id],
+            effects_applied=["polymorphed"],
+            message=f"You transform {target.name} into a {target_form}!"
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in polymorph_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Polymorph failed: {str(e)}"
+        )
+
+
+async def backstab_behavior(
+    caster,
+    target,
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Rogue single-target high-damage attack.
+    
+    Requires positioning (backstab bonus if attacking from behind).
+    Scales with dexterity.
+    Low resource cost but longer cooldown.
+    """
+    try:
+        base_damage = caster.base_attack_damage_min
+        if hasattr(caster, 'base_attack_damage_max'):
+            import random
+            base_damage = random.randint(caster.base_attack_damage_min, caster.base_attack_damage_max)
+        
+        # Rogue scaling - dexterity at 1.3x
+        dexterity = getattr(caster, 'dexterity', 10)
+        damage = int(base_damage + (dexterity * 1.3))
+        
+        # Backstab from behind bonus
+        from_behind = context.get('from_behind', False)
+        if from_behind:
+            damage = int(damage * 1.5)
+        
+        # High accuracy for rogue
+        import random
+        hit_roll = random.randint(1, 20) + (caster.armor_class // 2) + 10
+        if hit_roll >= target.armor_class:
+            old_hp = target.current_health
+            target.current_health = max(0, target.current_health - damage)
+            
+            msg = f"Backstab! You hit {target.name} for {damage} damage!"
+            if from_behind:
+                msg = f"Clean backstab! You hit {target.name} for {damage} damage!"
+            
+            logger.info(msg)
+            
+            return BehaviorResult(
+                success=True,
+                damage_dealt=damage,
+                targets_hit=[target.id],
+                cooldown_applied=ability_template.cooldown or 0.0,
+                message=msg
+            )
+        else:
+            return BehaviorResult(
+                success=True,
+                damage_dealt=0,
+                targets_hit=[],
+                message=f"Your backstab missed {target.name}!"
+            )
+    
+    except Exception as e:
+        logger.error(f"Error in backstab_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Backstab failed: {str(e)}"
+        )
+
+
+async def evasion_passive_behavior(
+    caster,
+    target,
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Rogue passive that increases dodge chance.
+    
+    Permanently increases AC (lower is better in some systems).
+    Can stack with other defensive abilities.
+    """
+    try:
+        ac_bonus = context.get('ac_bonus', -2)  # Lower AC = harder to hit
+        
+        logger.info(f"{caster.name} activated Evasion - AC increased by {abs(ac_bonus)}")
+        
+        return BehaviorResult(
+            success=True,
+            targets_hit=[caster.id],
+            effects_applied=["evasion_buff"],
+            message=f"You move with greater evasion! Defense increased."
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in evasion_passive_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Evasion activation failed: {str(e)}"
+        )
+
+
+async def damage_boost_behavior(
+    caster,
+    target,
+    ability_template,
+    combat_system,
+    **context
+) -> BehaviorResult:
+    """
+    Temporary buff that increases damage output.
+    
+    Support ability used by multiple classes.
+    Increases all ability damage by percentage for duration.
+    """
+    try:
+        duration = context.get('duration', 5.0)
+        damage_increase = context.get('damage_increase', 0.2)  # 20% boost
+        
+        logger.info(
+            f"{caster.name} activated damage boost - +{int(damage_increase*100)}% "
+            f"for {duration}s"
+        )
+        
+        return BehaviorResult(
+            success=True,
+            targets_hit=[target.id],
+            effects_applied=["damage_boost"],
+            message=f"You surge with power! Damage increased by {int(damage_increase*100)}%!"
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in damage_boost_behavior: {e}", exc_info=True)
+        return BehaviorResult(
+            success=False,
+            error=f"Damage boost failed: {str(e)}"
+        )

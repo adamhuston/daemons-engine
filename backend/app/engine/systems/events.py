@@ -232,6 +232,187 @@ class EventDispatcher:
                     wire_event["player_id"] = pid
                     await q.put(wire_event)
     
+    def ability_cast(
+        self,
+        caster_id: "PlayerId",
+        ability_id: str,
+        ability_name: str,
+        target_ids: List["PlayerId"] | None = None,
+        room_id: "RoomId | None" = None,
+    ) -> Event:
+        """
+        Create an ability_cast event when an ability is used.
+        
+        Args:
+            caster_id: Player who cast the ability
+            ability_id: The ability ID
+            ability_name: Human-readable ability name
+            target_ids: List of target player IDs affected
+            room_id: Room where ability was cast (for room-scoped events)
+        
+        Returns:
+            An ability_cast event dict
+        """
+        ev: Event = {
+            "type": "ability_cast",
+            "caster_id": caster_id,
+            "ability_id": ability_id,
+            "ability_name": ability_name,
+        }
+        if target_ids:
+            ev["target_ids"] = target_ids
+        if room_id:
+            ev["room_id"] = room_id
+        return ev
+    
+    def ability_error(
+        self,
+        player_id: "PlayerId",
+        ability_id: str,
+        ability_name: str,
+        error_message: str,
+    ) -> Event:
+        """
+        Create an ability_error event when ability use fails.
+        
+        Args:
+            player_id: Player who attempted the ability
+            ability_id: The ability ID
+            ability_name: Human-readable ability name
+            error_message: Why the ability failed
+        
+        Returns:
+            An ability_error event dict
+        """
+        ev: Event = {
+            "type": "ability_error",
+            "scope": "player",
+            "player_id": player_id,
+            "ability_id": ability_id,
+            "ability_name": ability_name,
+            "error": error_message,
+        }
+        return ev
+    
+    def ability_cast_complete(
+        self,
+        caster_id: "PlayerId",
+        ability_id: str,
+        ability_name: str,
+        success: bool,
+        message: str,
+        damage_dealt: int | None = None,
+        targets_hit: int | None = None,
+    ) -> Event:
+        """
+        Create an ability_cast_complete event when ability execution finishes.
+        
+        Args:
+            caster_id: Player who cast the ability
+            ability_id: The ability ID
+            ability_name: Human-readable ability name
+            success: Whether the ability succeeded
+            message: Result message
+            damage_dealt: Optional total damage dealt
+            targets_hit: Optional number of targets hit
+        
+        Returns:
+            An ability_cast_complete event dict
+        """
+        payload = {
+            "success": success,
+            "message": message,
+        }
+        if damage_dealt is not None:
+            payload["damage_dealt"] = damage_dealt
+        if targets_hit is not None:
+            payload["targets_hit"] = targets_hit
+        
+        ev: Event = {
+            "type": "ability_cast_complete",
+            "scope": "player",
+            "player_id": caster_id,
+            "ability_id": ability_id,
+            "ability_name": ability_name,
+            "payload": payload,
+        }
+        return ev
+    
+    def cooldown_update(
+        self,
+        player_id: "PlayerId",
+        ability_id: str,
+        cooldown_remaining: float,
+    ) -> Event:
+        """
+        Create a cooldown_update event when ability cooldown is applied.
+        
+        Args:
+            player_id: Player who cast the ability
+            ability_id: The ability ID
+            cooldown_remaining: Seconds remaining on cooldown
+        
+        Returns:
+            A cooldown_update event dict
+        """
+        ev: Event = {
+            "type": "cooldown_update",
+            "scope": "player",
+            "player_id": player_id,
+            "ability_id": ability_id,
+            "cooldown_remaining": cooldown_remaining,
+        }
+        return ev
+    
+    def resource_update(
+        self,
+        player_id: "PlayerId",
+        resources: Dict[str, Dict[str, Any]],
+    ) -> Event:
+        """
+        Create a resource_update event when player resources change.
+        
+        Args:
+            player_id: The player whose resources changed
+            resources: Dict mapping resource_id -> {current, max, percent}
+        
+        Returns:
+            A resource_update event dict
+        """
+        ev: Event = {
+            "type": "resource_update",
+            "scope": "player",
+            "player_id": player_id,
+            "payload": resources,
+        }
+        return ev
+    
+    def ability_learned(
+        self,
+        player_id: "PlayerId",
+        ability_id: str,
+        ability_name: str,
+    ) -> Event:
+        """
+        Create an ability_learned event when player learns a new ability.
+        
+        Args:
+            player_id: The player who learned the ability
+            ability_id: The ability ID
+            ability_name: Human-readable ability name
+        
+        Returns:
+            An ability_learned event dict
+        """
+        ev: Event = {
+            "type": "ability_learned",
+            "scope": "player",
+            "player_id": player_id,
+            "ability_id": ability_id,
+            "ability_name": ability_name,
+        }
+        return ev
+
     # ---------- Helpers ----------
     
     def _get_player_ids_in_room(self, room_id: "RoomId") -> Set["PlayerId"]:
