@@ -84,13 +84,28 @@ This project is a real-time, text-based dungeon crawler inspired by classic MUDs
 - HTTP endpoints:
   - `GET /` – health/hello check.
   - `GET /players` – returns current players from DB for debugging/testing.
-- WebSocket endpoint:
-  - `GET /ws/game?player_id=...`:
+  - **Auth endpoints (Phase 7):**
+    - `POST /auth/register` – Create new user account
+    - `POST /auth/login` – Authenticate and get JWT tokens
+    - `POST /auth/refresh` – Rotate access/refresh tokens
+    - `POST /auth/logout` – Revoke refresh token
+    - `GET /auth/me` – Get current user info from token
+  - **Character endpoints (Phase 7):**
+    - `POST /characters` – Create new character (max 3)
+    - `GET /characters` – List account's characters
+    - `POST /characters/{id}/select` – Set active character
+    - `DELETE /characters/{id}` – Delete character
+- WebSocket endpoints:
+  - `GET /ws/game?player_id=...` (legacy):
     - Accepts a WS connection for a given player.
     - Registers the player with `WorldEngine`.
-    - Starts:
-      - `_ws_receiver`: reads client commands and passes them to `WorldEngine`.
-      - `_ws_sender`: reads server events from a queue and sends them to client.
+  - `GET /ws/game/auth?token=...` (Phase 7):
+    - Authenticated WebSocket connection using JWT
+    - Verifies token and loads user's active character
+    - Sets auth_info in context for permission checks
+  - Both endpoints start:
+    - `_ws_receiver`: reads client commands and passes them to `WorldEngine`.
+    - `_ws_sender`: reads server events from a queue and sends them to client.
 
 The `WorldEngine` instance is stored in `app.state` (or a global), and all WS connections share this single engine.
 
@@ -147,6 +162,17 @@ The `WorldEngine` instance is stored in `app.state` (or a global), and all WS co
   - `id`, `template_id` (FK to NpcTemplate)
   - `room_id`, `spawn_room_id`, `respawn_time`
   - `instance_data` (JSON) for overrides
+- **Auth models (Phase 7):**
+  - `UserAccount` - Separate from Player (one account can have multiple characters)
+    - `id`, `username`, `email`, `password_hash`
+    - `role` (player, moderator, game_master, admin)
+    - `is_active`, `created_at`, `last_login`
+    - `active_character_id` - Currently selected character
+  - `RefreshToken` - Session management with token rotation
+    - `id`, `account_id`, `token_hash`, `expires_at`, `revoked`
+  - `SecurityEvent` - Audit log for security events
+    - `event_type`, `account_id`, `ip_address`, `timestamp`, `details`
+  - `Player.account_id` - Links characters to accounts (nullable)
 
 ### 3.3 In-memory world model
 
@@ -199,9 +225,76 @@ The `WorldEngine` instance is stored in `app.state` (or a global), and all WS co
     - `world_time: WorldTime` - Global time for rooms not in areas
 
 This layer is framework-agnostic (no FastAPI/SQLAlchemy here).  
-It represents the “live world” in memory.
+It represents the "live world" in memory.
 
-### 3.4 World loader
+### 3.4 Game Systems
+
+`app/engine/systems/`
+
+The game engine uses modular systems for different domains:
+
+- **GameContext** (`context.py`):
+  - Shared context object passed to all systems
+  - Contains references to World, all systems, and utility methods
+  - Enables systems to interact without tight coupling
+
+- **TimeEventManager** (`time_manager.py`):
+  - Handles scheduled events and recurring timers
+  - Priority queue (min-heap) of TimeEvents
+  - Used for: effect expiration, respawn timers, periodic world updates
+
+- **EventDispatcher** (`events.py`):
+  - Creates and routes events to players
+  - Handles scoping: player-specific, room-wide, or broadcast
+  - All events flow through `_dispatch_events()`
+
+- **CombatSystem** (`combat.py`):
+  - Manages attack, damage, death, and loot
+  - Supports player vs NPC and NPC vs player combat
+  - Auto-attack scheduling via TimeEventManager
+
+- **EffectSystem** (`effects.py`):
+  - Buffs, debuffs, DoT/HoT effects
+  - Stat modifiers with duration tracking
+  - Periodic damage/healing execution
+
+- **CommandRouter** (`router.py`):
+  - Command parsing and handler dispatch
+  - Registered via `@cmd` decorator
+  - Handles aliases and argument parsing
+
+- **TriggerSystem** (`triggers.py`):
+  - Room-based reactive triggers
+  - Conditions: flag_set, has_item, player_count, etc.
+  - Actions: message, spawn_npc, open_exit, give_item, etc.
+  - Timer triggers for periodic effects
+
+- **QuestSystem** (`quests.py`):
+  - Quest state machine (AVAILABLE → ACCEPTED → IN_PROGRESS → COMPLETED → TURNED_IN)
+  - Objective tracking (KILL, COLLECT, VISIT, TALK, etc.)
+  - NPC dialogue trees with conditions and actions
+  - Quest chains for multi-part storylines
+  - Repeatable quests with cooldowns
+  - Timed quests with failure conditions
+
+- **StateTracker** (`persistence.py`): **(Phase 6)**
+  - Dirty entity tracking for efficient saves
+  - Periodic saves every 60 seconds
+  - Critical saves for important events (death, quest completion)
+  - Graceful shutdown handling
+  - Entity types: players, rooms, NPCs, items, triggers
+  - Item decay system (1 hour default for ground items)
+
+- **AuthSystem** (`auth.py`): **(Phase 7)**
+  - JWT-based authentication with 1-hour access tokens
+  - Refresh token rotation with 7-day expiry
+  - Argon2 password hashing via passlib
+  - UserRole enum: PLAYER, MODERATOR, GAME_MASTER, ADMIN
+  - Permission enum for granular access control
+  - `requires_role()` and `requires_permission()` decorators
+  - Security event logging for audit trail
+
+### 3.5 World loader
 
 `app/engine/loader.py`
 
@@ -211,9 +304,25 @@ It represents the “live world” in memory.
   - Adds players to the `players` set of their current room.
   - Returns a fully-populated `World` object.
 
+- `load_triggers_from_yaml(world)`:
+  - Loads room triggers from `world_data/triggers/`
+  - Attaches triggers to WorldRoom instances
+
+- `load_quests_into_system(quest_system)`:
+  - Loads quest templates from `world_data/quests/`
+  - Parses objectives, rewards, and conditions
+
+- `load_dialogues_into_system(quest_system)`:
+  - Loads NPC dialogue trees from `world_data/dialogues/`
+  - Supports conditions, actions, and quest integration
+
+- `load_quest_chains_into_system(quest_system)`:
+  - Loads quest chains from `world_data/quest_chains/`
+  - Links quests into storylines with bonus rewards
+
 Called on backend startup, after initial seeding, to initialize `WorldEngine`.
 
-### 3.5 Game engine
+### 3.6 Game engine
 
 `app/engine/engine.py`
 

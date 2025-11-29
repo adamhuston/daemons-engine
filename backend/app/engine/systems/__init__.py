@@ -8,6 +8,9 @@ Each system handles a specific domain of game logic:
 - CombatSystem: Attack, damage, death, loot handling
 - EffectSystem: Buffs, debuffs, DoT effects
 - CommandRouter: Command parsing and handler routing
+- TriggerSystem: Room-based reactive triggers
+- StateTracker: Dirty tracking and persistence (Phase 6)
+- AuthSystem: Authentication and authorization (Phase 7)
 """
 
 from .time_manager import TimeEventManager
@@ -16,6 +19,46 @@ from .combat import CombatSystem, CombatConfig
 from .effects import EffectSystem, EffectConfig
 from .router import CommandRouter, CommandMeta
 from .context import GameContext
+from .triggers import (
+    TriggerSystem,
+    TriggerCondition,
+    TriggerAction,
+    RoomTrigger,
+    TriggerState,
+    TriggerContext,
+)
+from .quests import (
+    QuestSystem,
+    QuestTemplate,
+    QuestObjective,
+    QuestReward,
+    QuestProgress,
+    QuestStatus,
+    ObjectiveType,
+    QuestChain,
+    DialogueTree,
+    DialogueNode,
+    DialogueOption,
+    DialogueCondition,
+    DialogueAction,
+)
+from .persistence import (
+    StateTracker,
+    DirtyState,
+    ENTITY_PLAYER,
+    ENTITY_ROOM,
+    ENTITY_NPC,
+    ENTITY_ITEM,
+    ENTITY_TRIGGER,
+)
+from .auth import (
+    AuthSystem,
+    UserRole,
+    Permission,
+    SecurityEventType,
+    requires_role,
+    requires_permission,
+)
 
 __all__ = [
     "GameContext",
@@ -27,4 +70,37 @@ __all__ = [
     "EffectConfig",
     "CommandRouter",
     "CommandMeta",
+    "TriggerSystem",
+    "TriggerCondition",
+    "TriggerAction",
+    "RoomTrigger",
+    "TriggerState",
+    "TriggerContext",
+    "QuestSystem",
+    "QuestTemplate",
+    "QuestObjective",
+    "QuestReward",
+    "QuestProgress",
+    "QuestStatus",
+    "ObjectiveType",
+    "QuestChain",
+    "DialogueTree",
+    "DialogueNode",
+    "DialogueOption",
+    "DialogueCondition",
+    "DialogueAction",
+    "StateTracker",
+    "DirtyState",
+    "ENTITY_PLAYER",
+    "ENTITY_ROOM",
+    "ENTITY_NPC",
+    "ENTITY_ITEM",
+    "ENTITY_TRIGGER",
+    # Phase 7: Auth
+    "AuthSystem",
+    "UserRole",
+    "Permission",
+    "SecurityEventType",
+    "requires_role",
+    "requires_permission",
 ]

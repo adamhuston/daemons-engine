@@ -48,6 +48,11 @@ async def load_world(session: AsyncSession) -> World:
     players: dict[PlayerId, WorldPlayer] = {}
 
     for p in player_models:
+        # Load quest progress from DB (stored as dict of dicts)
+        quest_progress_data = p.quest_progress if hasattr(p, 'quest_progress') and p.quest_progress else {}
+        completed_quests_data = p.completed_quests if hasattr(p, 'completed_quests') and p.completed_quests else []
+        player_flags_data = p.player_flags if hasattr(p, 'player_flags') and p.player_flags else {}
+        
         players[p.id] = WorldPlayer(
             id=p.id,
             entity_type=EntityType.PLAYER,
@@ -66,6 +71,10 @@ async def load_world(session: AsyncSession) -> World:
             vitality=p.vitality,
             max_energy=p.max_energy,
             current_energy=p.current_energy,
+            # Quest system (Phase X)
+            quest_progress=quest_progress_data,
+            completed_quests=set(completed_quests_data),
+            player_flags=player_flags_data,
         )
 
     # ----- Place players into rooms (unified entity tracking) -----
@@ -253,6 +262,7 @@ async def load_world(session: AsyncSession) -> World:
             drop_table=t.loot_table or [],  # DB field is loot_table, runtime uses drop_table
             idle_messages=t.idle_messages or [],
             keywords=t.keywords or [],
+            persist_state=t.persist_state if hasattr(t, 'persist_state') else False,
         )
 
     # ----- Load NPC instances (Phase 4) -----
@@ -314,3 +324,551 @@ async def load_world(session: AsyncSession) -> World:
         npcs=npcs,
         container_contents=container_contents,
     )
+
+
+def load_triggers_from_yaml(world: World, world_data_dir: str | None = None) -> None:
+    """
+    Load room and area triggers from YAML files into the world.
+    
+    This function is called after load_world() to populate triggers
+    from the YAML definitions into the WorldRoom and WorldArea objects.
+    
+    Args:
+        world: The loaded World object
+        world_data_dir: Optional path to world_data directory. If not provided,
+                       defaults to backend/world_data
+    """
+    from pathlib import Path
+    import yaml
+    from .systems.triggers import RoomTrigger, TriggerCondition, TriggerAction
+    
+    if world_data_dir is None:
+        # Default: backend/world_data relative to this file
+        world_data_dir = Path(__file__).parent.parent.parent / "world_data"
+    else:
+        world_data_dir = Path(world_data_dir)
+    
+    rooms_loaded = 0
+    areas_loaded = 0
+    
+    # ----- Load room triggers -----
+    rooms_dir = world_data_dir / "rooms"
+    if rooms_dir.exists():
+        yaml_files = list(rooms_dir.glob("**/*.yaml"))
+        for yaml_file in yaml_files:
+            with open(yaml_file, 'r', encoding='utf-8') as f:
+                room_data = yaml.safe_load(f)
+            
+            if not room_data:
+                continue
+                
+            room_id = room_data.get('id')
+            triggers_data = room_data.get('triggers', [])
+            
+            if not room_id or not triggers_data:
+                continue
+            
+            room = world.rooms.get(room_id)
+            if not room:
+                continue
+            
+            # Parse each trigger
+            for trigger_dict in triggers_data:
+                trigger = _parse_trigger(trigger_dict)
+                if trigger:
+                    room.triggers.append(trigger)
+                    rooms_loaded += 1
+    
+    # ----- Load area triggers -----
+    areas_dir = world_data_dir / "areas"
+    if areas_dir.exists():
+        yaml_files = list(areas_dir.glob("**/*.yaml"))
+        for yaml_file in yaml_files:
+            with open(yaml_file, 'r', encoding='utf-8') as f:
+                area_data = yaml.safe_load(f)
+            
+            if not area_data:
+                continue
+                
+            area_id = area_data.get('id')
+            triggers_data = area_data.get('triggers', [])
+            
+            # Also load area metadata
+            if area_id and area_id in world.areas:
+                area = world.areas[area_id]
+                # Load optional metadata
+                if 'recommended_level' in area_data:
+                    area.recommended_level = area_data['recommended_level']
+                if 'theme' in area_data:
+                    area.theme = area_data['theme']
+                if 'area_flags' in area_data:
+                    area.area_flags = area_data['area_flags']
+            
+            if not area_id or not triggers_data:
+                continue
+            
+            area = world.areas.get(area_id)
+            if not area:
+                continue
+            
+            # Parse each trigger
+            for trigger_dict in triggers_data:
+                trigger = _parse_trigger(trigger_dict)
+                if trigger:
+                    area.triggers.append(trigger)
+                    areas_loaded += 1
+    
+    if rooms_loaded > 0 or areas_loaded > 0:
+        print(f"Loaded triggers: {rooms_loaded} room triggers, {areas_loaded} area triggers")
+
+
+def _parse_trigger(trigger_dict: dict):
+    """
+    Parse a trigger dictionary from YAML into a RoomTrigger object.
+    
+    Expected format:
+        id: unique_trigger_id
+        name: Human-readable name
+        event_type: on_enter | on_exit | on_command | on_timer | on_area_enter | on_area_exit
+        command_pattern: "pattern*"  # For on_command triggers
+        interval_seconds: 60         # For on_timer triggers
+        conditions:
+          - type: flag_set
+            flag: some_flag
+            expected: true
+          - type: has_item
+            template_id: item_123
+        actions:
+          - type: message_player
+            message: "You see something"
+          - type: set_flag
+            flag: some_flag
+            value: true
+        cooldown: 30
+        max_fires: 1
+        enabled: true
+    
+    Returns:
+        RoomTrigger or None if parsing fails.
+    """
+    from .systems.triggers import RoomTrigger, TriggerCondition, TriggerAction
+    
+    if not isinstance(trigger_dict, dict):
+        return None
+    
+    trigger_id = trigger_dict.get('id')
+    # Support both 'event' and 'event_type' for YAML flexibility
+    event_type = trigger_dict.get('event') or trigger_dict.get('event_type')
+    
+    if not trigger_id or not event_type:
+        print(f"Warning: Trigger missing id or event: {trigger_dict}")
+        return None
+    
+    # Parse conditions
+    conditions: list[TriggerCondition] = []
+    for cond_dict in trigger_dict.get('conditions', []):
+        if isinstance(cond_dict, dict):
+            cond_type = cond_dict.pop('type', None)
+            if cond_type:
+                conditions.append(TriggerCondition(
+                    type=cond_type,
+                    params=cond_dict.copy()
+                ))
+                # Restore type for potential re-use
+                cond_dict['type'] = cond_type
+    
+    # Parse actions
+    actions: list[TriggerAction] = []
+    for action_dict in trigger_dict.get('actions', []):
+        if isinstance(action_dict, dict):
+            action_type = action_dict.pop('type', None)
+            if action_type:
+                actions.append(TriggerAction(
+                    type=action_type,
+                    params=action_dict.copy()
+                ))
+                # Restore type for potential re-use
+                action_dict['type'] = action_type
+    
+    # Support both 'timer_interval' and 'interval_seconds' for YAML flexibility
+    timer_interval = trigger_dict.get('timer_interval') or trigger_dict.get('interval_seconds')
+    
+    return RoomTrigger(
+        id=trigger_id,
+        event=event_type,
+        conditions=conditions,
+        actions=actions,
+        command_pattern=trigger_dict.get('command_pattern'),
+        timer_interval=timer_interval,
+        timer_initial_delay=trigger_dict.get('timer_initial_delay', 0.0),
+        cooldown=trigger_dict.get('cooldown', 0.0),
+        max_fires=trigger_dict.get('max_fires', -1),
+        enabled=trigger_dict.get('enabled', True),
+    )
+
+
+def load_quests_into_system(quest_system, world_data_dir: str | None = None) -> int:
+    """
+    Load quest templates from YAML files into the QuestSystem.
+    
+    Args:
+        quest_system: The QuestSystem instance to register quests with
+        world_data_dir: Optional path to world_data directory
+        
+    Returns:
+        Number of quests loaded
+    """
+    from pathlib import Path
+    import yaml
+    from .systems.quests import (
+        QuestTemplate, QuestObjective, QuestReward, ObjectiveType
+    )
+    
+    if world_data_dir is None:
+        world_data_dir = Path(__file__).parent.parent.parent / "world_data"
+    else:
+        world_data_dir = Path(world_data_dir)
+    
+    quests_dir = world_data_dir / "quests"
+    loaded = 0
+    
+    if not quests_dir.exists():
+        print(f"Quests directory not found: {quests_dir}")
+        return 0
+    
+    yaml_files = list(quests_dir.glob("**/*.yaml"))
+    for yaml_file in yaml_files:
+        # Skip README files
+        if yaml_file.stem.lower() == 'readme':
+            continue
+            
+        try:
+            with open(yaml_file, 'r', encoding='utf-8') as f:
+                quest_data = yaml.safe_load(f)
+            
+            if not quest_data or 'id' not in quest_data:
+                continue
+            
+            # Parse objectives
+            objectives = []
+            for obj_data in quest_data.get('objectives', []):
+                try:
+                    obj_type = ObjectiveType(obj_data.get('type', 'visit'))
+                except ValueError:
+                    obj_type = ObjectiveType.VISIT
+                    
+                objectives.append(QuestObjective(
+                    id=obj_data.get('id', ''),
+                    type=obj_type,
+                    description=obj_data.get('description', ''),
+                    target_template_id=obj_data.get('target_template_id'),
+                    target_room_id=obj_data.get('target_room_id'),
+                    target_npc_name=obj_data.get('target_npc_name'),
+                    required_count=obj_data.get('required_count', 1),
+                    command_pattern=obj_data.get('command_pattern'),
+                    hidden=obj_data.get('hidden', False),
+                    optional=obj_data.get('optional', False),
+                ))
+            
+            # Parse rewards
+            rewards_data = quest_data.get('rewards', {})
+            rewards = QuestReward(
+                experience=rewards_data.get('experience', 0),
+                items=[tuple(item) for item in rewards_data.get('items', [])],
+                effects=rewards_data.get('effects', []),
+                flags=rewards_data.get('flags', {}),
+                currency=rewards_data.get('currency', 0),
+                reputation=rewards_data.get('reputation', {}),
+            )
+            
+            # Create template
+            template = QuestTemplate(
+                id=quest_data['id'],
+                name=quest_data.get('name', quest_data['id']),
+                description=quest_data.get('description', ''),
+                giver_npc_template=quest_data.get('giver_npc_template'),
+                giver_room_id=quest_data.get('giver_room_id'),
+                prerequisites=quest_data.get('prerequisites', []),
+                level_requirement=quest_data.get('level_requirement', 1),
+                required_items=quest_data.get('required_items', []),
+                required_flags=quest_data.get('required_flags', {}),
+                objectives=objectives,
+                turn_in_npc_template=quest_data.get('turn_in_npc_template'),
+                turn_in_room_id=quest_data.get('turn_in_room_id'),
+                auto_complete=quest_data.get('auto_complete', False),
+                rewards=rewards,
+                category=quest_data.get('category', 'main'),
+                repeatable=quest_data.get('repeatable', False),
+                cooldown_hours=quest_data.get('cooldown_hours', 0),
+                time_limit_minutes=quest_data.get('time_limit_minutes'),
+                accept_dialogue=quest_data.get('accept_dialogue', 'Quest accepted.'),
+                progress_dialogue=quest_data.get('progress_dialogue', 'Still working on it?'),
+                complete_dialogue=quest_data.get('complete_dialogue', 'Well done!'),
+                on_accept_actions=quest_data.get('on_accept_actions', []),
+                on_complete_actions=quest_data.get('on_complete_actions', []),
+                on_turn_in_actions=quest_data.get('on_turn_in_actions', []),
+            )
+            
+            quest_system.register_quest(template)
+            print(f"Loaded quest: {template.name} ({template.id})")
+            loaded += 1
+            
+        except Exception as e:
+            print(f"Error loading quest from {yaml_file}: {e}")
+    
+    print(f"Loaded {loaded} quests into QuestSystem")
+    return loaded
+
+
+def load_dialogues_into_system(quest_system, world_data_dir: str | None = None) -> int:
+    """
+    Load NPC dialogue trees from YAML files into the QuestSystem.
+    
+    Args:
+        quest_system: The QuestSystem instance to register dialogues with
+        world_data_dir: Optional path to world_data directory
+        
+    Returns:
+        Number of dialogue trees loaded
+    """
+    from pathlib import Path
+    import yaml
+    from .systems.quests import (
+        DialogueTree, DialogueNode, DialogueOption, 
+        DialogueCondition, DialogueAction, DialogueEntryOverride
+    )
+    
+    if world_data_dir is None:
+        world_data_dir = Path(__file__).parent.parent.parent / "world_data"
+    else:
+        world_data_dir = Path(world_data_dir)
+    
+    dialogues_dir = world_data_dir / "dialogues"
+    loaded = 0
+    
+    if not dialogues_dir.exists():
+        print(f"Dialogues directory not found: {dialogues_dir}")
+        return 0
+    
+    yaml_files = list(dialogues_dir.glob("**/*.yaml"))
+    for yaml_file in yaml_files:
+        # Skip README files
+        if yaml_file.stem.lower() == 'readme':
+            continue
+            
+        try:
+            with open(yaml_file, 'r', encoding='utf-8') as f:
+                dialogue_data = yaml.safe_load(f)
+            
+            if not dialogue_data or 'npc_template_id' not in dialogue_data:
+                continue
+            
+            npc_template_id = dialogue_data['npc_template_id']
+            
+            # Parse nodes
+            nodes = {}
+            for node_id, node_data in dialogue_data.get('nodes', {}).items():
+                # Parse node conditions
+                node_conditions = []
+                for cond_data in node_data.get('conditions', []):
+                    node_conditions.append(DialogueCondition(
+                        type=cond_data.get('type', ''),
+                        params=cond_data.get('params', {}),
+                        negate=cond_data.get('negate', False),
+                    ))
+                
+                # Parse node actions
+                node_actions = []
+                for action_data in node_data.get('actions', []):
+                    node_actions.append(DialogueAction(
+                        type=action_data.get('type', ''),
+                        params=action_data.get('params', {}),
+                    ))
+                
+                # Parse options
+                options = []
+                for opt_data in node_data.get('options', []):
+                    # Parse option conditions
+                    opt_conditions = []
+                    for cond_data in opt_data.get('conditions', []):
+                        opt_conditions.append(DialogueCondition(
+                            type=cond_data.get('type', ''),
+                            params=cond_data.get('params', {}),
+                            negate=cond_data.get('negate', False),
+                        ))
+                    
+                    # Parse option actions
+                    opt_actions = []
+                    for action_data in opt_data.get('actions', []):
+                        opt_actions.append(DialogueAction(
+                            type=action_data.get('type', ''),
+                            params=action_data.get('params', {}),
+                        ))
+                    
+                    options.append(DialogueOption(
+                        text=opt_data.get('text', ''),
+                        next_node=opt_data.get('next_node'),
+                        conditions=opt_conditions,
+                        actions=opt_actions,
+                        accept_quest=opt_data.get('accept_quest'),
+                        turn_in_quest=opt_data.get('turn_in_quest'),
+                        hidden_if_unavailable=opt_data.get('hidden_if_unavailable', True),
+                    ))
+                
+                nodes[node_id] = DialogueNode(
+                    id=node_id,
+                    text=node_data.get('text', ''),
+                    options=options,
+                    conditions=node_conditions,
+                    actions=node_actions,
+                )
+            
+            # Parse entry overrides
+            entry_overrides = []
+            for override_data in dialogue_data.get('entry_overrides', []):
+                conditions = []
+                for cond_data in override_data.get('conditions', []):
+                    conditions.append(DialogueCondition(
+                        type=cond_data.get('type', ''),
+                        params=cond_data.get('params', {}),
+                        negate=cond_data.get('negate', False),
+                    ))
+                entry_overrides.append(DialogueEntryOverride(
+                    conditions=conditions,
+                    node_id=override_data.get('node_id', ''),
+                ))
+            
+            # Create dialogue tree
+            tree = DialogueTree(
+                npc_template_id=npc_template_id,
+                nodes=nodes,
+                entry_node=dialogue_data.get('entry_node', 'greet'),
+                entry_overrides=entry_overrides,
+            )
+            
+            quest_system.register_dialogue(tree)
+            print(f"Loaded dialogue for: {npc_template_id}")
+            loaded += 1
+            
+        except Exception as e:
+            print(f"Error loading dialogue from {yaml_file}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    print(f"Loaded {loaded} dialogues into QuestSystem")
+    return loaded
+
+
+def load_quest_chains_into_system(quest_system, world_data_dir: str | None = None) -> int:
+    """
+    Load quest chains from YAML files into the QuestSystem.
+    
+    Phase X.4: Quest chains link multiple quests into a storyline
+    with bonus rewards on completion.
+    
+    Args:
+        quest_system: The QuestSystem instance to register chains with
+        world_data_dir: Optional path to world_data directory
+        
+    Returns:
+        Number of chains loaded
+    """
+    from pathlib import Path
+    import yaml
+    from .systems.quests import QuestChain, QuestReward
+    
+    if world_data_dir is None:
+        world_data_dir = Path(__file__).parent.parent.parent / "world_data"
+    else:
+        world_data_dir = Path(world_data_dir)
+    
+    chains_dir = world_data_dir / "quest_chains"
+    loaded = 0
+    
+    if not chains_dir.exists():
+        print(f"Quest chains directory not found: {chains_dir}")
+        return 0
+    
+    yaml_files = list(chains_dir.glob("**/*.yaml"))
+    for yaml_file in yaml_files:
+        # Skip README files
+        if yaml_file.stem.lower() == 'readme':
+            continue
+            
+        try:
+            with open(yaml_file, 'r', encoding='utf-8') as f:
+                chain_data = yaml.safe_load(f)
+            
+            if not chain_data or 'id' not in chain_data:
+                continue
+            
+            # Parse chain rewards
+            rewards_data = chain_data.get('chain_rewards', {})
+            chain_rewards = QuestReward(
+                experience=rewards_data.get('experience', 0),
+                items=[tuple(item) for item in rewards_data.get('items', [])],
+                flags=rewards_data.get('flags', {}),
+                currency=rewards_data.get('currency', 0),
+            )
+            
+            # Create chain
+            chain = QuestChain(
+                id=chain_data['id'],
+                name=chain_data.get('name', chain_data['id']),
+                description=chain_data.get('description', ''),
+                quest_ids=chain_data.get('quest_ids', []),
+                unlock_requirements=chain_data.get('unlock_requirements', []),
+                chain_rewards=chain_rewards,
+                completion_flags=chain_data.get('completion_flags', {}),
+            )
+            
+            quest_system.register_chain(chain)
+            print(f"Loaded quest chain: {chain.name} ({chain.id})")
+            loaded += 1
+            
+        except Exception as e:
+            print(f"Error loading quest chain from {yaml_file}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    print(f"Loaded {loaded} quest chains into QuestSystem")
+    return loaded
+
+
+def restore_player_quest_progress(quest_system, player) -> None:
+    """
+    Restore a player's quest progress from their saved data.
+    
+    This converts the stored dict format back into QuestProgress objects
+    in the player's quest_progress dict.
+    
+    Args:
+        quest_system: The QuestSystem instance
+        player: The WorldPlayer to restore progress for
+    """
+    from .systems.quests import QuestProgress, QuestStatus
+    
+    if not player.quest_progress:
+        return
+    
+    restored = {}
+    for quest_id, progress_data in player.quest_progress.items():
+        if isinstance(progress_data, dict):
+            try:
+                status_str = progress_data.get('status', 'in_progress')
+                status = QuestStatus(status_str)
+            except ValueError:
+                status = QuestStatus.IN_PROGRESS
+            
+            restored[quest_id] = QuestProgress(
+                quest_id=quest_id,
+                status=status,
+                objective_progress=progress_data.get('objective_progress', {}),
+                accepted_at=progress_data.get('accepted_at'),
+                completed_at=progress_data.get('completed_at'),
+                turned_in_at=progress_data.get('turned_in_at'),
+                completion_count=progress_data.get('completion_count', 0),
+                last_completed_at=progress_data.get('last_completed_at'),
+            )
+    
+    player.quest_progress = restored

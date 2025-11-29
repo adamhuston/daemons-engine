@@ -15,7 +15,7 @@ from .world import (
 from .behaviors import (
     BehaviorContext, BehaviorResult, get_behavior_instances
 )
-from .systems import GameContext, TimeEventManager, EventDispatcher, CombatSystem, EffectSystem, CommandRouter
+from .systems import GameContext, TimeEventManager, EventDispatcher, CombatSystem, EffectSystem, CommandRouter, TriggerSystem, TriggerContext, QuestSystem, StateTracker, ENTITY_PLAYER, ENTITY_ROOM, ENTITY_NPC, ENTITY_ITEM, ENTITY_TRIGGER
 
 
 
@@ -63,6 +63,18 @@ class WorldEngine:
         self.ctx.combat_system = self.combat_system
         self.effect_system = EffectSystem(self.ctx)
         self.ctx.effect_system = self.effect_system
+        self.trigger_system = TriggerSystem(self.ctx)
+        self.ctx.trigger_system = self.trigger_system
+        self.quest_system = QuestSystem(self.ctx)
+        self.ctx.quest_system = self.quest_system
+        
+        # Phase 6: State persistence tracker
+        if db_session_factory:
+            self.state_tracker = StateTracker(self.ctx, db_session_factory)
+            self.ctx.state_tracker = self.state_tracker
+        else:
+            self.state_tracker = None
+        
         self.command_router = CommandRouter(self)
         
         # Backward compatibility: reference listeners from context
@@ -266,6 +278,44 @@ class WorldEngine:
             description="[Admin] Hurt a target",
             usage="<target_name>"
         )
+        
+        # Quest commands (Phase X)
+        self.command_router.register_handler(
+            primary_name="journal",
+            handler=self._journal_handler,
+            names=["journal", "quests", "j"],
+            category="quest",
+            description="View your quest journal",
+            usage=""
+        )
+        
+        self.command_router.register_handler(
+            primary_name="quest",
+            handler=self._quest_handler,
+            names=["quest"],
+            category="quest",
+            description="View details of a specific quest",
+            usage="<quest_name>"
+        )
+        
+        self.command_router.register_handler(
+            primary_name="abandon",
+            handler=self._abandon_handler,
+            names=["abandon"],
+            category="quest",
+            description="Abandon a quest",
+            usage="<quest_name>"
+        )
+        
+        # Dialogue commands (Phase X.2)
+        self.command_router.register_handler(
+            primary_name="talk",
+            handler=self._talk_handler,
+            names=["talk", "speak"],
+            category="social",
+            description="Talk to an NPC",
+            usage="<npc_name>"
+        )
 
     # ---------- Command wrapper adapters (convert CommandRouter signature) ----------
 
@@ -340,16 +390,107 @@ class WorldEngine:
         return self._show_effects(player_id)
 
     def _heal_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
-        """Adapter for heal command."""
+        """Adapter for heal command. Requires GAME_MASTER role."""
+        # Permission check
+        if not self._check_permission(player_id, "MODIFY_STATS"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Heal whom?")]
         return self._heal(player_id, args)
 
     def _hurt_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
-        """Adapter for hurt command."""
+        """Adapter for hurt command. Requires GAME_MASTER role."""
+        # Permission check
+        if not self._check_permission(player_id, "MODIFY_STATS"):
+            return [self._msg_to_player(player_id, "You don't have permission to use this command.")]
+        
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Hurt whom?")]
         return self._hurt(player_id, args)
+
+    # ---------- Quest command handlers (Phase X) ----------
+
+    def _journal_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Show the player's quest journal."""
+        return self.quest_system.get_quest_log(player_id)
+
+    def _quest_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Show details of a specific quest."""
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Which quest? Usage: quest <quest_name>")]
+        return self.quest_system.get_quest_details(player_id, args.strip())
+
+    def _abandon_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Abandon a quest."""
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Abandon which quest? Usage: abandon <quest_name>")]
+        return self.quest_system.abandon_quest(player_id, args.strip())
+
+    def _talk_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Talk to an NPC to start dialogue."""
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Talk to whom? Usage: talk <npc_name>")]
+        
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        # Find NPC in room
+        npc_id = self._find_npc_in_room(player.room_id, args.strip())
+        if not npc_id:
+            return [self._msg_to_player(player_id, f"You don't see '{args.strip()}' here.")]
+        
+        npc = self.world.npcs.get(npc_id)
+        if not npc:
+            return [self._msg_to_player(player_id, "That NPC seems to have vanished.")]
+        
+        # Start dialogue
+        return self.quest_system.start_dialogue(player_id, npc_id, npc.template_id)
+
+    # ---------- Permission checking (Phase 7) ----------
+
+    def _check_permission(self, player_id: PlayerId, permission_name: str) -> bool:
+        """
+        Check if a player has a specific permission.
+        
+        Checks against the auth_info stored in the context (set during WebSocket handling)
+        or falls back to checking the player's linked account.
+        
+        Args:
+            player_id: The player to check permissions for
+            permission_name: Name of the permission (e.g., "MODIFY_STATS")
+            
+        Returns:
+            True if the player has the permission, False otherwise
+        """
+        # Import here to avoid circular imports
+        from .systems.auth import Permission, ROLE_PERMISSIONS, UserRole
+        
+        # First check if we have auth_info in context (from authenticated WebSocket)
+        if hasattr(self.ctx, 'auth_info') and self.ctx.auth_info:
+            role_str = self.ctx.auth_info.get('role', 'player')
+            try:
+                user_role = UserRole(role_str)
+            except ValueError:
+                user_role = UserRole.PLAYER
+            
+            # Check if the role has the permission
+            try:
+                perm = Permission(permission_name.lower())
+            except ValueError:
+                # Try with the exact name
+                perm_map = {p.name.upper(): p for p in Permission}
+                perm = perm_map.get(permission_name.upper())
+                if not perm:
+                    return False
+            
+            role_perms = ROLE_PERMISSIONS.get(user_role, set())
+            return perm in role_perms
+        
+        # For legacy connections without auth, deny admin commands
+        # (Or you could allow for testing by returning True here)
+        return False
 
     # ---------- Time event system (delegates to TimeEventManager) ----------
 
@@ -368,6 +509,13 @@ class WorldEngine:
         
         # Initialize per-NPC behavior timers
         self._init_npc_behaviors()
+        
+        # Initialize room and area trigger timers
+        self.trigger_system.initialize_all_timers()
+        
+        # Phase 6: Start periodic state saves
+        if self.state_tracker:
+            self.state_tracker.schedule_periodic_save()
     
     def _schedule_time_advancement(self) -> None:
         """
@@ -951,6 +1099,9 @@ class WorldEngine:
     
     async def stop_time_system(self) -> None:
         """Stop the time event processing loop. Delegates to TimeEventManager."""
+        # Phase 6: Save all dirty state before stopping
+        if self.state_tracker:
+            await self.state_tracker.shutdown()
         await self.time_manager.stop()
     
     def schedule_event(
@@ -1182,6 +1333,18 @@ class WorldEngine:
             look_events = self._look(player_id)
             await self._dispatch_events(look_events)
             
+            # Phase 6: Restore effects from database (with offline tick calculation)
+            if was_in_stasis and self._db_session_factory and self.effect_system:
+                try:
+                    async with self._db_session_factory() as session:
+                        effect_events = await self.effect_system.restore_player_effects(
+                            session, player_id
+                        )
+                        if effect_events:
+                            await self._dispatch_events(effect_events)
+                except Exception as e:
+                    print(f"[Phase6] Error restoring effects for {player_id}: {e}")
+            
             # Broadcast awakening message if coming out of stasis
             if was_in_stasis:
                 room = self.world.rooms.get(player.room_id)
@@ -1234,8 +1397,26 @@ class WorldEngine:
         from sqlalchemy import select, update
         from ..models import Player as DBPlayer, PlayerInventory as DBPlayerInventory, ItemInstance as DBItemInstance
         
+        # Serialize quest progress to JSON-compatible format
+        quest_progress_data = {}
+        for quest_id, progress in player.quest_progress.items():
+            # Handle both QuestProgress objects and raw dicts
+            if hasattr(progress, 'status'):
+                quest_progress_data[quest_id] = {
+                    'status': progress.status.value,
+                    'objective_progress': progress.objective_progress,
+                    'accepted_at': progress.accepted_at,
+                    'completed_at': progress.completed_at,
+                    'turned_in_at': progress.turned_in_at,
+                    'completion_count': progress.completion_count,
+                    'last_completed_at': progress.last_completed_at,
+                }
+            else:
+                # Already a dict
+                quest_progress_data[quest_id] = progress
+        
         async with self._db_session_factory() as session:
-            # Update player stats in database
+            # Update player stats in database (including quest data)
             player_stmt = (
                 update(DBPlayer)
                 .where(DBPlayer.id == player_id)
@@ -1245,6 +1426,10 @@ class WorldEngine:
                     level=player.level,
                     experience=player.experience,
                     current_room_id=player.room_id,
+                    # Quest system (Phase X)
+                    player_flags=player.player_flags,
+                    quest_progress=quest_progress_data,
+                    completed_quests=list(player.completed_quests),
                 )
             )
             await session.execute(player_stmt)
@@ -1283,7 +1468,7 @@ class WorldEngine:
                     await session.execute(item_stmt)
             
             await session.commit()
-            print(f"[Persistence] Saved stats and inventory for player {player.name} (ID: {player_id})")
+            print(f"[Persistence] Saved stats, inventory, and quest progress for player {player.name} (ID: {player_id})")
     
     async def player_disconnect(self, player_id: PlayerId) -> None:
         """
@@ -1292,6 +1477,15 @@ class WorldEngine:
         """
         # Save player stats to database before disconnect
         await self.save_player_stats(player_id)
+        
+        # Phase 6: Save player effects for offline tick calculation
+        if self._db_session_factory and self.effect_system:
+            try:
+                async with self._db_session_factory() as session:
+                    await self.effect_system.save_player_effects(session, player_id)
+                    await session.commit()
+            except Exception as e:
+                print(f"[Phase6] Error saving effects on disconnect for {player_id}: {e}")
         
         if player_id in self.world.players:
             player = self.world.players[player_id]
@@ -1564,12 +1758,14 @@ class WorldEngine:
                 )
             ]
 
-        if direction not in current_room.exits:
+        # Use effective exits (includes dynamic exits from triggers)
+        effective_exits = current_room.get_effective_exits()
+        if direction not in effective_exits:
             return [
                 self._msg_to_player(player_id, "You can't go that way."),
             ]
 
-        new_room_id = current_room.exits[direction]
+        new_room_id = effective_exits[direction]
         new_room = world.rooms.get(new_room_id)
         if new_room is None:
             return [
@@ -1590,6 +1786,46 @@ class WorldEngine:
                 )
             ]
 
+        # Fire on_exit triggers for the old room (before leaving)
+        exit_trigger_ctx = TriggerContext(
+            player_id=player_id,
+            room_id=old_room_id,
+            world=self.world,
+            event_type="on_exit",
+            direction=direction,
+        )
+        trigger_events = self.trigger_system.fire_event(old_room_id, "on_exit", exit_trigger_ctx)
+        events.extend(trigger_events)
+
+        # Check for area transition and fire area triggers
+        old_area_id = current_room.area_id
+        new_area_id = new_room.area_id
+        
+        if old_area_id != new_area_id:
+            # Fire on_area_exit for the old area
+            if old_area_id:
+                area_exit_ctx = TriggerContext(
+                    player_id=player_id,
+                    room_id=old_room_id,
+                    world=self.world,
+                    event_type="on_area_exit",
+                    direction=direction,
+                )
+                area_events = self.trigger_system.fire_area_event(old_area_id, "on_area_exit", area_exit_ctx)
+                events.extend(area_events)
+            
+            # Fire on_area_enter for the new area
+            if new_area_id:
+                area_enter_ctx = TriggerContext(
+                    player_id=player_id,
+                    room_id=new_room_id,
+                    world=self.world,
+                    event_type="on_area_enter",
+                    direction=direction,
+                )
+                area_events = self.trigger_system.fire_area_event(new_area_id, "on_area_enter", area_enter_ctx)
+                events.extend(area_events)
+
         # Update occupancy (unified entity tracking)
         current_room.entities.discard(player_id)
         new_room.entities.add(player_id)
@@ -1606,12 +1842,12 @@ class WorldEngine:
         if player.on_move_effect:
             description_lines.append(player.on_move_effect)
         
-        # Show new room
+        # Show new room (use effective description for trigger overrides)
         room_emoji = get_room_emoji(new_room.room_type)
         description_lines.extend([
             "",
             f"**{room_emoji} {new_room.name}**",
-            new_room.description
+            new_room.get_effective_description()
         ])
         
         # Trigger enter effect for new room
@@ -1635,9 +1871,10 @@ class WorldEngine:
             description_lines.append("Items here:")
             description_lines.extend(items_here)
         
-        # Add exits to the room description
-        if new_room.exits:
-            exits = list(new_room.exits.keys())
+        # Add exits to the room description (use effective exits)
+        effective_exits = new_room.get_effective_exits()
+        if effective_exits:
+            exits = list(effective_exits.keys())
             description_lines.append("")
             description_lines.append(f"Exits: {', '.join(exits)}")
         
@@ -1686,6 +1923,22 @@ class WorldEngine:
         # Trigger on_player_enter for NPCs in the new room (aggressive NPCs attack)
         asyncio.create_task(self._trigger_npc_player_enter(new_room_id, player_id))
 
+        # Fire on_enter triggers for the new room (after arrival)
+        enter_trigger_ctx = TriggerContext(
+            player_id=player_id,
+            room_id=new_room_id,
+            world=self.world,
+            event_type="on_enter",
+            direction=direction,
+        )
+        trigger_events = self.trigger_system.fire_event(new_room_id, "on_enter", enter_trigger_ctx)
+        events.extend(trigger_events)
+        
+        # Hook: Quest system VISIT objective tracking
+        if self.quest_system:
+            quest_events = self.quest_system.on_room_entered(player_id, new_room_id)
+            events.extend(quest_events)
+
         return events
 
     def _handle_look_command(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
@@ -1725,7 +1978,8 @@ class WorldEngine:
             ]
 
         room_emoji = get_room_emoji(room.room_type)
-        lines: list[str] = [f"**{room_emoji} {room.name}**", room.description]
+        # Use effective description for trigger overrides
+        lines: list[str] = [f"**{room_emoji} {room.name}**", room.get_effective_description()]
 
         # List all entities (players and NPCs) in the same room
         lines.extend(self._format_room_entities(room, player_id))
@@ -1743,9 +1997,10 @@ class WorldEngine:
             lines.append("Items here:")
             lines.extend(items_here)
 
-        # List available exits
-        if room.exits:
-            exits = list(room.exits.keys())
+        # List available exits (use effective exits for trigger overrides)
+        effective_exits = room.get_effective_exits()
+        if effective_exits:
+            exits = list(effective_exits.keys())
             lines.append("")
             lines.append(f"Exits: {', '.join(exits)}")
 
@@ -2940,10 +3195,17 @@ class WorldEngine:
             try:
                 add_item_to_inventory(world, player_id, new_item_id)
                 
-                return [
+                events = [
                     self._msg_to_player(player_id, f"You pick up {template.name}."),
                     self._msg_to_room(room.id, f"{player.name} picks up {template.name}.", exclude={player_id})
                 ]
+                
+                # Hook: Quest system COLLECT objective tracking
+                if self.quest_system:
+                    quest_events = self.quest_system.on_item_acquired(player_id, item.template_id, 1)
+                    events.extend(quest_events)
+                
+                return events
                 
             except InventoryFullError as e:
                 # Revert: add back to ground stack and remove new item
@@ -2956,10 +3218,17 @@ class WorldEngine:
                 room.items.remove(found_item_id)
                 add_item_to_inventory(world, player_id, found_item_id)
                 
-                return [
+                events = [
                     self._msg_to_player(player_id, f"You pick up {template.name}."),
                     self._msg_to_room(room.id, f"{player.name} picks up {template.name}.", exclude={player_id})
                 ]
+                
+                # Hook: Quest system COLLECT objective tracking
+                if self.quest_system:
+                    quest_events = self.quest_system.on_item_acquired(player_id, item.template_id, 1)
+                    events.extend(quest_events)
+                
+                return events
                 
             except InventoryFullError as e:
                 # Return item to room
@@ -3151,6 +3420,7 @@ class WorldEngine:
     def _drop(self, player_id: PlayerId, item_name: str) -> List[Event]:
         """Drop item from inventory."""
         from .inventory import remove_item_from_inventory, InventoryError, find_item_by_name
+        import time as time_module
         
         world = self.world
         
@@ -3176,6 +3446,7 @@ class WorldEngine:
         try:
             remove_item_from_inventory(world, player_id, found_item_id)
             item.room_id = room.id
+            item.dropped_at = time_module.time()  # Phase 6: Track drop time for decay
             room.items.add(found_item_id)
             
             # Broadcast to room

@@ -271,68 +271,405 @@ Before adding big systems, make the core loop solid.
 
 
 
-## Phase 5 - World structure, triggers, and scripting
+## Phase 5 - World structure, triggers, and scripting  **COMPLETE**
 
 **Goal**: Richer world behavior without hardcoding everything in Python.
 
-### Backend model
+### Phase 5.1 - Core Trigger Infrastructure ✅
 
-- World segmentation:
-    - Zones/areas with metadata (recommended level, themes, spawn tables).
-- Triggers:
-    - Room-level triggers: on enter/exit, on command, on timer.
-- Scripts:
-    - Choose a strategy:
-        - minimalist: table-driven triggers with types ("spawn npc", "open door", etc.).
-        - scriptable: embedded DSL or sandboxed Python scripts (more powerful, more complexity).
+- Trigger System Architecture:
+    - ✅ TriggerSystem class following GameContext pattern
+    - ✅ RoomTrigger dataclass: id, event, conditions, actions, cooldown, max_fires, enabled
+    - ✅ TriggerCondition and TriggerAction dataclasses with type + params
+    - ✅ TriggerState for runtime tracking (fire_count, last_fired_at, timer_event_id)
+    - ✅ TriggerContext passed to all handlers with player, room, area, direction, command
 
-### Engine changes
-- Trigger evaluation:
-    - On events like:
-        - player entering/leaving a room,
-        - specific commands (pull lever, press button),
-        - ticks.
-- Event injection:
-    - Triggers can:
-        - alter world state (spawn NPC, open exit),
-        - emit messages/events,
-        - apply effects / teleport players.
+- Core Event Types:
+    - ✅ on_enter: Fires when player enters a room
+    - ✅ on_exit: Fires when player leaves a room
+    - ✅ Variable substitution: {player.name}, {room.name}, {direction}
+    - ✅ Cooldown enforcement per player
+    - ✅ max_fires enforcement with fire_count tracking
 
-## Phase 6 - Persistence & scaling
+- Basic Conditions:
+    - ✅ flag_set: Check room_flags for specific flag value
+    - ✅ has_item: Check if player has item (by template_id or keywords)
+    - ✅ level: Check player level (min_level, max_level)
+
+- Basic Actions:
+    - ✅ message_player: Send message to triggering player
+    - ✅ message_room: Broadcast to all players in room
+    - ✅ set_flag: Set room flag to value
+    - ✅ toggle_flag: Toggle boolean room flag
+
+### Phase 5.2 - Commands, Timers & Expanded Conditions ✅
+
+- Command Triggers:
+    - ✅ on_command: Fires on specific player commands
+    - ✅ fnmatch pattern matching ("pull *", "open *door*", "press button")
+    - ✅ Integrated into router as pre-command hook
+    - ✅ Returns True to block further command processing
+
+- Timer Triggers:
+    - ✅ on_timer: Periodic automatic triggers
+    - ✅ timer_interval and timer_initial_delay configuration
+    - ✅ Integration with TimeEventManager
+    - ✅ start_room_timers() called on player enter
+    - ✅ Recurring=True for continuous operation
+
+- Expanded Conditions:
+    - ✅ health_percent: Check player health percentage (min, max)
+    - ✅ in_combat: Check if player is in combat
+    - ✅ has_effect: Check if player has specific effect
+    - ✅ entity_present: Check for NPC by template_id in room
+    - ✅ player_count: Check room player count (min, max)
+
+- Expanded Actions:
+    - ✅ damage: Deal damage to triggering player
+    - ✅ heal: Heal triggering player
+    - ✅ apply_effect: Apply effect to player (via EffectSystem)
+    - ✅ spawn_npc: Spawn NPC from template in room
+    - ✅ despawn_npc: Remove NPC from room
+
+### Phase 5.3 - Dynamic World State ✅
+
+- Exit Manipulation:
+    - ✅ WorldRoom.dynamic_exits dict for runtime exit overrides
+    - ✅ get_effective_exits() method combines base exits + dynamic
+    - ✅ open_exit action: Opens an exit to destination room
+    - ✅ close_exit action: Closes/removes an exit
+
+- Description System:
+    - ✅ WorldRoom.dynamic_description for runtime description override
+    - ✅ get_effective_description() returns dynamic or base description
+    - ✅ set_description action: Override room description
+    - ✅ reset_description action: Restore original description
+
+- Item Actions:
+    - ✅ spawn_item: Create item instance in room
+    - ✅ despawn_item: Remove item from room
+    - ✅ give_item: Give item to player
+    - ✅ take_item: Remove item from player
+
+- Trigger Control:
+    - ✅ enable_trigger: Enable a disabled trigger
+    - ✅ disable_trigger: Disable a trigger
+    - ✅ fire_trigger: Manually fire another trigger
+
+- Engine Integration:
+    - ✅ _look() uses get_effective_description()
+    - ✅ Movement commands use get_effective_exits()
+
+### Phase 5.4 - Area Enhancements & YAML Loading ✅
+
+- WorldArea Extensions:
+    - ✅ recommended_level, theme, area_flags fields
+    - ✅ triggers and trigger_states for area-level triggers
+    - ✅ Loaded from YAML area files
+
+- Area Triggers:
+    - ✅ on_area_enter: Fires when entering area from different area
+    - ✅ on_area_exit: Fires when leaving area to different area
+    - ✅ fire_area_event() with area state management
+    - ✅ Area transition detection in _move_player()
+
+- Timer Initialization:
+    - ✅ initialize_all_timers() for room and area on_timer triggers
+    - ✅ Called from start_time_system() at startup
+
+- YAML Trigger Loading:
+    - ✅ load_triggers_from_yaml() in loader.py
+    - ✅ _parse_trigger() parses conditions/actions from YAML
+    - ✅ Called from main.py after load_world()
+    - ✅ Supports both room and area trigger definitions
+
+- Example Content:
+    - ✅ room_1_1_1.yaml: Central hub with welcome, meditate, touch, pulse triggers
+    - ✅ room_0_0_0.yaml: Origin with conditional and level-gated triggers
+    - ✅ ethereal_nexus.yaml: Area enter/exit triggers
+
+## Phase X - Quest System and Narrative Progression
+
+**Goals**: Structured narrative experiences, player-driven story progression, and meaningful rewards.
+
+### Core Quest Infrastructure
+
+- Quest System Architecture:
+    - QuestSystem class following GameContext pattern
+    - QuestTemplate dataclass: id, name, description, objectives, rewards, prerequisites
+    - QuestStatus enum: NOT_AVAILABLE → AVAILABLE → ACCEPTED → IN_PROGRESS → COMPLETED → TURNED_IN
+    - QuestProgress dataclass for player-specific quest state tracking
+    - QuestObjective dataclass with type-specific parameters
+
+- Objective Types:
+    - KILL: Kill N of NPC template
+    - COLLECT: Collect N of item template
+    - DELIVER: Bring item to NPC
+    - VISIT: Enter a specific room
+    - INTERACT: Use command in room (trigger-based)
+    - ESCORT: Keep NPC alive to destination
+    - DEFEND: Prevent NPCs from reaching location
+    - TALK: Speak to NPC
+    - USE_ITEM: Use specific item
+
+- Quest Rewards:
+    - Experience points
+    - Items (via ItemSystem.give_item())
+    - Effects (via EffectSystem.apply_effect())
+    - Flags (player and room)
+    - Currency (future)
+    - Reputation (future)
+
+### NPC Dialogue System
+
+- Dialogue Data Structures:
+    - DialogueTree: Complete dialogue for an NPC
+    - DialogueNode: A node with text, options, conditions, actions
+    - DialogueOption: Player response with conditions and quest integration
+    - Variable substitution: {player.name}, {quest.progress}
+
+- Dialogue Flow:
+    - `talk <npc>` command initiates dialogue
+    - Numbered option selection (1, 2, 3...)
+    - Condition evaluation for available options
+    - Context-sensitive entry points based on quest status
+    - Quest accept/turn-in integration
+
+### Player Commands
+
+- `talk <npc>`: Initiate dialogue with NPC
+- `1`, `2`, `3`...: Select dialogue option by number
+- `bye`, `farewell`: End dialogue
+- `journal`, `quests`, `quest log`: View quest journal
+- `quest <name>`: View specific quest details
+- `abandon <quest>`: Abandon a quest
+
+### Engine Integration
+
+- Combat System hooks: on_npc_killed → KILL objectives
+- Item System hooks: on_item_acquired → COLLECT objectives
+- Movement hooks: on_room_entered → VISIT objectives
+- CommandRouter: Dialogue state handling before command dispatch
+
+### YAML Content System (Phase X.3) ✅
+
+- ✅ `world_data/quests/` directory for quest definitions
+- ✅ `world_data/dialogues/` directory for NPC dialogue trees
+- ✅ Quest YAML loader with full objective/reward parsing
+- ✅ Dialogue YAML loader with conditions, actions, and entry overrides
+- ✅ Quest chains for multi-part storylines (Phase X.4)
+- ✅ Repeatable quests with cooldown support (Phase X.4)
+- ✅ Timed quests with failure conditions (Phase X.4)
+
+### Database Extensions (Phase X.3) ✅
+
+- ✅ `player_flags` column in Player model for persistent state
+- ✅ `quest_progress` column in Player model for quest tracking
+- ✅ `completed_quests` column in Player model for completion history
+- ✅ Quest state serialization/deserialization in save_player_stats
+- ✅ Quest state restoration on player load
+
+### Advanced Quest Features (Phase X.4) ✅
+
+- ✅ QuestChain dataclass for linked quest series
+- ✅ Chain loading from `world_data/quest_chains/` YAML files
+- ✅ Chain completion tracking with bonus rewards
+- ✅ `get_chain_progress()` and `list_available_chains()` methods
+- ✅ `fail_quest()` method for timed quest expiration
+- ✅ `check_timed_quests()` for periodic timeout checking
+- ✅ Repeatable quest cooldown logic in `check_availability()`
+- ✅ `on_accept_actions`, `on_complete_actions`, `on_turn_in_actions` trigger integration
+- ✅ `_execute_quest_actions()` helper for quest-triggered behaviors
+
+### Sample Content
+
+- ✅ `wisp_investigation` - Exploration-focused starter quest (VISIT, TALK objectives)
+- ✅ `goblin_threat` - Combat-focused follow-up quest (KILL, COLLECT objectives)
+- ✅ `wandering_merchant` dialogue tree with quest integration and context-sensitive greetings
+- ✅ `ethereal_mystery` quest chain linking the two starter quests with bonus rewards
+
+### Future Considerations
+
+- Reputation system with faction standings
+- Dynamic quest generation based on world state
+- Party quests with shared objectives
+
+---
+
+## Phase X.R - Reconciliation & Code Hygiene
+
+**Goals**: Audit the codebase to eliminate dead code, redundant systems, and orphaned implementations left behind from iterative development. Ensure architectural consistency across all systems.
+
+### Code Audit Checklist
+
+- [x] **Time Systems**: Verify only one time management system is active ✅
+  - ✅ Only `TimeEventManager` handles scheduling (single instance in WorldEngine)
+  - ✅ Single game_loop in engine.py
+  - ✅ No duplicate schedulers or tick loops
+
+- [x] **Event Systems**: Confirm single source of truth for events ✅
+  - ✅ `EventDispatcher` is the sole event router
+  - ✅ All events flow through `_dispatch_events()`
+  - ✅ No orphaned event types found
+
+- [x] **Command Routing**: Single command dispatch path ✅
+  - ✅ `CommandRouter` is the only entry point
+  - ✅ All commands register via `@cmd` decorator
+  - ✅ No duplicate handlers
+
+- [x] **Trigger System**: No duplicate trigger mechanisms ✅
+  - ✅ `TriggerSystem` is sole trigger handler
+  - ✅ Quest actions use TriggerSystem for spawning/effects
+  - ✅ No hardcoded trigger-like logic elsewhere
+
+- [x] **NPC Behaviors**: Clean behavior hierarchy ✅
+  - ⚠️ `example_mod.py` - example behavior (can keep as reference)
+  - ✅ All behaviors properly registered via `@behavior` decorator
+  - ✅ No duplicate logic across files
+
+### Dead Code Detection
+
+- [ ] **Unused Modules**: 
+  - ⚠️ `look_helpers.py` - Not imported anywhere (candidate for removal or integration)
+  - ⚠️ `debug_check.py` - Debug utility script (keep but document purpose)
+  
+- [x] **TODOs Found** (2 items):
+  - `world.py:663` - Instance-specific weapon stats (future enhancement)
+  - `quests.py:637` - ItemSystem integration for quest rewards (future enhancement)
+
+- [ ] **Debug Print Statements**: 50+ print statements for debugging
+  - Should convert to proper `logging` module usage
+
+### System Consolidation
+
+- [✅] **Loader Functions**: Clarify responsibilities
+  - `load_yaml.py` - Standalone script for initial DB population
+  - `loader.py` - Runtime loading into World/QuestSystem
+  - ⚠️ Duplicate quest/dialogue loading logic (load_yaml.py has unused functions)
+  
+- [✅] **Model Definitions**: 
+  - Database models in `models.py`
+  - In-memory dataclasses in `world.py` and system files
+  - Clear separation maintained
+
+### Documentation Sync
+
+- [ ] **Docstrings**: Generally good, some systems need updates
+- [ ] **Type Hints**: Most files have complete annotations
+- [ ] **Architecture Docs**: Update `ARCHITECTURE.md` to reflect Phase X additions
+
+### Items to Clean Up
+
+1. ✅ Remove or integrate `look_helpers.py` (orphaned module) - REMOVED
+2. ⬜ Convert print statements to logging (deferred - many are useful debug info)
+3. ✅ Remove unused functions from `load_yaml.py` - REMOVED 3 unused functions
+4. ✅ Update ARCHITECTURE.md with quest system - ADDED Game Systems section (3.4)
+- [ ] Create integration tests for cross-system interactions
+- [ ] Add regression tests for fixed bugs
+
+---
+
+## Phase 6 - Persistence & scaling  **COMPLETE**
 
 **Goals**: Don't lose progress on restart. Support more players in the future.
 
-### Backend tasks
+### Implementation Summary
 
-- Persistence strategy:
-    - Periodic snapshots of World state to DB.
-    - Replay of essential state on startup (players, items, NPC states).
-- Locking/concurrency:
-    - Right now this is a single-process system: engine's command queue already serializes state.
-- For horizontal scaling:
-    - Make WorldEngine a service (separate process),
-    - Access it via a message bus (Redis/NATS/etc.),
-    - Multiple FastAPI nodes talk to the same engine.
-- Session handling:
-    - One logical player  possibly multiple connections (mobile reconnect).
-- Decide what happens on disconnect:
-    - stay in world for N seconds,
-    - vanish immediately,
-    - AI autoplay, etc.
+#### StateTracker System (persistence.py)
+- ✅ Dirty entity tracking with `mark_dirty()` and `mark_dirty_sync()`
+- ✅ Periodic saves every 60 seconds via TimeEventManager integration
+- ✅ Critical saves (immediate) for player death, quest completion
+- ✅ Graceful shutdown saves all dirty entities
+- ✅ Entity types: players, rooms, NPCs, items, triggers
 
-## Phase 7 - Accounts, auth, and security
+#### Database Migrations (e1f2a3b4c5d6_phase6_persistence.py)
+- ✅ `player_effects` table - stores active effects for offline tick calculation
+- ✅ `ground_items` table - tracks dropped items with decay timers
+- ✅ `trigger_state` table - persists permanent trigger fire counts
+- ✅ `npc_state` table - persists companion/persistent NPC positions and health
+- ✅ Added `persist_state` column to `npc_templates`
+- ✅ Added `dropped_at` column to `item_instances`
+
+#### Effect Persistence (effects.py)
+- ✅ `save_player_effects()` - saves effects with remaining duration
+- ✅ `restore_player_effects()` - restores effects on login
+- ✅ Offline tick calculation for DoT/HoT effects
+- ✅ Integrated with player connect/disconnect lifecycle
+
+#### Item Decay System
+- ✅ `dropped_at` timestamp on WorldItem dataclass
+- ✅ Items dropped set timestamp for decay tracking
+- ✅ Periodic decay check (every 5 minutes)
+- ✅ Default 1-hour decay time for ground items
+
+#### Trigger State Persistence (triggers.py)
+- ✅ `permanent` flag on RoomTrigger dataclass
+- ✅ `save_permanent_trigger_states()` - saves fire counts to DB
+- ✅ `restore_permanent_trigger_states()` - restores on startup
+
+#### NPC State Persistence
+- ✅ `persist_state` flag on NpcTemplate dataclass
+- ✅ Persistent NPCs (companions) save position and health
+- ✅ `restore_persistent_npcs()` - restores NPC state on startup
+
+#### Disconnect Handling
+- ✅ Player stats saved on disconnect (existing)
+- ✅ Player effects saved on disconnect (new)
+- ✅ "Stasis" visual feedback for other players
+
+### Future Enhancements
+- Horizontal scaling via message bus (Redis/NATS)
+- Session handling for mobile reconnect
+- Multiple connections per player
+
+## Phase 7 - Accounts, auth, and security **COMPLETE**
 
 **Goals**: Move from "just a player_id" to real accounts.
 
-### Backend tasks
+### Implementation Complete
 
-- Accounts:
-    - UserAccount separate from Player (one user may have multiple characters).
-- Auth:
-    - Minimal JWT / token-based auth for API/WebSocket.
-    - WebSocket handshake includes a token, backend attaches player_id based on it.
-- Permissions:
-    - Basic GM/Admin roles for in-game commands.
+**Database Schema**
+-  `user_accounts` table: username, email, password_hash, role, active_character_id
+-  `refresh_tokens` table: token rotation for session management
+-  `security_events` table: audit log for logins, logouts, role changes
+-  `players.account_id` foreign key linking characters to accounts
+
+**AuthSystem (systems/auth.py)**
+-  UserRole enum: PLAYER, MODERATOR, GAME_MASTER, ADMIN
+-  Permission enum: granular permissions (MODIFY_STATS, SPAWN_ITEM, etc.)
+-  JWT-based authentication with 1-hour access tokens
+-  Refresh token rotation with 7-day expiry
+-  Argon2 password hashing via passlib
+-  `requires_role()` and `requires_permission()` decorators
+
+**HTTP Endpoints**
+-  POST `/auth/register` - Create new account
+-  POST `/auth/login` - Get access + refresh tokens
+-  POST `/auth/refresh` - Rotate tokens
+-  POST `/auth/logout` - Revoke refresh token
+-  GET `/auth/me` - Get current user info
+
+**Character Management**
+-  POST `/characters` - Create character (max 3 per account)
+-  GET `/characters` - List account's characters
+-  POST `/characters/{id}/select` - Set active character
+-  DELETE `/characters/{id}` - Delete character
+
+**WebSocket Authentication**
+-  `/ws/game/auth?token=<access_token>` - Authenticated endpoint
+-  Verifies JWT and loads active character
+-  Sets auth_info in context for permission checks
+-  Legacy `/ws/game?player_id=` still works (deprecated)
+
+**Permission Enforcement**
+-  Admin commands (heal, hurt) require GAME_MASTER role
+-  `_check_permission()` method in WorldEngine
+-  Denied commands return error message
+
+**Client Updates**
+-  Login/Register UI with httpx
+-  Authenticated WebSocket connection flow
+-  Legacy mode toggle for backward compatibility
 
 ## Phase 8 - Admin & content tools
 

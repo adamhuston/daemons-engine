@@ -315,14 +315,25 @@ class WorldArea:
     climate: str = "temperate"
     ambient_lighting: str = "normal"
     weather_profile: str = "clear"
-    danger_level: int = 1  # ADD THIS
-    magic_intensity: str = "normal"  # ADD THIS
+    danger_level: int = 1
+    magic_intensity: str = "normal"
     ambient_sound: str | None = None
     default_respawn_time: int = 300  # Area-wide default respawn time in seconds
     time_phases: dict[str, str] = field(default_factory=lambda: DEFAULT_TIME_PHASES.copy())
     entry_points: set[RoomId] = field(default_factory=set)
     room_ids: set[RoomId] = field(default_factory=set)
     neighbor_areas: set[AreaId] = field(default_factory=set)
+    
+    # ---------- Phase 5.4: Area Enhancements ----------
+    # Level range recommendation for players
+    recommended_level: tuple[int, int] = (1, 10)  # (min_level, max_level)
+    # Theme identifier for client rendering, music, etc.
+    theme: str = "default"
+    # Arbitrary area state flags (set/read by triggers)
+    area_flags: Dict[str, Any] = field(default_factory=dict)
+    # Area-level triggers (on_area_enter, on_area_exit)
+    triggers: list = field(default_factory=list)  # List[RoomTrigger] 
+    trigger_states: Dict[str, Any] = field(default_factory=dict)  # Dict[str, TriggerState]
 
 
 @dataclass
@@ -881,6 +892,9 @@ class WorldItem:
     equipped_slot: str | None = None
     instance_data: dict = field(default_factory=dict)
     
+    # Persistence fields (Phase 6)
+    dropped_at: float | None = None  # Unix timestamp when dropped on ground (for decay)
+    
     # Cached description from template
     _description: str = ""
     
@@ -986,6 +1000,10 @@ class NpcTemplate:
     idle_messages: list  # Random messages NPC says when idle
     keywords: list  # For targeting: ["goblin", "warrior"]
     
+    # Phase 6: Persistence - if True, NPC state survives server restarts
+    # Used for companions, unique bosses, escort targets
+    persist_state: bool = False
+    
     # Resolved behavior config (populated at load time from behavior tags)
     resolved_behavior: dict = field(default_factory=dict)
 
@@ -1060,6 +1078,16 @@ class WorldPlayer(WorldEntity):
     # Connection state - whether player is actively connected
     is_connected: bool = False
     
+    # Quest tracking (Phase X)
+    quest_progress: Dict[str, Any] = field(default_factory=dict)  # quest_id -> QuestProgress
+    completed_quests: Set[str] = field(default_factory=set)       # Set of completed quest IDs
+    player_flags: Dict[str, Any] = field(default_factory=dict)    # Persistent player flags for quests
+    
+    # Dialogue state (Phase X.2)
+    active_dialogue: str | None = None           # NPC template ID of dialogue in progress
+    dialogue_node: str | None = None             # Current node ID in dialogue tree
+    active_dialogue_npc_id: str | None = None    # Instance ID of NPC being talked to
+    
     def __post_init__(self):
         """Ensure entity_type is set correctly."""
         object.__setattr__(self, 'entity_type', EntityType.PLAYER)
@@ -1086,6 +1114,41 @@ class WorldRoom:
     time_scale: float = 1.0  # e.g., 2.0 = double speed, 0.5 = half speed, 0.0 = frozen
     # Items in this room
     items: Set[ItemId] = field(default_factory=set)
+    
+    # ---------- Phase 5: Trigger System ----------
+    # Triggers respond to events (on_enter, on_exit, on_command, on_timer)
+    triggers: list = field(default_factory=list)  # List[RoomTrigger] - imported at runtime
+    # Runtime state for each trigger (fire_count, cooldowns, etc.)
+    trigger_states: Dict[str, Any] = field(default_factory=dict)  # Dict[str, TriggerState]
+    # Dynamic exits that can be opened/closed by triggers
+    dynamic_exits: Dict[Direction, RoomId] = field(default_factory=dict)
+    # Dynamic description override (set by triggers)
+    dynamic_description: str | None = None
+    # Arbitrary room state flags (set/read by triggers)
+    room_flags: Dict[str, Any] = field(default_factory=dict)
+    
+    def get_effective_exits(self) -> Dict[Direction, RoomId]:
+        """
+        Get all available exits, including dynamic ones.
+        
+        Dynamic exits override base exits for the same direction.
+        A dynamic exit set to None means the exit is closed (even if it exists in base).
+        """
+        # Start with base exits
+        effective = dict(self.exits)
+        # Overlay dynamic exits (None = closed)
+        for direction, target in self.dynamic_exits.items():
+            if target is None:
+                # Close the exit
+                effective.pop(direction, None)
+            else:
+                # Open/change the exit
+                effective[direction] = target
+        return effective
+    
+    def get_effective_description(self) -> str:
+        """Get the room description, using dynamic override if set."""
+        return self.dynamic_description if self.dynamic_description else self.description
 
 
 @dataclass

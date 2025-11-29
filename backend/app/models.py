@@ -47,6 +47,9 @@ class Player(Base):
     name: Mapped[str] = mapped_column(String, unique=True)
     current_room_id: Mapped[str] = mapped_column(String, ForeignKey("rooms.id"))
     
+    # Account linkage (Phase 7)
+    account_id: Mapped[str | None] = mapped_column(String, ForeignKey("user_accounts.id", ondelete="SET NULL"), nullable=True, index=True)
+    
     # Character class/archetype
     character_class: Mapped[str] = mapped_column(String, nullable=False, server_default="adventurer")
     level: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
@@ -67,6 +70,11 @@ class Player(Base):
 
     # Misc data (flags, temporary effects, etc.)
     data: Mapped[dict] = mapped_column(JSON, default=dict)
+    
+    # Quest system (Phase X)
+    player_flags: Mapped[dict] = mapped_column(JSON, default=dict)       # Persistent player flags for quests
+    quest_progress: Mapped[dict] = mapped_column(JSON, default=dict)     # quest_id -> QuestProgress dict
+    completed_quests: Mapped[list] = mapped_column(JSON, default=list)   # List of completed quest IDs
 
 
 class Area(Base):
@@ -259,3 +267,129 @@ class NpcInstance(Base):
     
     # Instance-specific overrides (JSON: custom name, modified stats, etc.)
     instance_data: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+# === Phase 6: Persistence Tables ===
+
+class PlayerEffect(Base):
+    """
+    Active effects on a player that persist across disconnects.
+    
+    Effects continue ticking while offline (can expire), so we store
+    the absolute expiration timestamp rather than remaining duration.
+    """
+    __tablename__ = "player_effects"
+    
+    player_id: Mapped[str] = mapped_column(String, ForeignKey("players.id"), primary_key=True)
+    effect_id: Mapped[str] = mapped_column(String, primary_key=True)
+    effect_type: Mapped[str] = mapped_column(String, nullable=False)  # buff, debuff, dot, hot
+    effect_data: Mapped[dict] = mapped_column(JSON, nullable=True)  # Full effect serialization
+    expires_at: Mapped[float] = mapped_column(Float, nullable=False)  # Unix timestamp
+    created_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class RoomState(Base):
+    """
+    Runtime room state that persists across server restarts.
+    
+    Stores flags, dynamic exits, and descriptions that change during gameplay.
+    """
+    __tablename__ = "room_state"
+    
+    room_id: Mapped[str] = mapped_column(String, ForeignKey("rooms.id"), primary_key=True)
+    room_flags: Mapped[dict] = mapped_column(JSON, default=dict)
+    dynamic_exits: Mapped[dict] = mapped_column(JSON, default=dict)
+    dynamic_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class TriggerState(Base):
+    """
+    Fire counts for permanent triggers.
+    
+    Only permanent triggers are saved here. Non-permanent triggers reset on restart.
+    """
+    __tablename__ = "trigger_state"
+    
+    trigger_id: Mapped[str] = mapped_column(String, primary_key=True)
+    scope: Mapped[str] = mapped_column(String, primary_key=True)  # 'room', 'area', or 'global'
+    scope_id: Mapped[str] = mapped_column(String, primary_key=True)  # room_id or area_id
+    fire_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    last_fired_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class NpcState(Base):
+    """
+    Runtime state for persistent NPCs (companions, unique bosses, escort targets).
+    
+    Only NPCs with persist_state=True in their template are saved here.
+    """
+    __tablename__ = "npc_state"
+    
+    instance_id: Mapped[str] = mapped_column(String, primary_key=True)
+    template_id: Mapped[str] = mapped_column(String, ForeignKey("npc_templates.id"), nullable=False)
+    current_room_id: Mapped[str | None] = mapped_column(String, ForeignKey("rooms.id"), nullable=True)
+    current_hp: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_alive: Mapped[bool] = mapped_column(Integer, nullable=False, server_default="1")
+    owner_player_id: Mapped[str | None] = mapped_column(String, ForeignKey("players.id"), nullable=True)  # For companions
+    instance_data: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+# === Phase 7: Authentication & Security Tables ===
+
+class UserAccount(Base):
+    """
+    User account for authentication.
+    
+    Accounts are separate from characters (Players) - one account can have
+    multiple characters. The active_character_id tracks which character
+    the user is currently playing.
+    """
+    __tablename__ = "user_accounts"
+    
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    username: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False, server_default="player")
+    is_active: Mapped[bool] = mapped_column(Integer, nullable=False, server_default="1")
+    created_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # Unix timestamp
+    last_login: Mapped[float | None] = mapped_column(Float, nullable=True)  # Unix timestamp
+    active_character_id: Mapped[str | None] = mapped_column(String, nullable=True)  # FK to players.id
+
+
+class RefreshToken(Base):
+    """
+    Refresh tokens for session management.
+    
+    Stores hashed refresh tokens with expiration and rotation support.
+    Tokens can be revoked individually or all tokens for an account.
+    """
+    __tablename__ = "refresh_tokens"
+    
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    account_id: Mapped[str] = mapped_column(String, ForeignKey("user_accounts.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    expires_at: Mapped[float] = mapped_column(Float, nullable=False)  # Unix timestamp
+    created_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # Unix timestamp
+    revoked: Mapped[bool] = mapped_column(Integer, nullable=False, server_default="0")
+    device_info: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class SecurityEvent(Base):
+    """
+    Audit log for security-relevant events.
+    
+    Tracks login attempts, password changes, permission changes, etc.
+    Used for security monitoring and debugging authentication issues.
+    """
+    __tablename__ = "security_events"
+    
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    account_id: Mapped[str | None] = mapped_column(String, ForeignKey("user_accounts.id", ondelete="SET NULL"), nullable=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)  # IPv6 max length
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    timestamp: Mapped[float] = mapped_column(Float, nullable=False, index=True)  # Unix timestamp

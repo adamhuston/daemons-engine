@@ -272,5 +272,6 @@ async def load_data():
         
         print("\n✅ All world data loaded!")
 
+
 if __name__ == "__main__":
     asyncio.run(load_data())

@@ -185,6 +185,11 @@ class CommandRouter:
         if not raw:
             return []
         
+        # Check if player is in dialogue mode (Phase X.2)
+        player = self.engine.world.players.get(player_id)
+        if player and player.active_dialogue:
+            return self._handle_dialogue_input(player_id, raw)
+        
         # Split into command and arguments
         parts = raw.split(maxsplit=1)
         cmd_name = parts[0].lower()
@@ -192,6 +197,11 @@ class CommandRouter:
         
         # Look up command
         if cmd_name not in self.commands:
+            # Check room triggers before returning unknown command
+            trigger_events = self._check_room_triggers(player_id, raw_command)
+            if trigger_events:
+                return trigger_events
+            
             return [self.engine._msg_to_player(
                 player_id,
                 "You mutter something unintelligible. (Unknown command)"
@@ -209,6 +219,41 @@ class CommandRouter:
                 player_id,
                 "Something went wrong executing that command."
             )]
+    
+    def _check_room_triggers(self, player_id: str, raw_command: str) -> List['Event']:
+        """
+        Check if the player's room has a trigger that matches the command.
+        
+        Args:
+            player_id: The player executing the command
+            raw_command: The raw command string
+            
+        Returns:
+            List of events if a trigger matched, empty list otherwise
+        """
+        # Get player's current room
+        player = self.engine.world.players.get(player_id)
+        if not player:
+            return []
+        
+        room_id = player.room_id
+        
+        # Check if trigger system exists
+        if not hasattr(self.engine, 'trigger_system'):
+            return []
+        
+        # Import TriggerContext here to avoid circular import
+        from .triggers import TriggerContext
+        
+        trigger_ctx = TriggerContext(
+            player_id=player_id,
+            room_id=room_id,
+            world=self.engine.world,
+            event_type="on_command",
+            raw_command=raw_command,
+        )
+        
+        return self.engine.trigger_system.fire_command(room_id, raw_command, trigger_ctx)
     
     def get_help(self, category: Optional[str] = None) -> str:
         """
@@ -250,3 +295,31 @@ class CommandRouter:
             lines.append("")
         
         return "\n".join(lines)
+    
+    def _handle_dialogue_input(self, player_id: str, raw: str) -> List['Event']:
+        """
+        Handle input when player is in dialogue mode.
+        
+        Args:
+            player_id: The player in dialogue
+            raw: Raw input string
+        
+        Returns:
+            List of events
+        """
+        raw_lower = raw.lower().strip()
+        
+        # Exit commands
+        if raw_lower in ("bye", "farewell", "leave", "exit", "goodbye"):
+            return self.engine.quest_system.end_dialogue(player_id)
+        
+        # Number selection (1, 2, 3, etc.)
+        if raw.isdigit():
+            option_num = int(raw)
+            return self.engine.quest_system.select_option(player_id, option_num)
+        
+        # Invalid input while in dialogue
+        return [self.engine._msg_to_player(
+            player_id,
+            "You're in a conversation. Enter a number (1, 2, 3...) to respond, or 'bye' to leave."
+        )]

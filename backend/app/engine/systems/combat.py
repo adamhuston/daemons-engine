@@ -729,6 +729,11 @@ class CombatSystem:
                     f"✨ You gain {xp_reward} experience!"
                 ))
                 
+                # Hook: Quest system KILL objective tracking
+                if self.ctx.quest_system:
+                    quest_events = self.ctx.quest_system.on_npc_killed(killer_id, npc.template_id)
+                    events.extend(quest_events)
+                
                 # Check for level-up
                 level_ups = killer_player.check_level_up()
                 for level_data in level_ups:
@@ -783,6 +788,14 @@ class CombatSystem:
             # Schedule respawn countdown via engine
             if self.ctx.engine:
                 self.ctx.engine.schedule_player_respawn(victim_id, countdown_seconds=10)
+            
+            # Phase 6: Critical save on player death
+            if self.ctx.state_tracker:
+                from .persistence import ENTITY_PLAYER
+                await_coro = self.ctx.state_tracker.mark_dirty(ENTITY_PLAYER, victim_id, critical=True)
+                # Since we're in sync context, schedule the async critical save
+                import asyncio
+                asyncio.create_task(await_coro)
         
         return events
     

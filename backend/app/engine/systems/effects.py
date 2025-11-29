@@ -380,3 +380,158 @@ class EffectSystem:
                     ])
         
         return expiration_callback
+
+    # ---------- Phase 6: Effect Persistence ----------
+    
+    async def save_player_effects(
+        self, 
+        session: Any,
+        player_id: str
+    ) -> None:
+        """
+        Save a player's active effects to database.
+        
+        Called during periodic saves and critical saves.
+        """
+        from sqlalchemy import text
+        import time
+        import json
+        
+        player = self.ctx.world.players.get(player_id)
+        if not player:
+            return
+        
+        # Delete existing effects for this player
+        await session.execute(
+            text("DELETE FROM player_effects WHERE player_id = :player_id"),
+            {"player_id": player_id}
+        )
+        
+        # Insert current active effects
+        for effect_id, effect in player.active_effects.items():
+            # Calculate remaining duration
+            remaining_duration = 0.0
+            if effect.duration > 0 and hasattr(effect, 'applied_at'):
+                elapsed = time.time() - effect.applied_at
+                remaining_duration = max(0, effect.duration - elapsed)
+            elif effect.duration > 0:
+                # If no applied_at, use full duration (shouldn't happen)
+                remaining_duration = effect.duration
+            
+            await session.execute(
+                text("""
+                    INSERT INTO player_effects 
+                    (player_id, effect_id, effect_name, effect_type, stat_modifiers,
+                     remaining_duration, magnitude, tick_interval, ticks_applied, saved_at)
+                    VALUES (:player_id, :effect_id, :effect_name, :effect_type, :stat_modifiers,
+                            :remaining_duration, :magnitude, :tick_interval, :ticks_applied, :saved_at)
+                """),
+                {
+                    "player_id": player_id,
+                    "effect_id": effect_id,
+                    "effect_name": effect.name,
+                    "effect_type": effect.effect_type,
+                    "stat_modifiers": json.dumps(effect.stat_modifiers),
+                    "remaining_duration": remaining_duration,
+                    "magnitude": effect.magnitude,
+                    "tick_interval": effect.interval,
+                    "ticks_applied": getattr(effect, 'ticks_applied', 0),
+                    "saved_at": time.time(),
+                }
+            )
+    
+    async def restore_player_effects(
+        self,
+        session: Any,
+        player_id: str
+    ) -> List[Event]:
+        """
+        Restore a player's effects from database on login.
+        
+        Calculates offline ticks for DoT/HoT effects and applies
+        any remaining effect duration.
+        
+        Returns events to notify player of restored effects.
+        """
+        from sqlalchemy import text
+        import time
+        import json
+        
+        events: List[Event] = []
+        player = self.ctx.world.players.get(player_id)
+        if not player:
+            return events
+        
+        result = await session.execute(
+            text("SELECT * FROM player_effects WHERE player_id = :player_id"),
+            {"player_id": player_id}
+        )
+        rows = result.fetchall()
+        
+        if not rows:
+            return events
+        
+        now = time.time()
+        restored_effects = []
+        
+        for row in rows:
+            saved_at = row.saved_at
+            offline_duration = now - saved_at
+            remaining = row.remaining_duration - offline_duration
+            
+            if remaining <= 0:
+                # Effect would have expired while offline
+                continue
+            
+            # Calculate offline DoT/HoT ticks
+            if row.magnitude != 0 and row.tick_interval > 0:
+                offline_ticks = int(offline_duration / row.tick_interval)
+                total_damage_healed = offline_ticks * row.magnitude
+                
+                if row.effect_type == "dot":
+                    # Apply poison damage from offline ticks
+                    player.current_hp = max(1, player.current_hp - total_damage_healed)
+                    if total_damage_healed > 0:
+                        events.append(self.ctx.msg_to_player(
+                            player_id,
+                            f"☠️ You took {total_damage_healed} poison damage while offline."
+                        ))
+                elif row.effect_type == "hot":
+                    # Apply healing from offline ticks
+                    player.current_hp = min(player.max_hp, player.current_hp + total_damage_healed)
+                    if total_damage_healed > 0:
+                        events.append(self.ctx.msg_to_player(
+                            player_id,
+                            f"💚 You recovered {total_damage_healed} HP from lingering healing effects."
+                        ))
+            
+            # Re-apply effect with remaining duration
+            stat_mods = json.loads(row.stat_modifiers) if row.stat_modifiers else {}
+            
+            effect_id = self.apply_effect(
+                entity_id=player_id,
+                effect_name=row.effect_name,
+                effect_type=row.effect_type,
+                duration=remaining,
+                stat_modifiers=stat_mods,
+                magnitude=row.magnitude,
+                interval=row.tick_interval,
+            )
+            
+            if effect_id:
+                restored_effects.append(row.effect_name)
+        
+        # Delete restored effects from database
+        await session.execute(
+            text("DELETE FROM player_effects WHERE player_id = :player_id"),
+            {"player_id": player_id}
+        )
+        
+        if restored_effects:
+            effect_list = ", ".join(restored_effects)
+            events.append(self.ctx.msg_to_player(
+                player_id,
+                f"🔄 Restored effects: {effect_list}"
+            ))
+        
+        return events

@@ -49,9 +49,17 @@ class GameContext:
         
         # System references (set by WorldEngine during initialization)
         self.time_manager: Any = None  # TimeEventManager
-        self.combat_system: Any = None  # CombatSystem (future)
-        self.effect_system: Any = None  # EffectSystem (future)
-        self.event_dispatcher: Any = None  # EventDispatcher (future)
+        self.combat_system: Any = None  # CombatSystem
+        self.effect_system: Any = None  # EffectSystem
+        self.event_dispatcher: Any = None  # EventDispatcher
+        self.trigger_system: Any = None  # TriggerSystem
+        self.quest_system: Any = None  # QuestSystem
+        self.state_tracker: Any = None  # StateTracker (Phase 6)
+        self.auth_system: Any = None  # AuthSystem (Phase 7)
+        
+        # Per-request auth info (set during WebSocket message handling)
+        # Contains {"user_id": str, "role": str} from verified JWT
+        self.auth_info: dict | None = None
     
     # ---------- Event Dispatch Helpers ----------
     
