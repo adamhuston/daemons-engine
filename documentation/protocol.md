@@ -1,6 +1,6 @@
 # WebSocket Protocol Documentation
 
-This document describes the communication protocol between the dungeon crawler client and server.
+This document describes the communication protocol between a Daemons engine server and a Daemons client (like Scry)
 
 ## Connection
 
@@ -491,6 +491,1125 @@ Items:
 **Container System:**
 - Items can contain other items (e.g., backpacks)
 - `put <item> in <container>` / `get <item> from <container>`
+
+## REST API Endpoints
+
+The server exposes REST endpoints for authentication, character management, and administrative functions. All endpoints use JSON for request/response bodies unless otherwise specified.
+
+### Base URL
+`http://host:port`
+
+### Authentication Endpoints
+
+#### POST /auth/register
+Register a new user account.
+
+**Request:**
+```json
+{
+  "username": "string (3-32 chars)",
+  "password": "string (8-128 chars)",
+  "email": "string (optional)"
+}
+```
+
+**Response (200):**
+```json
+{
+  "user_id": "uuid",
+  "username": "string",
+  "message": "Account created successfully"
+}
+```
+
+#### POST /auth/login
+Authenticate and receive JWT tokens.
+
+**Request:**
+```json
+{
+  "username": "string",
+  "password": "string"
+}
+```
+
+**Response (200):**
+```json
+{
+  "access_token": "jwt_token",
+  "refresh_token": "jwt_token",
+  "token_type": "bearer",
+  "user_id": "uuid",
+  "username": "string",
+  "role": "player|moderator|game_master|admin",
+  "active_character_id": "uuid|null"
+}
+```
+
+**Error (401):**
+```json
+{
+  "detail": "Invalid credentials"
+}
+```
+
+#### POST /auth/refresh
+Refresh access token using refresh token (implements token rotation).
+
+**Request:**
+```json
+{
+  "refresh_token": "jwt_token"
+}
+```
+
+**Response (200):**
+```json
+{
+  "access_token": "new_jwt_token",
+  "refresh_token": "new_refresh_token",
+  "token_type": "bearer"
+}
+```
+
+#### POST /auth/logout
+Logout by revoking refresh token for current device.
+
+**Request:**
+```json
+{
+  "refresh_token": "jwt_token"
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+#### GET /auth/me
+Get current user information from access token.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "user_id": "uuid",
+  "username": "string",
+  "email": "string|null",
+  "role": "player|moderator|game_master|admin",
+  "is_active": true,
+  "active_character_id": "uuid|null",
+  "characters": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "level": 1,
+      "character_class": "string"
+    }
+  ]
+}
+```
+
+### Character Management Endpoints
+
+All character endpoints require authentication via `Authorization: Bearer <access_token>` header.
+
+#### POST /characters
+Create a new character for the authenticated account (max 3 per account).
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request:**
+```json
+{
+  "name": "string (2-32 chars)",
+  "character_class": "string (default: adventurer)"
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "level": 1,
+  "character_class": "string",
+  "current_room_id": "room_1_1_1"
+}
+```
+
+**Error (400):**
+```json
+{
+  "detail": "Character name already taken"
+}
+```
+
+#### GET /characters
+List all characters for the authenticated account.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "characters": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "level": 1,
+      "character_class": "string",
+      "current_room_id": "string",
+      "is_active": true
+    }
+  ]
+}
+```
+
+#### POST /characters/{character_id}/select
+Set a character as the active character for the account.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "message": "Character selected",
+  "active_character_id": "uuid"
+}
+```
+
+#### DELETE /characters/{character_id}
+Permanently delete a character.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "message": "Character deleted",
+  "character_id": "uuid"
+}
+```
+
+### Admin API Endpoints
+
+All admin endpoints require authentication with elevated roles and use the `/api/admin` prefix.
+
+**Required Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Role Requirements:**
+- **MODERATOR**: Basic admin operations (view data, kick players)
+- **GAME_MASTER**: Content management (spawn NPCs/items, modify stats, reload content)
+- **ADMIN**: Server administration (shutdown, maintenance mode, account management)
+
+#### Server Management
+
+##### GET /api/admin/server/status
+Get current server status and metrics.
+
+**Requires:** MODERATOR+
+
+**Response (200):**
+```json
+{
+  "uptime_seconds": 12345.67,
+  "players_online": 5,
+  "players_in_combat": 2,
+  "npcs_alive": 30,
+  "rooms_total": 100,
+  "rooms_occupied": 8,
+  "areas_total": 5,
+  "scheduled_events": 42,
+  "next_event_in_seconds": 3.5,
+  "maintenance_mode": false,
+  "maintenance_reason": null,
+  "shutdown_pending": false,
+  "shutdown_at": null,
+  "shutdown_reason": null,
+  "content_version": "1.0.0",
+  "server_time": 1638360000.0
+}
+```
+
+##### POST /api/admin/server/maintenance
+Enable or disable maintenance mode.
+
+**Requires:** ADMIN (Permission.SERVER_COMMANDS)
+
+**Request:**
+```json
+{
+  "enabled": true,
+  "reason": "Scheduled maintenance",
+  "kick_players": false
+}
+```
+
+**Response (200):**
+```json
+{
+  "enabled": true,
+  "reason": "Scheduled maintenance",
+  "enabled_at": 1638360000.0,
+  "players_kicked": 0
+}
+```
+
+##### POST /api/admin/server/shutdown
+Initiate graceful server shutdown with countdown.
+
+**Requires:** ADMIN (Permission.SERVER_COMMANDS)
+
+**Request:**
+```json
+{
+  "countdown_seconds": 60,
+  "reason": "Server restart for updates"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "countdown_seconds": 60,
+  "shutdown_at": 1638360060.0,
+  "reason": "Server restart for updates",
+  "players_warned": 5
+}
+```
+
+##### POST /api/admin/server/shutdown/cancel
+Cancel a pending shutdown.
+
+**Requires:** ADMIN
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Shutdown cancelled"
+}
+```
+
+##### GET /api/admin/server/metrics
+Get Prometheus-format metrics for monitoring.
+
+**Requires:** MODERATOR+
+
+**Response (200):** Prometheus text exposition format
+
+**Example Prometheus scrape config:**
+```yaml
+scrape_configs:
+  - job_name: 'daemons'
+    static_configs:
+      - targets: ['localhost:8000']
+    metrics_path: '/api/admin/server/metrics'
+    bearer_token: '<admin_jwt_token>'
+```
+
+##### POST /api/admin/server/broadcast
+Broadcast a message to all connected players.
+
+**Requires:** MODERATOR+ (Permission.KICK_PLAYER)
+
+**Request:**
+```json
+{
+  "message": "Server restart in 5 minutes",
+  "sender_name": "SYSTEM"
+}
+```
+
+#### World Inspection
+
+##### GET /api/admin/world/players
+List all online players.
+
+**Requires:** MODERATOR+
+
+**Response (200):**
+```json
+[
+  {
+    "id": "uuid",
+    "name": "PlayerName",
+    "room_id": "room_1_1_1",
+    "level": 5,
+    "current_health": 85,
+    "max_health": 100,
+    "is_connected": true,
+    "in_combat": false
+  }
+]
+```
+
+##### GET /api/admin/world/players/{player_id}
+Get detailed information about a specific player.
+
+**Requires:** MODERATOR+
+
+##### GET /api/admin/world/rooms
+List all rooms, optionally filtered by area.
+
+**Requires:** MODERATOR+
+
+**Query Parameters:**
+- `area_id` (optional): Filter by area ID
+
+**Response (200):**
+```json
+[
+  {
+    "id": "room_1_1_1",
+    "name": "Central Chamber",
+    "area_id": "ethereal_nexus",
+    "player_count": 2,
+    "npc_count": 1,
+    "item_count": 3,
+    "exits": {"north": "room_1_1_2", "south": "room_1_1_0"}
+  }
+]
+```
+
+##### GET /api/admin/world/rooms/{room_id}
+Get detailed information about a specific room.
+
+**Requires:** MODERATOR+
+
+**Response (200):**
+```json
+{
+  "id": "room_1_1_1",
+  "name": "Central Chamber",
+  "description": "A mystical chamber...",
+  "room_type": "ethereal",
+  "area_id": "ethereal_nexus",
+  "exits": {"north": "room_1_1_2"},
+  "dynamic_exits": {},
+  "players": ["player_uuid_1"],
+  "npcs": ["npc_uuid_1"],
+  "items": ["item_uuid_1"],
+  "flags": {},
+  "triggers": ["trigger_1"]
+}
+```
+
+##### PUT /api/admin/world/rooms/{room_id}
+Update a room's properties.
+
+**Requires:** GAME_MASTER+ (Permission.MODIFY_WORLD)
+
+**Request:**
+```json
+{
+  "name": "New Room Name",
+  "description": "Updated description",
+  "room_type": "forest",
+  "on_enter_effect": "You feel a chill",
+  "on_exit_effect": null
+}
+```
+
+##### POST /api/admin/world/rooms
+Create a new room.
+
+**Requires:** GAME_MASTER+ (Permission.MODIFY_WORLD)
+
+**Request:**
+```json
+{
+  "id": "custom_room_1",
+  "name": "Custom Room",
+  "description": "A custom room",
+  "room_type": "urban",
+  "area_id": "my_area",
+  "exits": {"north": "room_1_1_1"}
+}
+```
+
+##### PATCH /api/admin/world/rooms/{room_id}/exits
+Update a room's exits.
+
+**Requires:** GAME_MASTER+ (Permission.MODIFY_WORLD)
+
+**Request:**
+```json
+{
+  "exits": {
+    "north": "target_room_id",
+    "south": null
+  },
+  "bidirectional": true
+}
+```
+
+##### POST /api/admin/world/rooms/{room_id}/reset-yaml-managed
+Reset a YAML-managed room to its original configuration.
+
+**Requires:** GAME_MASTER+
+
+##### GET /api/admin/world/areas
+List all areas.
+
+**Requires:** MODERATOR+
+
+**Response (200):**
+```json
+[
+  {
+    "id": "ethereal_nexus",
+    "name": "Ethereal Nexus",
+    "room_count": 50,
+    "player_count": 3,
+    "time_scale": 4.0
+  }
+]
+```
+
+##### GET /api/admin/world/npcs
+List all NPCs.
+
+**Requires:** MODERATOR+
+
+##### GET /api/admin/world/items
+List all items.
+
+**Requires:** MODERATOR+
+
+##### GET /api/admin/world/state
+Get complete world state snapshot (for debugging/dashboards).
+
+**Requires:** MODERATOR+
+
+#### Player Management
+
+##### POST /api/admin/players/{player_id}/teleport
+Teleport a player to a different room.
+
+**Requires:** GAME_MASTER+ (Permission.MODIFY_STATS)
+
+**Request:**
+```json
+{
+  "room_id": "target_room"
+}
+```
+
+##### POST /api/admin/players/{player_id}/heal
+Heal a player.
+
+**Requires:** GAME_MASTER+ (Permission.MODIFY_STATS)
+
+**Request:**
+```json
+{
+  "amount": 50
+}
+```
+
+##### POST /api/admin/players/{player_id}/kick
+Kick a player from the server.
+
+**Requires:** MODERATOR+ (Permission.KICK_PLAYER)
+
+##### POST /api/admin/players/{player_id}/give
+Give an item to a player.
+
+**Requires:** GAME_MASTER+ (Permission.SPAWN_ITEM)
+
+**Request:**
+```json
+{
+  "template_id": "health_potion",
+  "quantity": 5
+}
+```
+
+##### POST /api/admin/players/{player_id}/effect
+Apply a temporary effect (buff/debuff) to a player.
+
+**Requires:** GAME_MASTER+ (Permission.MODIFY_STATS)
+
+**Request:**
+```json
+{
+  "effect_name": "buff_strength",
+  "duration": 60,
+  "magnitude": 0
+}
+```
+
+##### POST /api/admin/players/{player_id}/kill
+Instantly kill a player.
+
+**Requires:** GAME_MASTER+ (Permission.MODIFY_STATS)
+
+##### POST /api/admin/players/{player_id}/message
+Send a direct message to a player.
+
+**Requires:** MODERATOR+ (Permission.KICK_PLAYER)
+
+**Request:**
+```json
+{
+  "message": "Please follow server rules",
+  "sender_name": "MODERATOR"
+}
+```
+
+#### Entity Spawning
+
+##### POST /api/admin/npcs/spawn
+Spawn an NPC in a room.
+
+**Requires:** GAME_MASTER+ (Permission.SPAWN_NPC)
+
+**Request:**
+```json
+{
+  "template_id": "goblin_scout",
+  "room_id": "room_1_1_1"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Spawned Goblin Scout in Central Chamber",
+  "npc_id": "uuid",
+  "room_id": "room_1_1_1"
+}
+```
+
+##### DELETE /api/admin/npcs/{npc_id}
+Despawn an NPC.
+
+**Requires:** GAME_MASTER+ (Permission.SPAWN_NPC)
+
+##### POST /api/admin/items/spawn
+Spawn an item in a room.
+
+**Requires:** GAME_MASTER+ (Permission.SPAWN_ITEM)
+
+**Request:**
+```json
+{
+  "template_id": "rusty_sword",
+  "room_id": "room_1_1_1",
+  "quantity": 1
+}
+```
+
+##### DELETE /api/admin/items/{item_id}
+Despawn an item.
+
+**Requires:** GAME_MASTER+ (Permission.SPAWN_ITEM)
+
+##### POST /api/admin/npcs/{npc_id}/move
+Move an NPC to a different room.
+
+**Requires:** GAME_MASTER+ (Permission.SPAWN_NPC)
+
+**Request:**
+```json
+{
+  "target_room_id": "room_1_1_2",
+  "reason": "Admin relocation"
+}
+```
+
+##### POST /api/admin/items/{item_id}/move
+Move an item to a different location.
+
+**Requires:** GAME_MASTER+ (Permission.SPAWN_ITEM)
+
+#### Content Management
+
+##### POST /api/admin/content/reload
+Hot-reload content from YAML files without restarting the server.
+
+**Requires:** ADMIN
+
+**Request:**
+```json
+{
+  "content_type": "all|areas|rooms|items|npcs|item_templates|npc_templates",
+  "file_path": "/path/to/file.yaml (optional)",
+  "force": false
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "content_type": "all",
+  "items_loaded": 45,
+  "items_updated": 12,
+  "items_failed": 0,
+  "errors": []
+}
+```
+
+##### POST /api/admin/content/validate
+Validate YAML content files without loading them.
+
+**Requires:** GAME_MASTER+
+
+**Request:**
+```json
+{
+  "content_type": "rooms|items|npcs|areas",
+  "file_path": "/path/to/file.yaml (optional)"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "content_type": "rooms",
+  "files_checked": 10,
+  "files_valid": 9,
+  "files_invalid": 1,
+  "results": [
+    {
+      "file_path": "/path/to/room.yaml",
+      "is_valid": false,
+      "errors": ["Missing required field: description"]
+    }
+  ]
+}
+```
+
+##### GET /api/admin/classes
+Get all loaded character classes.
+
+**Requires:** MODERATOR+
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "count": 3,
+  "classes": [
+    {
+      "class_id": "warrior",
+      "name": "Warrior",
+      "description": "A strong melee fighter",
+      "base_stats": {...},
+      "available_abilities": ["slash", "power_attack"]
+    }
+  ]
+}
+```
+
+##### GET /api/admin/abilities
+Get all loaded abilities.
+
+**Requires:** MODERATOR+
+
+##### POST /api/admin/classes/reload
+Hot-reload character classes and abilities from YAML.
+
+**Requires:** GAME_MASTER+ (Permission.SERVER_COMMANDS)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "detail": "Classes and abilities reloaded successfully",
+  "classes_loaded": 3,
+  "abilities_loaded": 15,
+  "behavior_count": 10
+}
+```
+
+#### Account Management
+
+##### GET /api/admin/accounts
+List user accounts with pagination and filters.
+
+**Requires:** ADMIN
+
+**Query Parameters:**
+- `limit`, `offset`: Pagination
+- `role`, `is_banned`, `is_active`: Filters
+
+##### GET /api/admin/accounts/{account_id}
+Get detailed account information.
+
+**Requires:** ADMIN
+
+##### PUT /api/admin/accounts/{account_id}/role
+Change an account's role.
+
+**Requires:** ADMIN
+
+**Request:**
+```json
+{
+  "role": "moderator|game_master|admin|player"
+}
+```
+
+##### POST /api/admin/accounts/{account_id}/ban
+Ban an account.
+
+**Requires:** ADMIN
+
+**Request:**
+```json
+{
+  "reason": "Violation of terms",
+  "duration_hours": 168,
+  "is_permanent": false
+}
+```
+
+##### POST /api/admin/accounts/{account_id}/unban
+Unban an account.
+
+**Requires:** ADMIN
+
+##### GET /api/admin/accounts/{account_id}/security-events
+Get security events for an account.
+
+**Requires:** ADMIN
+
+#### Trigger Management
+
+##### GET /api/admin/triggers/rooms/{room_id}
+Get all triggers in a room.
+
+**Requires:** GAME_MASTER+
+
+##### POST /api/admin/triggers/{trigger_id}/fire
+Manually fire a trigger.
+
+**Requires:** GAME_MASTER+
+
+##### POST /api/admin/triggers/{trigger_id}/enable
+Enable a trigger.
+
+**Requires:** GAME_MASTER+
+
+##### POST /api/admin/triggers/{trigger_id}/disable
+Disable a trigger.
+
+**Requires:** GAME_MASTER+
+
+##### POST /api/admin/triggers/{trigger_id}/reset
+Reset a trigger's state.
+
+**Requires:** GAME_MASTER+
+
+#### Quest Management
+
+##### GET /api/admin/quests/templates
+List all quest templates.
+
+**Requires:** GAME_MASTER+
+
+##### GET /api/admin/quests/progress/{player_id}
+Get quest progress for a player.
+
+**Requires:** GAME_MASTER+
+
+##### POST /api/admin/quests/modify
+Modify a player's quest progress.
+
+**Requires:** GAME_MASTER+
+
+## YAML Content System
+
+The game engine loads world content from YAML files in the `world_data/` directory. This allows for hot-reloading and CMS-driven content management without code changes.
+
+### Directory Structure
+
+```
+world_data/
+├── areas/           # Area definitions
+├── rooms/           # Room definitions
+├── items/           # Item templates
+├── item_instances/  # Item spawns in rooms
+├── npcs/            # NPC templates
+├── npc_spawns/      # NPC spawn locations
+├── classes/         # Character class definitions
+├── abilities/       # Ability definitions
+├── quests/          # Quest templates
+├── quest_chains/    # Quest chain definitions
+├── dialogues/       # NPC dialogue trees
+├── triggers/        # Room triggers
+└── factions/        # Faction definitions
+```
+
+### Area YAML Format
+
+**File:** `world_data/areas/ethereal_nexus.yaml`
+
+```yaml
+id: ethereal_nexus
+name: Ethereal Nexus
+description: A mystical realm between worlds
+time_scale: 4.0
+biome: mystical
+climate: temperate
+ambient_lighting: dim
+danger_level: 1
+magic_intensity: high
+ambient_sound: "gentle humming"
+default_respawn_time: 300
+starting_day: 1
+starting_hour: 6
+starting_minute: 0
+entry_points:
+  - room_1_1_1
+time_phases:
+  night:
+    start_hour: 0
+    ambient: "The ethereal mists glow faintly in the darkness."
+  morning:
+    start_hour: 6
+    ambient: "Morning light filters through the prismatic mists."
+  day:
+    start_hour: 12
+    ambient: "The realm shimmers with full daylight."
+  evening:
+    start_hour: 18
+    ambient: "Twilight casts long shadows."
+```
+
+### Room YAML Format
+
+**File:** `world_data/rooms/ethereal/room_1_1_1.yaml`
+
+```yaml
+id: room_1_1_1
+name: Central Chamber
+description: A vast chamber filled with swirling prismatic mists.
+room_type: ethereal
+area_id: ethereal_nexus
+exits:
+  north: room_1_1_2
+  south: room_1_1_0
+  east: room_1_2_1
+on_enter_effect: "You step into the shimmering mists."
+on_exit_effect: null
+lighting_override: null  # Uses area ambient_lighting
+```
+
+### Item Template YAML Format
+
+**File:** `world_data/items/weapons/rusty_sword.yaml`
+
+```yaml
+id: rusty_sword
+name: Rusty Sword
+description: A worn blade, still sharp enough to cut.
+item_type: weapon
+item_subtype: sword
+equipment_slot: weapon
+weight: 5.0
+max_stack_size: 1
+rarity: common
+value: 10
+has_durability: true
+max_durability: 100
+damage_min: 3
+damage_max: 8
+attack_speed: 2.0
+damage_type: slashing
+stat_modifiers:
+  strength: 1
+flavor_text: "Once wielded by a novice adventurer."
+keywords:
+  - sword
+  - weapon
+  - rusty
+```
+
+### NPC Template YAML Format
+
+**File:** `world_data/npcs/goblin_scout.yaml`
+
+```yaml
+id: goblin_scout
+name: Goblin Scout
+description: A small, wiry goblin with beady eyes.
+npc_type: aggressive
+level: 2
+max_health: 20
+armor_class: 12
+strength: 8
+dexterity: 14
+intelligence: 6
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 1.2
+experience_reward: 15
+behavior:
+  aggressive: true
+  wander: true
+  flee_health_percent: 20
+  social: true
+  call_for_help_radius: 2
+idle_messages:
+  - "The goblin scout scans the area nervously."
+  - "A goblin mutters something in its guttural language."
+keywords:
+  - goblin
+  - scout
+loot_table:
+  - item_id: rusty_dagger
+    drop_chance: 0.4
+  - item_id: small_health_potion
+    drop_chance: 0.2
+```
+
+### NPC Spawn YAML Format
+
+**File:** `world_data/npc_spawns/ethereal/spawns.yaml`
+
+```yaml
+spawns:
+  - template_id: goblin_scout
+    room_id: room_1_1_2
+    respawn_time_override: 180  # 3 minutes
+  - template_id: ethereal_guardian
+    room_id: room_1_1_5
+    respawn_time_override: -1  # Never respawn
+```
+
+### Character Class YAML Format
+
+**File:** `world_data/classes/warrior.yaml`
+
+```yaml
+class_id: warrior
+name: Warrior
+description: A strong melee fighter who excels in close combat.
+base_stats:
+  strength: 16
+  dexterity: 12
+  intelligence: 8
+  vitality: 14
+stat_growth:
+  strength: 3
+  dexterity: 1
+  intelligence: 0
+  vitality: 2
+resources:
+  rage:
+    name: Rage
+    max_value: 100
+    regen_per_second: 0
+    regen_in_combat: 5
+available_abilities:
+  - slash
+  - power_attack
+  - defensive_stance
+```
+
+### Ability YAML Format
+
+**File:** `world_data/abilities/slash.yaml`
+
+```yaml
+ability_id: slash
+name: Slash
+description: A quick melee attack.
+ability_type: active
+costs:
+  energy: 10
+cooldown_seconds: 3.0
+gcd_seconds: 1.0
+target_mode: single_enemy
+behavior:
+  type: damage
+  base_damage: 15
+  scaling_stat: strength
+  scaling_multiplier: 1.5
+```
+
+### Faction YAML Format
+
+**File:** `world_data/factions/order_of_light.yaml`
+
+```yaml
+faction_id: order_of_light
+name: Order of Light
+description: A holy order dedicated to protecting the realm.
+faction_type: guild
+alignment: good
+opposed_factions:
+  - shadow_cult
+allied_factions:
+  - merchants_guild
+default_standing: neutral
+standing_thresholds:
+  hostile: -50
+  unfriendly: -10
+  neutral: 0
+  friendly: 25
+  allied: 50
+member_npcs:
+  - paladin_guard
+  - priest_healer
+```
+
+### Loading Process
+
+1. **Server Startup**: All YAML files are loaded into the database via `load_yaml.py`
+2. **Database to Memory**: `loader.py` loads database records into in-memory `World` object
+3. **Hot Reload**: Admin API `/api/admin/content/reload` reloads YAML without restart
+4. **Validation**: `/api/admin/content/validate` checks YAML syntax before loading
+
+### CMS Integration Points
+
+The Daemonswright CMS can interact with the game engine by:
+
+1. **Reading current content** via Admin API endpoints (GET /api/admin/world/*)
+2. **Creating YAML files** in `world_data/` directories
+3. **Triggering hot-reload** via POST /api/admin/content/reload
+4. **Validating before save** via POST /api/admin/content/validate
+5. **Monitoring errors** via reload response errors array
+
+**Example CMS Workflow:**
+```
+1. CMS UI creates/edits room in web form
+2. CMS generates YAML and writes to world_data/rooms/custom/new_room.yaml
+3. CMS calls POST /api/admin/content/reload {"content_type": "rooms", "file_path": "..."}
+4. Engine validates and loads new room
+5. CMS receives success/error response
+6. Players can immediately access new room via movement commands
+```
 
 ## Internal Architecture
 
