@@ -21,15 +21,16 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db import get_session
 from app.engine.systems.auth import (ROLE_PERMISSIONS, AuthSystem, Permission,
                                      UserRole, verify_access_token)
 from app.logging import admin_audit, get_logger
 from app.models import Room, SecurityEvent, UserAccount
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 # Module logger
 logger = get_logger(__name__)
@@ -1014,9 +1015,10 @@ async def get_prometheus_metrics(
         bearer_token: '<admin_jwt_token>'
     ```
     """
+    from starlette.responses import Response
+
     from app.metrics import (get_metrics, get_metrics_content_type,
                              update_world_metrics)
-    from starlette.responses import Response
 
     engine = get_engine_from_request(request)
     world = engine.world
@@ -4008,6 +4010,7 @@ class ContentReloader:
     ) -> ReloadResult:
         """Reload item templates from YAML files."""
         import yaml
+
         from app.engine.world import ItemTemplate as WorldItemTemplate
 
         items_dir = self.world_data_dir / "items"
@@ -4085,6 +4088,7 @@ class ContentReloader:
     ) -> ReloadResult:
         """Reload NPC templates from YAML files."""
         import yaml
+
         from app.engine.behaviors import resolve_behaviors
         from app.engine.world import NpcTemplate as WorldNpcTemplate
 

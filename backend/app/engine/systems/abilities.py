@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+
 from app.engine.systems.context import GameContext
 from app.engine.world import ResourceDef, StatGrowth, WorldEntity, WorldPlayer
 
@@ -87,9 +88,9 @@ class AbilityTemplate:
     # Effect execution - supports behavior chaining!
     # Legacy: behavior_id for single behavior (backward compatible)
     # New: behaviors list for chaining multiple behaviors
-    behavior_id: Optional[
-        str
-    ] = None  # Legacy single behavior (converted to behaviors list)
+    behavior_id: Optional[str] = (
+        None  # Legacy single behavior (converted to behaviors list)
+    )
     behaviors: List[str] = field(
         default_factory=list
     )  # Behavior chain: ["melee_attack", "stun_effect"]
@@ -108,9 +109,9 @@ class AbilityTemplate:
 
     # Unlock condition
     required_level: int = 1  # Minimum level to learn
-    required_class: Optional[
-        str
-    ] = None  # Restricted to specific class, or None for any
+    required_class: Optional[str] = (
+        None  # Restricted to specific class, or None for any
+    )
 
     # GCD category
     gcd_category: Optional[str] = None  # GCD category: "melee", "spell", "shared"

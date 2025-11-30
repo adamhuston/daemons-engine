@@ -13,6 +13,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
+
 from app.engine.systems.bulk_service import (BatchValidationRequest,
                                              BulkExportRequest,
                                              BulkImportRequest, BulkService)

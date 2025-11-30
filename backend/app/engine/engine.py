@@ -1977,7 +1977,9 @@ class WorldEngine:
         target.data["banned_by"] = admin_player.name
 
         events = [
-            self._msg_to_player(player_id, f"🚫 Banned {target.name} for: {ban_reason}"),
+            self._msg_to_player(
+                player_id, f"🚫 Banned {target.name} for: {ban_reason}"
+            ),
             self._msg_to_room(
                 target.room_id, f"⚠️ {target.name} has been banned from the game."
             ),

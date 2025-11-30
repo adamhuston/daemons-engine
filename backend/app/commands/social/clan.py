@@ -332,9 +332,7 @@ class ClanCommand:
                     rank_name = (
                         "Officer"
                         if rank == 3
-                        else "Member"
-                        if rank == 2
-                        else "Initiate"
+                        else "Member" if rank == 2 else "Initiate"
                     )
                     members_text += f"  {member.name} ({rank_name})\n"
 

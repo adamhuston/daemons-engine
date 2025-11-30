@@ -13,6 +13,7 @@ Comprehensive test suite covering:
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 # Import the systems and models
 from app.engine.systems.clan_system import ClanInfo, ClanMemberInfo, ClanSystem
 from app.engine.systems.context import GameContext

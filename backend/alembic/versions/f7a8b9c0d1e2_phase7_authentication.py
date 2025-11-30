@@ -14,6 +14,7 @@ Phase 7: Accounts, Authentication, Security
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.

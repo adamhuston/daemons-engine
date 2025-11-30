@@ -118,9 +118,9 @@ class BulkService:
         self.schema_registry = schema_registry
 
         # Track import operations for rollback
-        self._import_backups: Dict[
-            str, Optional[str]
-        ] = {}  # {file_path: original_content | None}
+        self._import_backups: Dict[str, Optional[str]] = (
+            {}
+        )  # {file_path: original_content | None}
 
     async def bulk_import(self, request: BulkImportRequest) -> BulkImportResponse:
         """

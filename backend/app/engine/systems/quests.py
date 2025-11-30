@@ -293,13 +293,13 @@ class QuestSystem:
     def __init__(self, ctx: "GameContext"):
         self.ctx = ctx
         self.templates: Dict[str, QuestTemplate] = {}
-        self.dialogue_trees: Dict[
-            str, DialogueTree
-        ] = {}  # npc_template_id -> DialogueTree
+        self.dialogue_trees: Dict[str, DialogueTree] = (
+            {}
+        )  # npc_template_id -> DialogueTree
         self.chains: Dict[str, QuestChain] = {}  # chain_id -> QuestChain
-        self._quest_to_chain: Dict[
-            str, str
-        ] = {}  # quest_id -> chain_id (reverse lookup)
+        self._quest_to_chain: Dict[str, str] = (
+            {}
+        )  # quest_id -> chain_id (reverse lookup)
 
     # === Template Management ===
 

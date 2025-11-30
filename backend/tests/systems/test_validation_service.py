@@ -9,6 +9,7 @@ Tests:
 """
 
 import pytest
+
 from app.engine.systems.validation_service import ReferenceCache
 
 

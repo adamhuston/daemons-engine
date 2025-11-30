@@ -5,10 +5,11 @@ import uuid
 from pathlib import Path
 
 import yaml
+from sqlalchemy import select
+
 from app.db import AsyncSessionLocal
 from app.models import (Area, ItemInstance, ItemTemplate, NpcInstance,
                         NpcTemplate, Room)
-from sqlalchemy import select
 
 
 async def load_data():
