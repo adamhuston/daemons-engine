@@ -31,10 +31,15 @@ Event = Dict[str, Any]
 
 @dataclass
 class CombatConfig:
-    """Configuration for combat mechanics."""
-    crit_chance: float = 0.10  # 10% base critical hit chance
-    crit_multiplier: float = 1.5  # Critical hits deal 1.5x damage
-    recovery_time: float = 0.5  # Recovery time between swings
+    """
+    Configuration for combat mechanics.
+    
+    Note: Critical hits are determined by D20 mechanics (natural 20),
+    not by percentage chance. The fields below are legacy and unused.
+    """
+    crit_chance: float = 0.10  # LEGACY: Not used (D20 uses natural 20)
+    crit_multiplier: float = 1.5  # LEGACY: Not used (D20 doubles dice damage)
+    recovery_time: float = 0.5  # Recovery time between auto-attack swings
 
 
 class CombatSystem:
@@ -179,6 +184,15 @@ class CombatSystem:
             if attacker_id in world.players:
                 return [self.ctx.msg_to_player(attacker_id, "You are nowhere.")]
             return []
+        
+        # Wake up sleeping attacker
+        if attacker_id in world.players and attacker.is_sleeping:
+            attacker.is_sleeping = False
+            attacker.sleep_start_time = None
+            events.append(self.ctx.msg_to_player(
+                attacker_id,
+                "You wake up as you prepare to fight!"
+            ))
 
         # Check if already in combat
         if attacker.combat.is_in_combat():
@@ -206,6 +220,20 @@ class CombatSystem:
             if attacker_id in world.players:
                 return [self.ctx.msg_to_player(attacker_id, f"{target.name} is already dead.")]
             return []
+        
+        # Wake up sleeping target
+        if target_id in world.players and target.is_sleeping:
+            target.is_sleeping = False
+            target.sleep_start_time = None
+            events.append(self.ctx.msg_to_player(
+                target_id,
+                "You wake with a start as you're attacked!"
+            ))
+            events.append(self.ctx.msg_to_room(
+                room.id,
+                f"{target.name} jolts awake!",
+                exclude={target_id}
+            ))
 
         # Start the attack on the entity
         attacker.start_attack(target.id, world.item_templates)
@@ -272,14 +300,15 @@ class CombatSystem:
         events: List[Event] = []
         
         if flee:
-            # Flee uses a dex check that becomes easier at low health
-            # DC = 15 - (10 * missing_health_percent)
+            # Flee uses D20 Dexterity ability check
+            # DC = 15 - (10 * missing_health_percent) - easier when injured
+            # Roll: d20 + dexterity modifier
             health_percent = player.current_health / player.max_health if player.max_health > 0 else 1.0
             missing_percent = 1.0 - health_percent
             flee_dc = max(5, 15 - int(10 * missing_percent))
             
             roll = random.randint(1, 20)
-            dex_mod = (player.get_effective_dexterity() - 10) // 2
+            dex_mod = player.get_ability_modifier(player.get_effective_dexterity())
             total = roll + dex_mod
             
             if total >= flee_dc:
@@ -311,7 +340,7 @@ class CombatSystem:
                         ))
                         events.append(self.ctx.msg_to_player(
                             player_id,
-                            f"You flee {direction}!"
+                            f"You flee {direction}! (rolled {roll}+{dex_mod}={total} vs DC {flee_dc})"
                         ))
                     else:
                         events.append(self.ctx.msg_to_player(player_id, "You try to flee but the exit leads nowhere!"))
@@ -321,7 +350,7 @@ class CombatSystem:
                 # Flee failed - stay in combat
                 events.append(self.ctx.msg_to_player(
                     player_id,
-                    "You fail to escape!"
+                    f"You fail to escape! (rolled {roll}+{dex_mod}={total} vs DC {flee_dc})"
                 ))
         else:
             # Regular disengage
@@ -467,26 +496,69 @@ class CombatSystem:
                 attacker.combat.clear_combat()
                 return
             
-            # Calculate damage
+            # ========== D20 ATTACK ROLL ==========
+            # Use centralized d20 module for attack mechanics
+            from . import d20
+            
+            attack_bonus = attacker.get_melee_attack_bonus()
+            target_ac = target.get_effective_armor_class()
+            
+            # Make attack roll using centralized mechanics
+            is_hit, attack_roll, attack_total, is_crit = d20.make_attack_roll(attack_bonus, target_ac)
+            
+            # If attack misses
+            if not is_hit:
+                events: List[Event] = []
+                
+                # Attacker message
+                if attacker_id in world.players:
+                    events.append(self.ctx.msg_to_player(
+                        attacker_id,
+                        f"You swing at {target.name} but miss! (rolled {attack_roll}+{attack_bonus}={attack_total} vs AC {target_ac})"
+                    ))
+                
+                # Target message
+                if target_id in world.players:
+                    events.append(self.ctx.msg_to_player(
+                        target_id,
+                        f"{attacker.name} swings at you but misses!"
+                    ))
+                
+                # Room broadcast
+                room = world.rooms.get(attacker.room_id)
+                if room:
+                    events.append(self.ctx.msg_to_room(
+                        room.id,
+                        f"{attacker.name} swings at {target.name} but misses!",
+                        exclude={attacker_id, target_id}
+                    ))
+                
+                # Continue auto-attack if enabled
+                if attacker.combat.auto_attack and attacker.is_alive():
+                    attacker.combat.start_phase(CombatPhase.RECOVERY, self.config.recovery_time)
+                    self._schedule_next_swing(attacker_id, target_id, weapon)
+                else:
+                    attacker.combat.clear_combat()
+                
+                await self.ctx.dispatch_events(events)
+                return
+            
+            # ========== ATTACK HIT - CALCULATE DAMAGE ==========
+            # Base weapon damage
             damage = random.randint(weapon.damage_min, weapon.damage_max)
             
-            # Apply strength modifier
-            str_bonus = (attacker.get_effective_strength() - 10) // 2
-            damage = max(1, damage + str_bonus)
+            # Add strength modifier to damage
+            str_mod = attacker.get_ability_modifier(attacker.get_effective_strength())
+            damage = max(1, damage + str_mod)
             
-            # Apply target's armor
-            armor_reduction = target.get_effective_armor_class() // 5
-            damage = max(1, damage - armor_reduction)
-            
-            # Check for critical hit
-            is_crit = random.random() < self.config.crit_chance
+            # Critical hits use centralized mechanics
             if is_crit:
-                damage = int(damage * self.config.crit_multiplier)
+                damage = d20.calculate_critical_damage(damage, str_mod)
             
             # Apply damage
             target.current_health = max(0, target.current_health - damage)
             
-            print(f"[Combat DEBUG] Damage applied: {damage} to {target.name}, health now: {target.current_health}, is_alive: {target.is_alive()}")
+            print(f"[Combat DEBUG] Attack roll: {attack_roll}+{attack_bonus}={attack_total} vs AC {target_ac} - HIT! Damage: {damage}")
             
             # Build result
             result = CombatResult(
@@ -500,13 +572,14 @@ class CombatSystem:
             
             # Generate events
             events: List[Event] = []
-            crit_text = " **CRITICAL!**" if is_crit else ""
+            crit_text = " **CRITICAL HIT!**" if is_crit else ""
             
-            # Attacker message
+            # Attacker message with attack roll info
             if attacker_id in world.players:
+                roll_info = f" (rolled {attack_roll}+{attack_bonus}={attack_total} vs AC {target_ac})" if not is_crit else f" (natural 20!)"
                 events.append(self.ctx.msg_to_player(
                     attacker_id,
-                    f"You hit {target.name} for {damage} damage!{crit_text}"
+                    f"You hit {target.name} for {damage} damage!{crit_text}{roll_info}"
                 ))
             
             # Target message and health update

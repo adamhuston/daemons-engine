@@ -11,7 +11,11 @@ Each system handles a specific domain of game logic:
 - TriggerSystem: Room-based reactive triggers
 - StateTracker: Dirty tracking and persistence (Phase 6)
 - AuthSystem: Authentication and authorization (Phase 7)
+- d20: Centralized D20 tabletop RPG mechanics
 """
+
+# Import d20 first (no dependencies)
+from . import d20
 
 from .time_manager import TimeEventManager
 from .events import EventDispatcher
@@ -61,6 +65,7 @@ from .auth import (
 )
 
 __all__ = [
+    "d20",
     "GameContext",
     "TimeEventManager",
     "EventDispatcher",

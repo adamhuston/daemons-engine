@@ -209,6 +209,12 @@ class EventDispatcher:
                 for pid in player_ids:
                     if pid in exclude:
                         continue
+                    
+                    # Skip sleeping players for room messages (they don't hear/see)
+                    player = self.ctx.world.players.get(pid)
+                    if player and player.is_sleeping:
+                        continue
+                    
                     q = self.ctx._listeners.get(pid)
                     if q is None:
                         continue

@@ -26,43 +26,70 @@ async def whirlwind_attack_behavior(
     Warrior signature AoE attack.
     
     Spin in place hitting all enemies in the room.
-    - Costs rage
-    - Moderate damage per target
-    - Scales with strength
-    - Requires level 10
+    Uses D20 melee attack rolls for each target.
+    Damage: 1d12 + strength modifier per target
     """
     try:
+        import random
+        from .. import d20
+        
         if not isinstance(targets, list):
             targets = [targets]
         
         total_damage = 0
         targets_hit = []
+        messages = []
         
-        # Base damage for whirlwind
-        base_damage = context.get('base_damage', 60)
-        strength = getattr(caster, 'strength', 10)
+        # Get attack bonus once
+        attack_bonus = caster.get_melee_attack_bonus()
+        str_mod = caster.get_ability_modifier(caster.get_effective_strength())
         
-        # Warrior scaling: 1.5x strength
-        damage_per_target = int(base_damage + (strength * 1.5))
-        
-        import random
         for target in targets:
-            # Whirlwind has decent accuracy
-            hit_roll = random.randint(1, 20) + (caster.armor_class // 2) + 3
-            if hit_roll >= target.armor_class:
+            # D20 attack roll for each target using centralized mechanics
+            target_ac = target.get_effective_armor_class()
+            is_hit, attack_roll, attack_total, is_crit = d20.make_attack_roll(attack_bonus, target_ac)
+            
+            if is_hit:
+                # Base damage: 1d12 (great weapon)
+                base_damage = random.randint(1, 12)
+                damage = base_damage + str_mod
+                
+                # Apply scaling from template
+                scaling = ability_template.scaling or {}
+                for stat_name, multiplier in scaling.items():
+                    if stat_name == "strength":
+                        stat_value = caster.get_effective_strength()
+                        extra_damage = int(stat_value * multiplier) - str_mod
+                        damage += max(0, extra_damage)
+                
+                # Critical hits use centralized d20 mechanics
+                if is_crit:
+                    damage = d20.calculate_critical_damage(damage, str_mod)
+                
+                damage = max(1, damage)
+                
+                # Apply damage
                 old_hp = target.current_health
-                target.current_health = max(0, target.current_health - damage_per_target)
-                total_damage += damage_per_target
+                target.current_health = max(0, target.current_health - damage)
+                total_damage += damage
                 targets_hit.append(target.id)
                 
-                logger.info(f"Whirlwind hit {target.name} for {damage_per_target} damage")
+                crit_text = " **CRIT!**" if is_crit else ""
+                logger.info(f"Whirlwind hit {target.name} for {damage} damage{crit_text}")
+        
+        hit_count = len(targets_hit)
+        miss_count = len(targets) - hit_count
+        
+        message = f"Whirlwind! You spin and hit {hit_count} enemies for {total_damage} total damage!"
+        if miss_count > 0:
+            message += f" ({miss_count} missed)"
         
         return BehaviorResult(
             success=True,
             damage_dealt=total_damage,
             targets_hit=targets_hit,
             cooldown_applied=ability_template.cooldown or 0.0,
-            message=f"Whirlwind! You spin and hit {len(targets_hit)} enemies for {total_damage} total damage!"
+            message=message
         )
     
     except Exception as e:
@@ -83,42 +110,69 @@ async def shield_bash_behavior(
     """
     Warrior defensive ability with crowd control.
     
-    Bash enemy with shield:
-    - Moderate melee damage
-    - Applies stun effect
+    Bash enemy with shield using D20 mechanics:
+    - D20 melee attack roll
+    - Damage: 1d8 + strength modifier
+    - Applies stun effect on hit
     - Scales with strength
     - Short cooldown for frequent use
     """
     try:
-        base_damage = context.get('base_damage', 40)
-        strength = getattr(caster, 'strength', 10)
-        damage = int(base_damage + (strength * 0.8))
-        
-        # Hit check
         import random
-        hit_roll = random.randint(1, 20) + (caster.armor_class // 2)
+        from .. import d20
         
-        if hit_roll >= target.armor_class:
-            old_hp = target.current_health
-            target.current_health = max(0, target.current_health - damage)
-            
-            logger.info(f"{caster.name} shield bashed {target.name} for {damage} damage + stun")
-            
-            return BehaviorResult(
-                success=True,
-                damage_dealt=damage,
-                targets_hit=[target.id],
-                effects_applied=["stun"],
-                cooldown_applied=ability_template.cooldown or 0.0,
-                message=f"Shield Bash! You hit {target.name} for {damage} damage and stun them!"
-            )
-        else:
+        # D20 attack roll using centralized mechanics
+        attack_bonus = caster.get_melee_attack_bonus()
+        target_ac = target.get_effective_armor_class()
+        
+        is_hit, attack_roll, attack_total, is_crit = d20.make_attack_roll(attack_bonus, target_ac)
+        
+        if not is_hit:
             return BehaviorResult(
                 success=True,
                 damage_dealt=0,
                 targets_hit=[],
-                message=f"Your shield bash missed {target.name}!"
+                message=f"Your shield bash missed {target.name}! (Rolled {attack_roll}, needed {target_ac - attack_bonus})"
             )
+        
+        # Base damage: 1d8 (shield)
+        base_damage = random.randint(1, 8)
+        str_mod = caster.get_ability_modifier(caster.get_effective_strength())
+        damage = base_damage + str_mod
+        
+        # Apply scaling
+        scaling = ability_template.scaling or {}
+        for stat_name, multiplier in scaling.items():
+            if stat_name == "strength":
+                stat_value = caster.get_effective_strength()
+                extra_damage = int(stat_value * multiplier) - str_mod
+                damage += max(0, extra_damage)
+        
+        # Critical hit using centralized d20 mechanics
+        if is_crit:
+            damage = d20.calculate_critical_damage(damage, str_mod)
+        
+        damage = max(1, damage)
+        
+        # Apply damage
+        target.current_health = max(0, target.current_health - damage)
+        
+        # Apply stun effect
+        if not hasattr(target, 'status_effects'):
+            target.status_effects = {}
+        target.status_effects['stunned'] = 2  # 2 turns
+        
+        crit_text = " **CRIT!**" if is_crit else ""
+        logger.info(f"{caster.name} shield bashed {target.name} for {damage} damage{crit_text} + stun")
+        
+        return BehaviorResult(
+            success=True,
+            damage_dealt=damage,
+            targets_hit=[target.id],
+            effects_applied=["stun"],
+            cooldown_applied=ability_template.cooldown or 0.0,
+            message=f"Shield Bash! You hit {target.name} for {damage} damage{crit_text} and stun them!"
+        )
     
     except Exception as e:
         logger.error(f"Error in shield_bash_behavior: {e}", exc_info=True)
@@ -138,37 +192,69 @@ async def inferno_behavior(
     """
     Mage ultimate AoE fire spell.
     
-    More powerful variant of fireball:
-    - Affects larger area
-    - Higher damage per target
+    More powerful variant of fireball using D20 mechanics:
+    - D20 spell attack roll per target
+    - Damage: 3d6 + intelligence modifier per hit
     - Applies burning effect for damage over time
     - High mana cost and longer cooldown
     """
     try:
+        import random
+        from .. import d20
+        
         if not isinstance(targets, list):
             targets = [targets]
         
         total_damage = 0
         targets_hit = []
         
-        # Inferno is powerful - high base damage
-        base_damage = context.get('base_damage', 120)
-        intelligence = getattr(caster, 'intelligence', 10)
+        # Get attack bonus once
+        attack_bonus = caster.get_spell_attack_bonus()
+        int_mod = caster.get_ability_modifier(caster.get_effective_intelligence())
         
-        # Mage scaling: 1.4x intelligence
-        damage_per_target = int(base_damage + (intelligence * 1.4))
-        
-        import random
         for target in targets:
-            # Spells are hard to dodge
-            hit_roll = random.randint(1, 20) + (caster.armor_class // 2) + 10
-            if hit_roll >= target.armor_class:
-                old_hp = target.current_health
-                target.current_health = max(0, target.current_health - damage_per_target)
-                total_damage += damage_per_target
+            # D20 spell attack roll using centralized mechanics
+            target_ac = target.get_effective_armor_class()
+            is_hit, attack_roll, attack_total, is_crit = d20.make_attack_roll(attack_bonus, target_ac)
+            
+            if is_hit:
+                # Base damage: 3d6 (powerful fire spell)
+                base_damage = sum(random.randint(1, 6) for _ in range(3))
+                damage = base_damage + int_mod
+                
+                # Apply scaling
+                scaling = ability_template.scaling or {}
+                for stat_name, multiplier in scaling.items():
+                    if stat_name == "intelligence":
+                        stat_value = caster.get_effective_intelligence()
+                        extra_damage = int(stat_value * multiplier) - int_mod
+                        damage += max(0, extra_damage)
+                
+                # Critical hit using centralized d20 mechanics
+                if is_crit:
+                    damage = d20.calculate_critical_damage(damage, int_mod)
+                
+                damage = max(1, damage)
+                
+                # Apply damage
+                target.current_health = max(0, target.current_health - damage)
+                total_damage += damage
                 targets_hit.append(target.id)
                 
-                logger.info(f"Inferno hit {target.name} for {damage_per_target} damage")
+                # Apply burning effect
+                if not hasattr(target, 'status_effects'):
+                    target.status_effects = {}
+                target.status_effects['burning'] = 3  # 3 turns of DoT
+                
+                crit_text = " **CRIT!**" if is_crit else ""
+                logger.info(f"Inferno hit {target.name} for {damage} fire damage{crit_text}")
+        
+        hit_count = len(targets_hit)
+        miss_count = len(targets) - hit_count
+        
+        message = f"Inferno! You scorch {hit_count} enemies for {total_damage} total damage!"
+        if miss_count > 0:
+            message += f" ({miss_count} dodged the flames)"
         
         return BehaviorResult(
             success=True,
@@ -176,7 +262,7 @@ async def inferno_behavior(
             targets_hit=targets_hit,
             effects_applied=["burning"],  # DoT effect
             cooldown_applied=ability_template.cooldown or 0.0,
-            message=f"Inferno! You scorch {len(targets_hit)} enemies for {total_damage} total damage!"
+            message=message
         )
     
     except Exception as e:
@@ -197,40 +283,66 @@ async def arcane_missiles_behavior(
     """
     Mage rapid-fire single-target spell.
     
-    Launches multiple magical projectiles:
-    - Reliable damage per cast
+    Launches multiple magical projectiles using D20 mechanics:
+    - Each missile makes a D20 spell attack roll
+    - Damage: 1d4+1 + intelligence modifier per missile
+    - 3 missiles per cast
     - Low cooldown for frequent use
     - Scales with intelligence
-    - Can chain to multiple targets in implementation
     """
     try:
-        missile_count = context.get('missile_count', 3)
-        base_damage_per_missile = context.get('base_damage_per_missile', 25)
-        intelligence = getattr(caster, 'intelligence', 10)
-        
-        # Each missile benefits from intelligence scaling
-        damage_per_missile = int(base_damage_per_missile + (intelligence * 0.6))
-        total_damage = damage_per_missile * missile_count
-        
-        # High accuracy for guaranteed hit
         import random
-        hit_roll = random.randint(1, 20) + (caster.armor_class // 2) + 12
+        from .. import d20
         
-        if hit_roll >= target.armor_class:
-            old_hp = target.current_health
-            target.current_health = max(0, target.current_health - total_damage)
+        missile_count = context.get('missile_count', 3)
+        total_damage = 0
+        hits = 0
+        crits = 0
+        
+        attack_bonus = caster.get_spell_attack_bonus()
+        int_mod = caster.get_ability_modifier(caster.get_effective_intelligence())
+        target_ac = target.get_effective_armor_class()
+        
+        for i in range(missile_count):
+            # Each missile rolls independently using centralized d20 mechanics
+            is_hit, attack_roll, attack_total, is_crit = d20.make_attack_roll(attack_bonus, target_ac)
             
-            logger.info(
-                f"Arcane Missiles hit {target.name} "
-                f"({missile_count} missiles x {damage_per_missile} = {total_damage} damage)"
-            )
-            
+            if is_hit:
+                # Missile damage: 1d4+1 (magic missile style)
+                base_damage = random.randint(1, 4) + 1
+                damage = base_damage + int_mod
+                
+                # Apply scaling
+                scaling = ability_template.scaling or {}
+                for stat_name, multiplier in scaling.items():
+                    if stat_name == "intelligence":
+                        stat_value = caster.get_effective_intelligence()
+                        extra_damage = int(stat_value * multiplier) - int_mod
+                        damage += max(0, extra_damage)
+                
+                # Critical hit using centralized d20 mechanics
+                if is_crit:
+                    damage = d20.calculate_critical_damage(damage, int_mod)
+                    crits += 1
+                
+                damage = max(1, damage)
+                target.current_health = max(0, target.current_health - damage)
+                total_damage += damage
+                hits += 1
+                
+                crit_text = " CRIT!" if is_crit else ""
+                logger.info(
+                    f"Arcane Missile {i+1} hit {target.name} for {damage} damage{crit_text}"
+                )
+        
+        if hits > 0:
+            crit_info = f" ({crits} crits!)" if crits > 0 else ""
             return BehaviorResult(
                 success=True,
                 damage_dealt=total_damage,
                 targets_hit=[target.id],
                 cooldown_applied=ability_template.cooldown or 0.0,
-                message=f"Arcane Missiles! {missile_count} projectiles strike {target.name} for {total_damage} total damage!"
+                message=f"Arcane Missiles! {hits}/{missile_count} projectiles strike {target.name} for {total_damage} total damage{crit_info}!"
             )
         else:
             return BehaviorResult(
@@ -268,7 +380,7 @@ async def shadow_clone_behavior(
     try:
         clone_count = context.get('clone_count', 2)
         duration = context.get('duration', 8.0)
-        dexterity = getattr(caster, 'dexterity', 10)
+        dexterity = caster.get_effective_dexterity()
         
         # More dexterity = more/better clones
         actual_clones = clone_count + (dexterity // 10)

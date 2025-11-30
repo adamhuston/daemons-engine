@@ -197,6 +197,11 @@ class CommandRouter:
         
         # Look up command
         if cmd_name not in self.commands:
+            # Check if it's a skill-like ability (non-spell) that can be invoked directly
+            ability_events = await self._check_direct_ability_use(player_id, cmd_name, args)
+            if ability_events:
+                return ability_events
+            
             # Check room triggers before returning unknown command
             trigger_events = self._check_room_triggers(player_id, raw_command)
             if trigger_events:
@@ -223,6 +228,50 @@ class CommandRouter:
                 player_id,
                 "Something went wrong executing that command."
             )]
+    
+    async def _check_direct_ability_use(self, player_id: str, ability_name: str, args: str) -> List['Event']:
+        """
+        Check if the command is a skill-like ability that can be invoked directly.
+        
+        Spell-like abilities (category="magic") require the 'cast' command.
+        All other abilities can be used directly by their name.
+        
+        Args:
+            player_id: The player executing the command
+            ability_name: The potential ability name
+            args: Arguments (target name, etc.)
+            
+        Returns:
+            List of events if ability was executed, empty list if not an ability
+        """
+        player = self.engine.world.players.get(player_id)
+        if not player or not player.has_character_sheet():
+            return []
+        
+        # Get ability by ID (ability names are typically lowercase IDs)
+        ability = self.engine.class_system.get_ability(ability_name)
+        if not ability:
+            return []
+        
+        # Check if player has learned this ability
+        learned = player.get_learned_abilities()
+        if ability.ability_id not in learned:
+            return []
+        
+        # Check if player has unlocked this ability (level requirement)
+        if ability.required_level > player.level:
+            return []
+        
+        # Check if it's a spell-like ability (requires 'cast' command)
+        if ability.ability_category == "magic":
+            return [self.engine._msg_to_player(
+                player_id,
+                f"You must use 'cast {ability_name}' to cast spells."
+            )]
+        
+        # Execute the ability directly (it's a skill-like ability)
+        # Pass through the _cast_ability method which handles targeting and execution
+        return await self.engine._cast_ability(player_id, f"{ability_name} {args}".strip())
     
     def _check_room_triggers(self, player_id: str, raw_command: str) -> List['Event']:
         """

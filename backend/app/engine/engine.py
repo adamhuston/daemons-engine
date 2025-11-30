@@ -163,6 +163,25 @@ class WorldEngine:
             usage=""
         )
         
+        # Sleep/Wake commands for regeneration
+        self.command_router.register_handler(
+            primary_name="sleep",
+            handler=self._sleep_handler,
+            names=["sleep", "rest"],
+            category="character",
+            description="Sleep to regenerate HP and resources faster",
+            usage=""
+        )
+        
+        self.command_router.register_handler(
+            primary_name="wake",
+            handler=self._wake_handler,
+            names=["wake", "awaken", "stand"],
+            category="character",
+            description="Wake up from sleeping",
+            usage=""
+        )
+        
         # Say command
         self.command_router.register_handler(
             primary_name="say",
@@ -599,6 +618,14 @@ class WorldEngine:
         """Adapter for stats command."""
         return self._show_stats(player_id)
 
+    def _sleep_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Handler for sleep command - enter sleeping state for faster regeneration."""
+        return self._sleep(player_id)
+    
+    def _wake_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+        """Handler for wake command - exit sleeping state."""
+        return self._wake(player_id)
+
     def _say_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """Adapter for say command."""
         if not args or not args.strip():
@@ -674,8 +701,9 @@ class WorldEngine:
         return await self._cast_ability(player_id, args)
     
     def _abilities_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
-        """Adapter for abilities/skills command."""
-        return self._show_abilities(player_id)
+        """Adapter for abilities/skills command. Use 'list' to show locked abilities."""
+        show_locked = args.strip().lower() == "list"
+        return self._show_abilities(player_id, show_locked=show_locked)
     
     def _resources_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """Adapter for resources command."""
@@ -1754,6 +1782,9 @@ class WorldEngine:
         # Schedule NPC housekeeping tick (respawns, etc.) - every 30 seconds
         self._schedule_npc_housekeeping_tick()
         
+        # Schedule passive regeneration tick for players
+        self._schedule_regeneration_tick()
+        
         # Initialize per-NPC behavior timers
         self._init_npc_behaviors()
         
@@ -1898,6 +1929,113 @@ class WorldEngine:
             delay_seconds=30.0,
             callback=npc_housekeeping_tick,
             event_id="npc_housekeeping_tick"
+        )
+    
+    def _schedule_regeneration_tick(self) -> None:
+        """
+        Schedule recurring regeneration tick for all online players and NPCs.
+        Handles passive HP and resource regeneration based on player state (awake/sleeping).
+        NPCs always use the awake regeneration rate.
+        """
+        async def regeneration_tick():
+            """Process HP and resource regeneration for all online players and living NPCs."""
+            from .systems import d20
+            import time
+            
+            current_time = time.time()
+            events = []
+            
+            # Process player regeneration
+            for player_id, player in list(self.world.players.items()):
+                if not player.is_connected or not player.is_alive():
+                    continue
+                
+                # Calculate time since last regen tick
+                time_delta = current_time - player.last_regen_tick
+                player.last_regen_tick = current_time
+                
+                # Determine regen rates based on sleeping state
+                if player.is_sleeping:
+                    hp_regen_rate = d20.HEALTH_REGEN_SLEEPING
+                    resource_regen_rate = d20.RESOURCE_REGEN_SLEEPING
+                else:
+                    hp_regen_rate = d20.HEALTH_REGEN_AWAKE
+                    resource_regen_rate = d20.RESOURCE_REGEN_AWAKE
+                
+                # Regenerate HP
+                if player.current_health < player.max_health:
+                    hp_gained = int(hp_regen_rate * time_delta)
+                    if hp_gained > 0:
+                        old_hp = player.current_health
+                        player.current_health = min(player.max_health, player.current_health + hp_gained)
+                        
+                        # Send stat update to player
+                        events.append({
+                            "type": "stat_update",
+                            "scope": "player",
+                            "player_id": player_id,
+                            "payload": {
+                                "health": player.current_health,
+                                "max_health": player.max_health,
+                            }
+                        })
+                
+                # Regenerate resources
+                if player.character_sheet:
+                    resources_updated = {}
+                    for resource_id, pool in player.character_sheet.resource_pools.items():
+                        if pool.current < pool.max:
+                            resource_gained = int(pool.max * resource_regen_rate * time_delta)
+                            if resource_gained > 0:
+                                pool.current = min(pool.max, pool.current + resource_gained)
+                                resources_updated[resource_id] = {
+                                    "current": pool.current,
+                                    "max": pool.max,
+                                    "percent": (pool.current / pool.max * 100) if pool.max > 0 else 0
+                                }
+                    
+                    # Send resource update if any resources changed
+                    if resources_updated:
+                        events.append({
+                            "type": "resource_update",
+                            "scope": "player",
+                            "player_id": player_id,
+                            "payload": resources_updated
+                        })
+            
+            # Process NPC regeneration (always use awake rate)
+            for npc_id, npc in list(self.world.npcs.items()):
+                if not npc.is_alive():
+                    continue
+                
+                # Initialize last_regen_tick if not set (for existing NPCs)
+                if not hasattr(npc, 'last_regen_tick'):
+                    npc.last_regen_tick = current_time
+                
+                # Calculate time since last regen tick
+                time_delta = current_time - npc.last_regen_tick
+                npc.last_regen_tick = current_time
+                
+                # Regenerate HP using awake rate
+                if npc.current_health < npc.max_health:
+                    hp_gained = int(d20.HEALTH_REGEN_AWAKE * time_delta)
+                    if hp_gained > 0:
+                        npc.current_health = min(npc.max_health, npc.current_health + hp_gained)
+                        # NPCs don't get UI updates, regeneration happens silently
+            
+            # Dispatch all regen events
+            if events:
+                await self._dispatch_events(events)
+            
+            # Reschedule next regen tick
+            self._schedule_regeneration_tick()
+        
+        # Regen tick every few seconds (defined in d20 module)
+        from .systems import d20
+        self.schedule_event(
+            delay_seconds=d20.REGEN_TICK_INTERVAL,
+            callback=regeneration_tick,
+            event_id="regeneration_tick"
         )
     
     def _get_npc_respawn_time(self, npc: WorldNpc) -> int:
@@ -2224,14 +2362,24 @@ class WorldEngine:
             }
         })
         
-        # Announce arrival if room changed
+        # Announce arrival to other players in the room
         if old_room_id != respawn_room_id:
+            # Player moved to a different room
             events.append({
                 "type": "message",
                 "scope": "room",
                 "room_id": respawn_room_id,
                 "exclude": [player_id],
                 "text": f"{player.name} materializes in a shimmer of light."
+            })
+        else:
+            # Player respawned in the same room they died in
+            events.append({
+                "type": "message",
+                "scope": "room",
+                "room_id": respawn_room_id,
+                "exclude": [player_id],
+                "text": f"{player.name}'s body glows with ethereal light as life returns to them."
             })
         
         await self._dispatch_events(events)
@@ -3184,6 +3332,11 @@ class WorldEngine:
             ]
 
         player = world.players[player_id]
+        
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
         current_room = world.rooms.get(player.room_id)
 
         if current_room is None:
@@ -3404,6 +3557,11 @@ class WorldEngine:
             ]
 
         player = world.players[player_id]
+        
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
         room = world.rooms.get(player.room_id)
 
         if room is None:
@@ -3907,6 +4065,110 @@ class WorldEngine:
             lines.append(f"Active Effects: {len(player.active_effects)} (use 'effects' to view)")
 
         return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    def _sleep(self, player_id: PlayerId) -> List[Event]:
+        """
+        Enter sleeping state for faster HP and resource regeneration.
+        Cannot sleep while in combat.
+        """
+        import time
+        
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        # Check if already sleeping
+        if player.is_sleeping:
+            return [self._msg_to_player(player_id, "You're already sleeping.")]
+        
+        # Check if in combat
+        if player.is_in_combat():
+            return [self._msg_to_player(
+                player_id,
+                "You can't sleep while in combat!"
+            )]
+        
+        # Enter sleeping state
+        player.is_sleeping = True
+        player.sleep_start_time = time.time()
+        
+        events: List[Event] = []
+        
+        # Message to player
+        events.append(self._msg_to_player(
+            player_id,
+            "You lie down and close your eyes, drifting into a restful sleep..."
+        ))
+        
+        # Message to room
+        room = self.world.rooms.get(player.room_id)
+        if room:
+            events.append(self._msg_to_room(
+                room.id,
+                f"{player.name} lies down and falls asleep.",
+                exclude={player_id}
+            ))
+        
+        return events
+    
+    def _check_sleeping(self, player_id: PlayerId) -> List[Event] | None:
+        """
+        Check if a player is sleeping and return a wake reminder message if so.
+        
+        Returns:
+            List with wake reminder message if player is sleeping, None otherwise
+        """
+        player = self.world.players.get(player_id)
+        if player and player.is_sleeping:
+            return [self._msg_to_player(
+                player_id,
+                "You can't do that while sleeping. Use 'wake' to wake up."
+            )]
+        return None
+    
+    def _wake(self, player_id: PlayerId) -> List[Event]:
+        """
+        Exit sleeping state and return to normal regeneration.
+        """
+        import time
+        
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "You have no form.")]
+        
+        # Check if not sleeping
+        if not player.is_sleeping:
+            return [self._msg_to_player(player_id, "You're not sleeping.")]
+        
+        # Calculate how long they slept
+        sleep_duration = time.time() - (player.sleep_start_time or time.time())
+        
+        # Exit sleeping state
+        player.is_sleeping = False
+        player.sleep_start_time = None
+        
+        events: List[Event] = []
+        
+        # Message to player with sleep duration
+        minutes = int(sleep_duration // 60)
+        seconds = int(sleep_duration % 60)
+        duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+        
+        events.append(self._msg_to_player(
+            player_id,
+            f"You awaken feeling refreshed. (Slept for {duration_str})"
+        ))
+        
+        # Message to room
+        room = self.world.rooms.get(player.room_id)
+        if room:
+            events.append(self._msg_to_room(
+                room.id,
+                f"{player.name} awakens.",
+                exclude={player_id}
+            ))
+        
+        return events
 
     def _say(self, player_id: PlayerId, text: str) -> List[Event]:
         """
@@ -4585,6 +4847,11 @@ class WorldEngine:
         if player_id not in world.players:
             return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
         
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+        
         player = world.players[player_id]
         inventory = player.inventory_meta
         
@@ -4626,6 +4893,11 @@ class WorldEngine:
         
         if player_id not in world.players:
             return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
         
         player = world.players[player_id]
         room = world.rooms[player.room_id]
@@ -4900,6 +5172,11 @@ class WorldEngine:
         if player_id not in world.players:
             return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
         
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+        
         player = world.players[player_id]
         room = world.rooms[player.room_id]
         
@@ -4939,6 +5216,11 @@ class WorldEngine:
         
         if player_id not in world.players:
             return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
         
         player = world.players[player_id]
         
@@ -5004,6 +5286,11 @@ class WorldEngine:
         if player_id not in world.players:
             return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
         
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+        
         player = world.players[player_id]
         
         # Find equipped item
@@ -5044,6 +5331,11 @@ class WorldEngine:
         
         if player_id not in world.players:
             return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
+        
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
         
         player = world.players[player_id]
         
@@ -5234,6 +5526,11 @@ class WorldEngine:
         if not player:
             return [self._msg_to_player(player_id, "You have no form.")]
         
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+        
         # Parse ability name and optional target
         parts = args.split(maxsplit=1)
         ability_id = parts[0].lower()
@@ -5336,12 +5633,13 @@ class WorldEngine:
                 error=f"Ability execution error: {str(e)}"
             )
     
-    def _show_abilities(self, player_id: PlayerId) -> List[Event]:
+    def _show_abilities(self, player_id: PlayerId, show_locked: bool = False) -> List[Event]:
         """
-        Show the player's learned abilities and their status.
+        Show the player's learned abilities that are available at their current level.
         
         Args:
             player_id: The player
+            show_locked: If True, also show abilities locked by level requirements
             
         Returns:
             List of events
@@ -5363,20 +5661,47 @@ class WorldEngine:
                 "You haven't learned any abilities yet."
             )]
         
-        lines = ["═══ Your Abilities ═══"]
-        lines.append("")
+        # Filter abilities by player's current level
+        player_level = player.level
+        available_abilities = []
+        locked_abilities = []
         
-        for ability_id in sorted(learned):
+        for ability_id in learned:
             ability = self.class_system.get_ability(ability_id)
             if not ability:
                 continue
             
+            if ability.required_level <= player_level:
+                available_abilities.append((ability_id, ability))
+            else:
+                locked_abilities.append((ability_id, ability))
+        
+        if not available_abilities:
+            return [self._msg_to_player(
+                player_id,
+                "You haven't unlocked any abilities at your current level yet."
+            )]
+        
+        lines = ["═══ Your Abilities ═══"]
+        lines.append(f"Level {player_level}")
+        lines.append("")
+        
+        # Sort by required level, then by name
+        available_abilities.sort(key=lambda x: (x[1].required_level, x[1].name))
+        
+        for ability_id, ability in available_abilities:
             # Get cooldown status
             cooldown = self.ability_executor.get_ability_cooldown(player_id, ability_id)
             cooldown_str = f" [CD: {cooldown:.1f}s]" if cooldown > 0 else ""
             
-            lines.append(f"{ability.name}{cooldown_str}")
-            lines.append(f"  {ability.description}")
+            # Show required level
+            level_str = f" (Lvl {ability.required_level})" if ability.required_level > 1 else ""
+            
+            # Indicate if it's a spell (requires 'cast') or skill (direct use)
+            usage_hint = f" [Use: cast {ability_id}]" if ability.ability_category == "magic" else f" [Use: {ability_id}]"
+            
+            lines.append(f"{ability.name}{level_str}{cooldown_str}")
+            lines.append(f"  {ability.description}{usage_hint}")
             
             # Show costs if any
             if ability.costs:
@@ -5384,6 +5709,21 @@ class WorldEngine:
                 lines.append(f"  Cost: {costs_str}")
             
             lines.append("")
+        
+        # Show locked abilities only if requested
+        if show_locked and locked_abilities:
+            lines.append("─── Locked Abilities ───")
+            lines.append("")
+            locked_abilities.sort(key=lambda x: (x[1].required_level, x[1].name))
+            
+            for ability_id, ability in locked_abilities:
+                lines.append(f"🔒 {ability.name} (Requires Level {ability.required_level})")
+                lines.append(f"  {ability.description}")
+                lines.append("")
+        
+        # Add helpful hint if there are locked abilities but they're not shown
+        if not show_locked and locked_abilities:
+            lines.append(f"💡 You have {len(locked_abilities)} locked ability{'ies' if len(locked_abilities) != 1 else 'y'}. Use 'abilities list' to see all.")
         
         return [self._msg_to_player(player_id, "\n".join(lines))]
     

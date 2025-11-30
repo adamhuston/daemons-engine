@@ -717,6 +717,107 @@ class WorldEntity:
         
         return self.base_attack_speed
     
+    # ========== D20 System Helper Methods ==========
+    # These methods delegate to the centralized d20 module for consistency
+    
+    def get_ability_modifier(self, stat_value: int) -> int:
+        """
+        Calculate D20 ability modifier from stat value.
+        Delegates to d20.calculate_ability_modifier() for centralized mechanics.
+        
+        Examples:
+            10 -> +0, 12 -> +1, 14 -> +2, 16 -> +3, 20 -> +5
+            8 -> -1, 6 -> -2
+        """
+        from .systems import d20
+        return d20.calculate_ability_modifier(stat_value)
+    
+    def get_proficiency_bonus(self) -> int:
+        """
+        Calculate proficiency bonus based on level.
+        Delegates to d20.calculate_proficiency_bonus() for centralized mechanics.
+        
+        Levels 1-4: +2
+        Levels 5-8: +3
+        Levels 9-12: +4
+        Levels 13-16: +5
+        Levels 17-20: +6
+        """
+        from .systems import d20
+        return d20.calculate_proficiency_bonus(self.level)
+    
+    def get_melee_attack_bonus(self, finesse: bool = False) -> int:
+        """
+        Calculate melee attack bonus.
+        Delegates to d20.calculate_melee_attack_bonus() for centralized mechanics.
+        
+        Args:
+            finesse: If True, use dexterity instead of strength
+        """
+        from .systems import d20
+        return d20.calculate_melee_attack_bonus(
+            self.get_effective_strength(),
+            self.level,
+            finesse=finesse,
+            dexterity=self.get_effective_dexterity()
+        )
+    
+    def get_spell_attack_bonus(self) -> int:
+        """
+        Calculate spell attack bonus.
+        Delegates to d20.calculate_spell_attack_bonus() for centralized mechanics.
+        
+        Uses intelligence as the spellcasting ability (can be customized per class).
+        """
+        from .systems import d20
+        return d20.calculate_spell_attack_bonus(
+            self.get_effective_intelligence(),
+            self.level
+        )
+    
+    def get_spell_save_dc(self) -> int:
+        """
+        Calculate spell save DC (difficulty class).
+        Delegates to d20.calculate_spell_save_dc() for centralized mechanics.
+        
+        Targets must roll d20 + their save modifier >= this DC to resist.
+        """
+        from .systems import d20
+        return d20.calculate_spell_save_dc(
+            self.get_effective_intelligence(),
+            self.level
+        )
+    
+    def make_saving_throw(self, save_type: str, dc: int) -> tuple[bool, int]:
+        """
+        Make a saving throw against a DC.
+        Delegates to d20.make_saving_throw() for centralized mechanics.
+        
+        Args:
+            save_type: "strength", "dexterity", "intelligence", "vitality" (constitution)
+            dc: Difficulty class to beat
+            
+        Returns:
+            (success, roll_total) - True if save succeeded, and the total roll
+        """
+        from .systems import d20
+        
+        # Get the appropriate stat modifier
+        stat_map = {
+            "strength": self.get_effective_strength(),
+            "dexterity": self.get_effective_dexterity(),
+            "intelligence": self.get_effective_intelligence(),
+            "vitality": self.get_effective_vitality(),
+            "constitution": self.get_effective_vitality(),  # Alias
+        }
+        
+        stat_value = stat_map.get(save_type, 10)
+        modifier = self.get_ability_modifier(stat_value)
+        
+        # Use centralized saving throw
+        success, roll, total = d20.make_saving_throw(modifier, dc)
+        return (success, total)
+    
     def get_weapon_stats(self, item_templates: Dict[str, 'ItemTemplate'] | None = None) -> WeaponStats:
         """
         Get combat stats for currently equipped weapon (or natural attacks).
@@ -1220,6 +1321,11 @@ class WorldPlayer(WorldEntity):
     # Phase 9: Character class and abilities
     character_sheet: CharacterSheet | None = None  # Optional - backward compatible
     
+    # Resting and regeneration
+    is_sleeping: bool = False  # Whether player is sleeping for faster regen
+    sleep_start_time: float | None = None  # When player started sleeping
+    last_regen_tick: float = field(default_factory=time.time)  # Last HP/resource regen time
+    
     def __post_init__(self):
         """Ensure entity_type is set correctly."""
         object.__setattr__(self, 'entity_type', EntityType.PLAYER)
@@ -1260,6 +1366,23 @@ class WorldPlayer(WorldEntity):
         if not self.character_sheet:
             return False
         return ability_id in self.character_sheet.learned_abilities
+    
+    def get_effective_armor_class(self) -> int:
+        """
+        Get armor class with all effect modifiers and sleeping penalty applied.
+        
+        Overrides WorldEntity.get_effective_armor_class() to add sleeping penalty.
+        """
+        from .systems import d20
+        
+        # Get base AC with effect modifiers
+        ac = super().get_effective_armor_class()
+        
+        # Apply sleeping penalty (you're defenseless while sleeping)
+        if self.is_sleeping:
+            ac += d20.SLEEPING_AC_PENALTY
+        
+        return ac
 
 
 @dataclass

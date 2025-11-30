@@ -539,7 +539,7 @@ class AbilityExecutor:
             behavior_result.effects_applied = combined_effects
             behavior_result.message = " ".join(combined_messages) if combined_messages else behavior_result.message
             
-            # 5. Check for target deaths after behavior chain execution
+            # 5. Check for target deaths and trigger retaliation after behavior chain execution
             death_events = []
             if targets and combined_damage > 0:
                 for target in targets if isinstance(targets, list) else [targets]:
@@ -553,10 +553,25 @@ class AbilityExecutor:
                         # Clear caster's combat state if target was their combat target
                         if hasattr(caster, 'combat') and caster.combat.target_id == target.id:
                             caster.combat.clear_combat()
-            
-            # Dispatch death events immediately
-            if death_events:
-                await self.context.event_dispatcher.dispatch(death_events)
+                    else:
+                        # Target survived - trigger retaliation/combat engagement
+                        world = self.context.world
+                        
+                        # If target is a player, make them auto-retaliate (if not already in combat)
+                        if target.id in world.players:
+                            if hasattr(target, 'combat') and not target.combat.is_in_combat():
+                                try:
+                                    retaliation_events = self.context.combat_system.start_attack_entity(
+                                        target.id, caster.id
+                                    )
+                                    if retaliation_events:
+                                        await self.context.event_dispatcher.dispatch(retaliation_events)
+                                except Exception as e:
+                                    logger.warning(f"Player retaliation failed: {e}")
+                        
+                        # If target is an NPC, trigger engine hooks so AI behaviors can respond
+                        elif target.id in world.npcs and self.context.engine:
+                            await self.context.engine._trigger_npc_combat_start(target.id, caster.id)
             
             # 6. Apply cooldowns
             self._apply_cooldowns(caster, ability)
@@ -574,7 +589,13 @@ class AbilityExecutor:
                 targets_hit=behavior_result.targets_hit
             )
             
+            # Dispatch ability completion events FIRST, then death events
+            # This ensures the hit message appears before the death message
             await self.context.event_dispatcher.dispatch([cooldown_event, complete_event])
+            
+            # Dispatch death events after ability completion
+            if death_events:
+                await self.context.event_dispatcher.dispatch(death_events)
             
             logger.info(
                 f"{caster.name} cast {ability_id}: {behavior_result.message}"

@@ -130,10 +130,10 @@ async def arcane_bolt_behavior(
     """
     Basic arcane spell attack behavior.
     
-    Handles:
-    - Intelligence-based spell damage calculation
-    - Spell hit chance (vs target AC)
-    - Mana cost
+    Uses D20 spell attack mechanics:
+    - Spell attack roll: d20 + spell attack bonus vs target AC
+    - Damage: 1d10 + intelligence modifier
+    - Intelligence scaling from ability template
     
     Args:
         caster: The entity casting the ability
@@ -146,47 +146,74 @@ async def arcane_bolt_behavior(
         BehaviorResult with damage_dealt, success status
     """
     try:
-        # Calculate base spell damage
         import random
-        base_damage = random.randint(10, 20)  # Base arcane bolt damage
+        from .. import d20
         
-        # Apply intelligence scaling
-        scaling = ability_template.scaling or {}
-        damage = base_damage
+        # ========== D20 SPELL ATTACK ROLL ==========
+        spell_attack_bonus = caster.get_spell_attack_bonus()
+        target_ac = target.get_effective_armor_class()
         
-        for stat_name, multiplier in scaling.items():
-            stat_value = getattr(caster, stat_name, 0)
-            damage += int(stat_value * multiplier)
+        # Use centralized d20 attack roll mechanics
+        is_hit, attack_roll, attack_total, is_crit = d20.make_attack_roll(spell_attack_bonus, target_ac)
         
-        # Spell hit check (spells have higher base hit chance)
-        hit_roll = random.randint(1, 20) + 5  # +5 spell attack bonus
-        if hit_roll >= target.armor_class:
-            # Hit - apply damage
-            old_hp = target.current_health
-            target.current_health = max(0, target.current_health - damage)
-            
+        # Miss
+        if not is_hit:
             logger.info(
-                f"{caster.name} hit {target.name} with Arcane Bolt for {damage} damage "
-                f"({old_hp} -> {target.current_health} HP)"
+                f"{caster.name}'s Arcane Bolt missed {target.name} "
+                f"(rolled {attack_roll}+{spell_attack_bonus}={attack_total} vs AC {target_ac})"
             )
-            
-            return BehaviorResult(
-                success=True,
-                damage_dealt=damage,
-                targets_hit=[target.id],
-                cooldown_applied=ability_template.cooldown or 0.0,
-                message=f"Your Arcane Bolt hits {target.name} for {damage} damage!"
-            )
-        else:
-            # Miss
-            logger.info(f"{caster.name}'s Arcane Bolt missed {target.name}")
+            miss_message = f"Your Arcane Bolt misses {target.name}! (rolled {attack_roll}+{spell_attack_bonus}={attack_total} vs AC {target_ac})"
             return BehaviorResult(
                 success=True,
                 damage_dealt=0,
                 targets_hit=[],
                 cooldown_applied=ability_template.cooldown or 0.0,
-                message=f"Your Arcane Bolt misses {target.name}!"
+                message=miss_message
             )
+        
+        # ========== CALCULATE SPELL DAMAGE ==========
+        # Base damage: 1d10
+        base_damage = random.randint(1, 10)
+        
+        # Add intelligence modifier
+        int_mod = caster.get_ability_modifier(caster.get_effective_intelligence())
+        damage = base_damage + int_mod
+        
+        # Apply intelligence scaling from ability template
+        scaling = ability_template.scaling or {}
+        for stat_name, multiplier in scaling.items():
+            if stat_name == "intelligence":
+                stat_value = caster.get_effective_intelligence()
+                # Add scaled damage (beyond the base modifier)
+                extra_damage = int(stat_value * multiplier) - int_mod  # Subtract already-added mod
+                damage += max(0, extra_damage)
+        
+        # Critical hits use centralized d20 mechanics
+        if is_crit:
+            damage = d20.calculate_critical_damage(damage, int_mod)
+        
+        # Ensure minimum 1 damage
+        damage = max(1, damage)
+        
+        # Apply damage to target
+        old_hp = target.current_health
+        target.current_health = max(0, target.current_health - damage)
+        
+        crit_text = " **CRITICAL HIT!**" if is_crit else ""
+        roll_info = f" (natural 20!)" if is_crit else f" (rolled {attack_roll}+{spell_attack_bonus}={attack_total} vs AC {target_ac})"
+        
+        logger.info(
+            f"{caster.name} hit {target.name} with Arcane Bolt for {damage} damage{crit_text} "
+            f"({old_hp} -> {target.current_health} HP)"
+        )
+        
+        return BehaviorResult(
+            success=True,
+            damage_dealt=damage,
+            targets_hit=[target.id],
+            cooldown_applied=ability_template.cooldown or 0.0,
+            message=f"Your Arcane Bolt hits {target.name} for {damage} damage!{crit_text}{roll_info}"
+        )
     
     except Exception as e:
         logger.error(f"Error in arcane_bolt_behavior: {e}", exc_info=True)
@@ -688,41 +715,61 @@ async def frostbolt_behavior(
     """
     Ice spell that damages and slows the target.
     
-    Basic mage ranged attack with crowd control component.
-    Scales with intelligence.
+    Uses D20 spell attack mechanics.
+    Damage: 1d8 + intelligence modifier + slow effect
     """
     try:
-        # Calculate base damage from intelligence
-        int_stat = caster.character_sheet.stats.get("intelligence", 10)
-        int_scaling = ability_template.scaling.get("intelligence", 1.2)
-        base_damage = int(int_stat * int_scaling)
-        
-        # Spell hit check
-        spell_hit_chance = 0.85 + (int_stat / 500)
         import random
-        if random.random() > spell_hit_chance:
+        from .. import d20
+        
+        # ========== D20 SPELL ATTACK ROLL ==========
+        spell_attack_bonus = caster.get_spell_attack_bonus()
+        target_ac = target.get_effective_armor_class()
+        
+        is_hit, attack_roll, attack_total, is_crit = d20.make_attack_roll(spell_attack_bonus, target_ac)
+        
+        if not is_hit:
             logger.info(f"{caster.name}'s Frostbolt missed {target.name}")
             return BehaviorResult(
                 success=True,
                 targets_hit=[],
-                message=f"Your Frostbolt fizzles and misses {target.name}!"
+                message=f"Your Frostbolt fizzles and misses {target.name}! (rolled {attack_roll}+{spell_attack_bonus}={attack_total} vs AC {target_ac})"
             )
         
+        # ========== CALCULATE DAMAGE ==========
+        base_damage = random.randint(1, 8)  # 1d8
+        int_mod = caster.get_ability_modifier(caster.get_effective_intelligence())
+        damage = base_damage + int_mod
+        
+        # Apply scaling
+        scaling = ability_template.scaling or {}
+        for stat_name, multiplier in scaling.items():
+            if stat_name == "intelligence":
+                stat_value = caster.get_effective_intelligence()
+                extra_damage = int(stat_value * multiplier) - int_mod
+                damage += max(0, extra_damage)
+        
+        if is_crit:
+            damage = d20.calculate_critical_damage(damage, int_mod)
+        
+        damage = max(1, damage)
+        
         # Apply damage
-        target.character_sheet.stats["health"] = max(
-            0, target.character_sheet.stats.get("health", 100) - base_damage
-        )
+        old_hp = target.current_health
+        target.current_health = max(0, target.current_health - damage)
+        
+        crit_text = " **CRITICAL!**" if is_crit else ""
         
         logger.info(
-            f"{caster.name} hit {target.name} with Frostbolt for {base_damage} frost damage"
+            f"{caster.name} hit {target.name} with Frostbolt for {damage} frost damage{crit_text}"
         )
         
         return BehaviorResult(
             success=True,
             targets_hit=[target.id],
-            damage_dealt=base_damage,
+            damage_dealt=damage,
             effects_applied=["slow_effect"],
-            message=f"Your Frostbolt hits {target.name} for {base_damage} frost damage and slows them!"
+            message=f"Your Frostbolt hits {target.name} for {damage} frost damage and slows them!{crit_text}"
         )
     
     except Exception as e:
@@ -744,12 +791,14 @@ async def mana_shield_behavior(
     Mana-based damage absorption shield.
     
     Creates a protective barrier that absorbs damage.
-    Shield strength scales with intelligence.
+    Shield strength scales with intelligence: 5 HP per point of INT.
     """
     try:
-        int_stat = caster.character_sheet.stats.get("intelligence", 10)
-        int_scaling = ability_template.scaling.get("intelligence", 1.0)
-        shield_amount = int(int_stat * int_scaling * 5)  # 5x intelligence
+        int_stat = caster.get_effective_intelligence()
+        int_mod = caster.get_ability_modifier(int_stat)
+        
+        # Shield strength: 5 HP per intelligence point
+        shield_amount = int_stat * 5
         
         logger.info(
             f"{caster.name} activated Mana Shield - absorbs {shield_amount} damage"
@@ -759,7 +808,7 @@ async def mana_shield_behavior(
             success=True,
             targets_hit=[caster.id],
             effects_applied=["shield_effect"],
-            message=f"A shimmering barrier of mana surrounds you! (Shield: {shield_amount})"
+            message=f"A shimmering barrier of mana surrounds you! (Shield: {shield_amount} HP)"
         )
     
     except Exception as e:
@@ -780,40 +829,64 @@ async def quick_strike_behavior(
     """
     Fast melee attack for rogues.
     
+    Uses D20 melee attack mechanics with dexterity (finesse weapon).
     Low-damage, low-cooldown strike that can be chained.
-    Scales with dexterity.
     """
     try:
-        # Calculate damage from dexterity
-        dex_stat = caster.character_sheet.stats.get("dexterity", 10)
-        dex_scaling = ability_template.scaling.get("dexterity", 1.0)
-        base_damage = int(dex_stat * dex_scaling)
-        
-        # Melee hit check (high accuracy)
-        hit_chance = 0.95 + (dex_stat / 1000)
         import random
-        if random.random() > hit_chance:
+        from .. import d20
+        
+        # ========== D20 MELEE ATTACK ROLL (Finesse) ==========
+        # Use melee attack bonus with finesse (dexterity instead of strength)
+        attack_bonus = caster.get_melee_attack_bonus(finesse=True)
+        target_ac = target.get_effective_armor_class()
+        
+        is_hit, attack_roll, attack_total, is_crit = d20.make_attack_roll(attack_bonus, target_ac)
+        
+        # Get dex modifier for damage
+        dex_mod = caster.get_ability_modifier(caster.get_effective_dexterity())
+        
+        if not is_hit:
             logger.info(f"{caster.name}'s Quick Strike missed {target.name}")
             return BehaviorResult(
                 success=True,
                 targets_hit=[],
-                message=f"Your Quick Strike misses {target.name}!"
+                message=f"Your Quick Strike misses {target.name}! (rolled {attack_roll}+{attack_bonus}={attack_total} vs AC {target_ac})"
             )
         
+        # ========== CALCULATE DAMAGE ==========
+        # Base damage: 1d4 (light weapon)
+        base_damage = random.randint(1, 4)
+        damage = base_damage + dex_mod
+        
+        # Apply scaling
+        scaling = ability_template.scaling or {}
+        for stat_name, multiplier in scaling.items():
+            if stat_name == "dexterity":
+                stat_value = caster.get_effective_dexterity()
+                extra_damage = int(stat_value * multiplier) - dex_mod
+                damage += max(0, extra_damage)
+        
+        if is_crit:
+            damage = d20.calculate_critical_damage(damage, dex_mod)
+        
+        damage = max(1, damage)
+        
         # Apply damage
-        target.character_sheet.stats["health"] = max(
-            0, target.character_sheet.stats.get("health", 100) - base_damage
-        )
+        old_hp = target.current_health
+        target.current_health = max(0, target.current_health - damage)
+        
+        crit_text = " **CRITICAL!**" if is_crit else ""
         
         logger.info(
-            f"{caster.name} hit {target.name} with Quick Strike for {base_damage} damage"
+            f"{caster.name} hit {target.name} with Quick Strike for {damage} damage{crit_text}"
         )
         
         return BehaviorResult(
             success=True,
             targets_hit=[target.id],
-            damage_dealt=base_damage,
-            message=f"You quickly strike {target.name} for {base_damage} damage!"
+            damage_dealt=damage,
+            message=f"You quickly strike {target.name} for {damage} damage!{crit_text}"
         )
     
     except Exception as e:
@@ -834,19 +907,23 @@ async def poison_strike_behavior(
     """
     Melee attack that applies poison damage over time.
     
-    Rogue ability with DoT (damage over time) component.
-    Scales with dexterity.
+    Uses D20 melee attack with dexterity (finesse).
+    Applies poison effect on hit.
     """
     try:
-        # Calculate initial damage from dexterity
-        dex_stat = caster.character_sheet.stats.get("dexterity", 10)
-        dex_scaling = ability_template.scaling.get("dexterity", 1.2)
-        base_damage = int(dex_stat * dex_scaling * 0.8)  # Lower initial damage
-        
-        # Melee hit check
-        hit_chance = 0.90 + (dex_stat / 500)
         import random
-        if random.random() > hit_chance:
+        from .. import d20
+        
+        # ========== D20 MELEE ATTACK ROLL (Finesse) ==========
+        attack_bonus = caster.get_melee_attack_bonus(finesse=True)
+        target_ac = target.get_effective_armor_class()
+        
+        is_hit, attack_roll, attack_total, is_crit = d20.make_attack_roll(attack_bonus, target_ac)
+        
+        # Get dex modifier for damage
+        dex_mod = caster.get_ability_modifier(caster.get_effective_dexterity())
+        
+        if not is_hit:
             logger.info(f"{caster.name}'s Poison Strike missed {target.name}")
             return BehaviorResult(
                 success=True,
@@ -854,21 +931,43 @@ async def poison_strike_behavior(
                 message=f"Your Poison Strike misses {target.name}!"
             )
         
-        # Apply initial damage
-        target.character_sheet.stats["health"] = max(
-            0, target.character_sheet.stats.get("health", 100) - base_damage
-        )
+        # ========== CALCULATE DAMAGE ==========
+        # Base damage: 1d6 (poisoned blade)
+        base_damage = random.randint(1, 6)
+        damage = base_damage + dex_mod
+        
+        # Apply scaling
+        scaling = ability_template.scaling or {}
+        for stat_name, multiplier in scaling.items():
+            if stat_name == "dexterity":
+                stat_value = caster.get_effective_dexterity()
+                extra_damage = int(stat_value * multiplier) - dex_mod
+                damage += max(0, extra_damage)
+        
+        # Reduce initial damage (DoT will do more over time)
+        damage = int(damage * 0.8)
+        
+        if is_crit:
+            damage = d20.calculate_critical_damage(damage, dex_mod)
+        
+        damage = max(1, damage)
+        
+        # Apply damage
+        old_hp = target.current_health
+        target.current_health = max(0, target.current_health - damage)
+        
+        crit_text = " **CRITICAL!**" if is_crit else ""
         
         logger.info(
-            f"{caster.name} hit {target.name} with Poison Strike for {base_damage} damage + poison"
+            f"{caster.name} hit {target.name} with Poison Strike for {damage} damage + poison{crit_text}"
         )
         
         return BehaviorResult(
             success=True,
             targets_hit=[target.id],
-            damage_dealt=base_damage,
+            damage_dealt=damage,
             effects_applied=["poison_effect"],
-            message=f"You strike {target.name} with poisoned blades for {base_damage} damage! Poison spreads..."
+            message=f"You strike {target.name} with poisoned blades for {damage} damage!{crit_text} Poison spreads..."
         )
     
     except Exception as e:
