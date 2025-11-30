@@ -254,8 +254,9 @@ def main(page: ft.Page):
                 elif ev_type == "message" and text:
                     append_line(text)
                 elif ev_type == "stat_update" and payload:
-                    if "current_health" in payload:
-                        state["current_health"] = payload["current_health"]
+                    # Server sends "health" for current health
+                    if "health" in payload:
+                        state["current_health"] = payload["health"]
                     if "max_health" in payload:
                         state["max_health"] = payload["max_health"]
                     

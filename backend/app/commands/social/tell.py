@@ -40,6 +40,11 @@ class TellCommand:
         target_name = parts[0]
         message = parts[1]
         
+        # Check if sender is dead
+        sender = self.ctx.world.players.get(player_id)
+        if sender and not sender.is_alive():
+            return [self.ctx.msg_to_player(player_id, "The dead cannot send tells.")]
+        
         # Find target player
         target_id = None
         for pid, p in self.ctx.world.players.items():
@@ -89,6 +94,11 @@ class TellCommand:
             )]
         
         player = self.ctx.world.players[player_id]
+        
+        # Check if sender is dead
+        if not player.is_alive():
+            return [self.ctx.msg_to_player(player_id, "The dead cannot send tells.")]
+        
         if not player.player_flags or "last_tell_from" not in player.player_flags:
             return [self.ctx.msg_to_player(
                 player_id,

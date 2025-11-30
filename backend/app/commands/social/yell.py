@@ -29,6 +29,11 @@ class YellCommand:
         
         message = args.strip()
         player = self.ctx.world.players[player_id]
+        
+        # Check if dead
+        if not player.is_alive():
+            return [self.ctx.msg_to_player(player_id, "The dead cannot yell.")]
+        
         room_id = player.room_id
         room = self.ctx.world.rooms.get(room_id)
         

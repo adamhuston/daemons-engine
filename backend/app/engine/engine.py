@@ -1394,7 +1394,7 @@ class WorldEngine:
                 "type": "stat_update",
                 "scope": "player",
                 "player_id": target.id,
-                "payload": {"current_health": target.max_health, "max_health": target.max_health}
+                "payload": {"health": target.max_health, "max_health": target.max_health}
             })
         
         # Notify room
@@ -3333,6 +3333,10 @@ class WorldEngine:
 
         player = world.players[player_id]
         
+        # Check if dead
+        if not player.is_alive():
+            return [self._msg_to_player(player_id, "You can't move while dead.")]
+        
         # Check if sleeping
         sleeping_check = self._check_sleeping(player_id)
         if sleeping_check:
@@ -4185,6 +4189,11 @@ class WorldEngine:
             ]
 
         player = world.players[player_id]
+        
+        # Check if dead
+        if not player.is_alive():
+            return [self._msg_to_player(player_id, "The dead cannot speak.")]
+        
         room = world.rooms.get(player.room_id)
 
         if room is None:
@@ -4228,6 +4237,11 @@ class WorldEngine:
             ]
 
         player = world.players[player_id]
+        
+        # Check if dead
+        if not player.is_alive():
+            return [self._msg_to_player(player_id, "The dead cannot emote.")]
+        
         room = world.rooms.get(player.room_id)
 
         if room is None:
@@ -4894,12 +4908,17 @@ class WorldEngine:
         if player_id not in world.players:
             return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
         
+        player = world.players[player_id]
+        
+        # Check if dead
+        if not player.is_alive():
+            return [self._msg_to_player(player_id, "You can't pick up items while dead.")]
+        
         # Check if sleeping
         sleeping_check = self._check_sleeping(player_id)
         if sleeping_check:
             return sleeping_check
         
-        player = world.players[player_id]
         room = world.rooms[player.room_id]
         
         # Find item in room by name
@@ -5404,6 +5423,11 @@ class WorldEngine:
             return [self._msg_to_player(player_id, "You have no form. (Player not found)")]
         
         player = world.players[player_id]
+        
+        # Check if dead
+        if not player.is_alive():
+            return [self._msg_to_player(player_id, "You can't give items while dead.")]
+        
         room = world.rooms[player.room_id]
         
         # Find the item in giver's inventory
@@ -5525,6 +5549,10 @@ class WorldEngine:
         player = self.world.players.get(player_id)
         if not player:
             return [self._msg_to_player(player_id, "You have no form.")]
+        
+        # Check if dead
+        if not player.is_alive():
+            return [self._msg_to_player(player_id, "You can't use abilities while dead.")]
         
         # Check if sleeping
         sleeping_check = self._check_sleeping(player_id)
