@@ -14,37 +14,43 @@ All log entries include contextual information like player_id, room_id, etc.
 
 import logging
 import sys
-from typing import Any, Optional
 from datetime import datetime
+from typing import Any
 
 import structlog
 from structlog.typing import EventDict, WrappedLogger
-
 
 # ============================================================================
 # Custom Processors
 # ============================================================================
 
-def add_timestamp(logger: WrappedLogger, method_name: str, event_dict: EventDict) -> EventDict:
+
+def add_timestamp(
+    logger: WrappedLogger, method_name: str, event_dict: EventDict
+) -> EventDict:
     """Add ISO timestamp to all log entries."""
     event_dict["timestamp"] = datetime.utcnow().isoformat() + "Z"
     return event_dict
 
 
-def add_service_name(logger: WrappedLogger, method_name: str, event_dict: EventDict) -> EventDict:
+def add_service_name(
+    logger: WrappedLogger, method_name: str, event_dict: EventDict
+) -> EventDict:
     """Add service name for log aggregation."""
     event_dict["service"] = "daemons"
     return event_dict
 
 
-def sanitize_sensitive_data(logger: WrappedLogger, method_name: str, event_dict: EventDict) -> EventDict:
+def sanitize_sensitive_data(
+    logger: WrappedLogger, method_name: str, event_dict: EventDict
+) -> EventDict:
     """Remove or mask sensitive fields from logs."""
     sensitive_keys = {"password", "token", "secret", "api_key", "authorization"}
-    
+
     for key in list(event_dict.keys()):
         if any(s in key.lower() for s in sensitive_keys):
             event_dict[key] = "[REDACTED]"
-    
+
     return event_dict
 
 
@@ -52,14 +58,13 @@ def sanitize_sensitive_data(logger: WrappedLogger, method_name: str, event_dict:
 # Logger Configuration
 # ============================================================================
 
+
 def configure_logging(
-    development: bool = True,
-    log_level: str = "INFO",
-    json_output: bool = False
+    development: bool = True, log_level: str = "INFO", json_output: bool = False
 ) -> None:
     """
     Configure structured logging for the application.
-    
+
     Args:
         development: If True, use pretty console output. If False, use JSON.
         log_level: Minimum log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -69,9 +74,9 @@ def configure_logging(
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=getattr(logging, log_level.upper(), logging.INFO)
+        level=getattr(logging, log_level.upper(), logging.INFO),
     )
-    
+
     # Shared processors for all environments
     shared_processors = [
         structlog.contextvars.merge_contextvars,
@@ -85,18 +90,14 @@ def configure_logging(
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
     ]
-    
+
     if development and not json_output:
         # Pretty console output for development
-        processors = shared_processors + [
-            structlog.dev.ConsoleRenderer(colors=True)
-        ]
+        processors = shared_processors + [structlog.dev.ConsoleRenderer(colors=True)]
     else:
         # JSON output for production
-        processors = shared_processors + [
-            structlog.processors.JSONRenderer()
-        ]
-    
+        processors = shared_processors + [structlog.processors.JSONRenderer()]
+
     structlog.configure(
         processors=processors,
         wrapper_class=structlog.stdlib.BoundLogger,
@@ -109,7 +110,7 @@ def configure_logging(
 def get_logger(name: str = "daemons") -> structlog.stdlib.BoundLogger:
     """
     Get a configured structured logger.
-    
+
     Usage:
         logger = get_logger(__name__)
         logger.info("Player connected", player_id="abc123", room_id="room1")
@@ -121,20 +122,15 @@ def get_logger(name: str = "daemons") -> structlog.stdlib.BoundLogger:
 # Context Managers for Request/Session Logging
 # ============================================================================
 
+
 def bind_player_context(player_id: str, player_name: str = None) -> None:
     """Bind player context to all subsequent log entries in this request."""
-    structlog.contextvars.bind_contextvars(
-        player_id=player_id,
-        player_name=player_name
-    )
+    structlog.contextvars.bind_contextvars(player_id=player_id, player_name=player_name)
 
 
 def bind_request_context(request_id: str, endpoint: str = None) -> None:
     """Bind request context to all subsequent log entries."""
-    structlog.contextvars.bind_contextvars(
-        request_id=request_id,
-        endpoint=endpoint
-    )
+    structlog.contextvars.bind_contextvars(request_id=request_id, endpoint=endpoint)
 
 
 def clear_context() -> None:
@@ -146,10 +142,11 @@ def clear_context() -> None:
 # Specialized Loggers
 # ============================================================================
 
+
 class AdminAuditLogger:
     """
     Specialized logger for admin actions that should be audited.
-    
+
     All admin actions are logged with:
     - Admin user ID and name
     - Action type
@@ -157,10 +154,10 @@ class AdminAuditLogger:
     - Timestamp
     - Success/failure status
     """
-    
+
     def __init__(self):
         self.logger = get_logger("daemons.admin.audit")
-    
+
     def log_action(
         self,
         admin_id: str,
@@ -169,11 +166,11 @@ class AdminAuditLogger:
         target_type: str = None,
         target_id: str = None,
         details: dict = None,
-        success: bool = True
+        success: bool = True,
     ) -> None:
         """
         Log an admin action for audit purposes.
-        
+
         Args:
             admin_id: UUID of the admin user
             admin_name: Display name of the admin
@@ -192,15 +189,15 @@ class AdminAuditLogger:
             "success": success,
             "audit": True,  # Flag for log aggregation filtering
         }
-        
+
         if details:
             log_data["details"] = details
-        
+
         if success:
             self.logger.info("Admin action performed", **log_data)
         else:
             self.logger.warning("Admin action failed", **log_data)
-    
+
     def log_teleport(
         self,
         admin_id: str,
@@ -208,7 +205,7 @@ class AdminAuditLogger:
         target_player_id: str,
         from_room: str,
         to_room: str,
-        success: bool = True
+        success: bool = True,
     ) -> None:
         """Log a teleport action."""
         self.log_action(
@@ -218,9 +215,9 @@ class AdminAuditLogger:
             target_type="player",
             target_id=target_player_id,
             details={"from_room": from_room, "to_room": to_room},
-            success=success
+            success=success,
         )
-    
+
     def log_spawn(
         self,
         admin_id: str,
@@ -229,7 +226,7 @@ class AdminAuditLogger:
         template_id: str,
         room_id: str,
         instance_id: str = None,
-        success: bool = True
+        success: bool = True,
     ) -> None:
         """Log a spawn action."""
         self.log_action(
@@ -239,16 +236,16 @@ class AdminAuditLogger:
             target_type=entity_type,
             target_id=instance_id,
             details={"template_id": template_id, "room_id": room_id},
-            success=success
+            success=success,
         )
-    
+
     def log_kick(
         self,
         admin_id: str,
         admin_name: str,
         target_player_id: str,
         reason: str,
-        success: bool = True
+        success: bool = True,
     ) -> None:
         """Log a kick action."""
         self.log_action(
@@ -258,9 +255,9 @@ class AdminAuditLogger:
             target_type="player",
             target_id=target_player_id,
             details={"reason": reason},
-            success=success
+            success=success,
         )
-    
+
     def log_give_item(
         self,
         admin_id: str,
@@ -268,7 +265,7 @@ class AdminAuditLogger:
         target_player_id: str,
         item_template_id: str,
         quantity: int,
-        success: bool = True
+        success: bool = True,
     ) -> None:
         """Log a give item action."""
         self.log_action(
@@ -278,9 +275,9 @@ class AdminAuditLogger:
             target_type="player",
             target_id=target_player_id,
             details={"item_template_id": item_template_id, "quantity": quantity},
-            success=success
+            success=success,
         )
-    
+
     def log_modify_stat(
         self,
         admin_id: str,
@@ -289,7 +286,7 @@ class AdminAuditLogger:
         stat_name: str,
         old_value: Any,
         new_value: Any,
-        success: bool = True
+        success: bool = True,
     ) -> None:
         """Log a stat modification action."""
         self.log_action(
@@ -301,11 +298,11 @@ class AdminAuditLogger:
             details={
                 "stat_name": stat_name,
                 "old_value": old_value,
-                "new_value": new_value
+                "new_value": new_value,
             },
-            success=success
+            success=success,
         )
-    
+
     def log_content_reload(
         self,
         admin_id: str,
@@ -314,7 +311,7 @@ class AdminAuditLogger:
         items_loaded: int,
         items_updated: int,
         items_failed: int,
-        success: bool = True
+        success: bool = True,
     ) -> None:
         """Log a content reload action."""
         self.log_action(
@@ -326,18 +323,18 @@ class AdminAuditLogger:
             details={
                 "items_loaded": items_loaded,
                 "items_updated": items_updated,
-                "items_failed": items_failed
+                "items_failed": items_failed,
             },
-            success=success
+            success=success,
         )
-    
+
     def log_maintenance_toggle(
         self,
         admin_id: str,
         enabled: bool,
         reason: str = None,
         kick_players: bool = False,
-        success: bool = True
+        success: bool = True,
     ) -> None:
         """Log maintenance mode toggle."""
         self.log_action(
@@ -349,17 +346,17 @@ class AdminAuditLogger:
             details={
                 "enabled": enabled,
                 "reason": reason,
-                "kick_players": kick_players
+                "kick_players": kick_players,
             },
-            success=success
+            success=success,
         )
-    
+
     def log_shutdown_initiated(
         self,
         admin_id: str,
         countdown_seconds: int,
         reason: str = None,
-        success: bool = True
+        success: bool = True,
     ) -> None:
         """Log server shutdown initiation."""
         self.log_action(
@@ -368,18 +365,11 @@ class AdminAuditLogger:
             action="shutdown_initiated",
             target_type="server",
             target_id="shutdown",
-            details={
-                "countdown_seconds": countdown_seconds,
-                "reason": reason
-            },
-            success=success
+            details={"countdown_seconds": countdown_seconds, "reason": reason},
+            success=success,
         )
-    
-    def log_shutdown_cancelled(
-        self,
-        admin_id: str,
-        success: bool = True
-    ) -> None:
+
+    def log_shutdown_cancelled(self, admin_id: str, success: bool = True) -> None:
         """Log server shutdown cancellation."""
         self.log_action(
             admin_id=admin_id,
@@ -388,51 +378,55 @@ class AdminAuditLogger:
             target_type="server",
             target_id="shutdown",
             details={},
-            success=success
+            success=success,
         )
 
 
 class GameEventLogger:
     """
     Specialized logger for game events.
-    
+
     Logs significant game events for analytics and debugging:
     - Combat events
     - Player actions
     - NPC behavior
     - System events
     """
-    
+
     def __init__(self):
         self.logger = get_logger("daemons.game.events")
-    
-    def log_player_connect(self, player_id: str, player_name: str, room_id: str) -> None:
+
+    def log_player_connect(
+        self, player_id: str, player_name: str, room_id: str
+    ) -> None:
         """Log player connection."""
         self.logger.info(
             "Player connected",
             player_id=player_id,
             player_name=player_name,
             room_id=room_id,
-            event_type="player_connect"
+            event_type="player_connect",
         )
-    
-    def log_player_disconnect(self, player_id: str, player_name: str, session_duration: float = None) -> None:
+
+    def log_player_disconnect(
+        self, player_id: str, player_name: str, session_duration: float = None
+    ) -> None:
         """Log player disconnection."""
         self.logger.info(
             "Player disconnected",
             player_id=player_id,
             player_name=player_name,
             session_duration_seconds=session_duration,
-            event_type="player_disconnect"
+            event_type="player_disconnect",
         )
-    
+
     def log_combat_start(
         self,
         attacker_id: str,
         attacker_type: str,
         defender_id: str,
         defender_type: str,
-        room_id: str
+        room_id: str,
     ) -> None:
         """Log combat initiation."""
         self.logger.info(
@@ -442,15 +436,11 @@ class GameEventLogger:
             defender_id=defender_id,
             defender_type=defender_type,
             room_id=room_id,
-            event_type="combat_start"
+            event_type="combat_start",
         )
-    
+
     def log_combat_end(
-        self,
-        winner_id: str,
-        loser_id: str,
-        cause: str,
-        room_id: str
+        self, winner_id: str, loser_id: str, cause: str, room_id: str
     ) -> None:
         """Log combat conclusion."""
         self.logger.info(
@@ -459,16 +449,16 @@ class GameEventLogger:
             loser_id=loser_id,
             cause=cause,
             room_id=room_id,
-            event_type="combat_end"
+            event_type="combat_end",
         )
-    
+
     def log_player_death(
         self,
         player_id: str,
         player_name: str,
         cause: str,
         killer_id: str = None,
-        room_id: str = None
+        room_id: str = None,
     ) -> None:
         """Log player death."""
         self.logger.warning(
@@ -478,9 +468,9 @@ class GameEventLogger:
             cause=cause,
             killer_id=killer_id,
             room_id=room_id,
-            event_type="player_death"
+            event_type="player_death",
         )
-    
+
     def log_npc_spawn(self, npc_id: str, template_id: str, room_id: str) -> None:
         """Log NPC spawn."""
         self.logger.debug(
@@ -488,10 +478,12 @@ class GameEventLogger:
             npc_id=npc_id,
             template_id=template_id,
             room_id=room_id,
-            event_type="npc_spawn"
+            event_type="npc_spawn",
         )
-    
-    def log_npc_death(self, npc_id: str, template_id: str, killer_id: str, room_id: str) -> None:
+
+    def log_npc_death(
+        self, npc_id: str, template_id: str, killer_id: str, room_id: str
+    ) -> None:
         """Log NPC death."""
         self.logger.debug(
             "NPC died",
@@ -499,10 +491,12 @@ class GameEventLogger:
             template_id=template_id,
             killer_id=killer_id,
             room_id=room_id,
-            event_type="npc_death"
+            event_type="npc_death",
         )
-    
-    def log_item_pickup(self, player_id: str, item_id: str, item_name: str, room_id: str) -> None:
+
+    def log_item_pickup(
+        self, player_id: str, item_id: str, item_name: str, room_id: str
+    ) -> None:
         """Log item pickup."""
         self.logger.debug(
             "Item picked up",
@@ -510,10 +504,12 @@ class GameEventLogger:
             item_id=item_id,
             item_name=item_name,
             room_id=room_id,
-            event_type="item_pickup"
+            event_type="item_pickup",
         )
-    
-    def log_item_drop(self, player_id: str, item_id: str, item_name: str, room_id: str) -> None:
+
+    def log_item_drop(
+        self, player_id: str, item_id: str, item_name: str, room_id: str
+    ) -> None:
         """Log item drop."""
         self.logger.debug(
             "Item dropped",
@@ -521,30 +517,26 @@ class GameEventLogger:
             item_id=item_id,
             item_name=item_name,
             room_id=room_id,
-            event_type="item_drop"
+            event_type="item_drop",
         )
 
 
 class PerformanceLogger:
     """
     Specialized logger for performance metrics.
-    
+
     Logs timing and performance data for:
     - Command processing time
     - Database query time
     - WebSocket message latency
     - Tick processing time
     """
-    
+
     def __init__(self):
         self.logger = get_logger("daemons.performance")
-    
+
     def log_command_timing(
-        self,
-        command: str,
-        player_id: str,
-        duration_ms: float,
-        success: bool = True
+        self, command: str, player_id: str, duration_ms: float, success: bool = True
     ) -> None:
         """Log command processing time."""
         level = "debug" if duration_ms < 100 else "warning"
@@ -554,14 +546,11 @@ class PerformanceLogger:
             player_id=player_id,
             duration_ms=round(duration_ms, 2),
             success=success,
-            metric_type="command_timing"
+            metric_type="command_timing",
         )
-    
+
     def log_tick_timing(
-        self,
-        tick_type: str,
-        duration_ms: float,
-        entities_processed: int = 0
+        self, tick_type: str, duration_ms: float, entities_processed: int = 0
     ) -> None:
         """Log game tick processing time."""
         self.logger.debug(
@@ -569,15 +558,11 @@ class PerformanceLogger:
             tick_type=tick_type,
             duration_ms=round(duration_ms, 2),
             entities_processed=entities_processed,
-            metric_type="tick_timing"
+            metric_type="tick_timing",
         )
-    
+
     def log_db_query(
-        self,
-        query_type: str,
-        table: str,
-        duration_ms: float,
-        rows_affected: int = 0
+        self, query_type: str, table: str, duration_ms: float, rows_affected: int = 0
     ) -> None:
         """Log database query timing."""
         level = "debug" if duration_ms < 50 else "warning"
@@ -587,7 +572,7 @@ class PerformanceLogger:
             table=table,
             duration_ms=round(duration_ms, 2),
             rows_affected=rows_affected,
-            metric_type="db_query"
+            metric_type="db_query",
         )
 
 

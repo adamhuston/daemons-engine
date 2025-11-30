@@ -7,15 +7,16 @@ This module provides:
 3. Validation and error handling for content loading
 4. AbilityExecutor for ability validation, cooldown, and execution
 """
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Dict, Set, List, Optional, Any, Tuple
-import yaml
+
 import logging
 import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
-from app.engine.world import ResourceDef, StatGrowth, WorldPlayer, WorldEntity
+import yaml
 from app.engine.systems.context import GameContext
+from app.engine.world import ResourceDef, StatGrowth, WorldEntity, WorldPlayer
 
 logger = logging.getLogger(__name__)
 
@@ -24,39 +25,41 @@ logger = logging.getLogger(__name__)
 # Domain Models (ClassTemplate and AbilityTemplate)
 # =============================================================================
 
+
 @dataclass
 class ClassTemplate:
     """
     Defines a playable character class.
-    
+
     Loaded from YAML files in world_data/classes/
     """
+
     class_id: str  # "warrior", "mage", "rogue"
     name: str  # Display name
     description: str  # Flavor text
-    
+
     # Base stats at level 1
     base_stats: Dict[str, int]  # {"strength": 12, "dexterity": 10, ...}
-    
+
     # Stat growth per level
     stat_growth: Dict[str, StatGrowth]  # How each stat progresses
-    
+
     # Starting resources at level 1
     starting_resources: Dict[str, int]  # {"health": 100, "mana": 50}
-    
+
     # Resource definitions for this class (regen rates, modifiers, etc.)
     resources: Dict[str, ResourceDef]  # Overrides/adds resources
-    
+
     # Abilities available to this class
     available_abilities: List[str]  # ["slash", "power_attack", "rally"]
-    
+
     # Ability slots unlock per level
     ability_slots: Dict[int, int]  # {1: 2, 5: 3, 10: 4} = slots at levels
-    
+
     # Global cooldown (GCD) configuration per ability category
     gcd_config: Dict[str, float] = field(default_factory=dict)
     # {"melee": 1.0, "spell": 1.5, "shared": 1.0}
-    
+
     # Flavor/metadata
     icon: Optional[str] = None
     keywords: List[str] = field(default_factory=list)
@@ -66,56 +69,63 @@ class ClassTemplate:
 class AbilityTemplate:
     """
     Defines a usable ability.
-    
+
     Loaded from YAML files in world_data/abilities/
     """
+
     ability_id: str  # "slash", "fireball", "heal"
     name: str  # Display name
     description: str  # Flavor text
-    
+
     # Classification
     ability_type: str  # "active", "passive", "reactive"
     ability_category: str  # "melee", "ranged", "magic", "utility"
-    
+
     # Cooldown mechanics
     cooldown: float  # Seconds between uses (personal cooldown)
-    
+
     # Effect execution - supports behavior chaining!
     # Legacy: behavior_id for single behavior (backward compatible)
     # New: behaviors list for chaining multiple behaviors
-    behavior_id: Optional[str] = None  # Legacy single behavior (converted to behaviors list)
-    behaviors: List[str] = field(default_factory=list)  # Behavior chain: ["melee_attack", "stun_effect"]
-    
+    behavior_id: Optional[
+        str
+    ] = None  # Legacy single behavior (converted to behaviors list)
+    behaviors: List[str] = field(
+        default_factory=list
+    )  # Behavior chain: ["melee_attack", "stun_effect"]
+
     # Targeting (base defaults)
     target_type: str = "self"  # "self", "enemy", "ally", "room"
     target_range: int = 0  # 0 = self, 1+ = distance (rooms)
-    
+
     # Resource costs (e.g., {"mana": 30} or {"rage": 25})
     costs: Dict[str, int] = field(default_factory=dict)
-    
+
     # Execution requirements
     requires_target: bool = False
     requires_los: bool = False  # Line of sight
     can_use_while_moving: bool = False
-    
+
     # Unlock condition
     required_level: int = 1  # Minimum level to learn
-    required_class: Optional[str] = None  # Restricted to specific class, or None for any
-    
+    required_class: Optional[
+        str
+    ] = None  # Restricted to specific class, or None for any
+
     # GCD category
     gcd_category: Optional[str] = None  # GCD category: "melee", "spell", "shared"
-    
+
     # Effects and scaling
     effects: List[str] = field(default_factory=list)  # Effect template IDs
     scaling: Dict[str, float] = field(default_factory=dict)
     # {"strength": 1.2, "intelligence": 0.5, "level": 0.1}
-    
+
     # UI/flavor
     icon: Optional[str] = None
     animation: Optional[str] = None
     sound: Optional[str] = None
     keywords: List[str] = field(default_factory=list)
-    
+
     # Ability-specific metadata (used by behaviors)
     metadata: Dict[str, Any] = field(default_factory=dict)
     # For utility abilities: {"duration": 300.0, "light_level": 50, "radius": 1}
@@ -126,50 +136,51 @@ class AbilityTemplate:
 # YAML Loaders
 # =============================================================================
 
+
 async def load_classes_from_yaml(path: Path) -> Dict[str, ClassTemplate]:
     """
     Load all class definitions from YAML files.
-    
+
     Args:
         path: Path to directory containing class YAML files (e.g., world_data/classes/)
-        
+
     Returns:
         Dict mapping class_id -> ClassTemplate
-        
+
     Raises:
         FileNotFoundError: If path doesn't exist
         yaml.YAMLError: If YAML is malformed
         ValueError: If class data is invalid
     """
     classes = {}
-    
+
     if not path.exists():
         logger.warning(f"Classes directory does not exist: {path}")
         return classes
-    
+
     for yaml_file in sorted(path.glob("*.yaml")):
         if yaml_file.name.startswith("_"):
             # Skip schema/documentation files
             continue
-        
+
         try:
-            with open(yaml_file, 'r') as f:
+            with open(yaml_file, "r") as f:
                 data = yaml.safe_load(f)
-            
+
             if not data:
                 logger.warning(f"Empty YAML file: {yaml_file}")
                 continue
-            
+
             # Convert stat_growth dicts to StatGrowth objects
             if "stat_growth" in data:
                 stat_growth = {}
                 for stat_name, growth_data in data["stat_growth"].items():
                     stat_growth[stat_name] = StatGrowth(
                         per_level=growth_data.get("per_level", 0),
-                        per_milestone=growth_data.get("per_milestone", {})
+                        per_milestone=growth_data.get("per_milestone", {}),
                     )
                 data["stat_growth"] = stat_growth
-            
+
             # Convert resources dicts to ResourceDef objects
             if "resources" in data:
                 resources = {}
@@ -182,71 +193,76 @@ async def load_classes_from_yaml(path: Path) -> Dict[str, ClassTemplate]:
                         regen_rate=resource_data.get("regen_rate", 1.0),
                         regen_type=resource_data.get("regen_type", "passive"),
                         regen_modifiers=resource_data.get("regen_modifiers", {}),
-                        color=resource_data.get("color", "#FFFFFF")
+                        color=resource_data.get("color", "#FFFFFF"),
                     )
                 data["resources"] = resources
-            
+
             class_template = ClassTemplate(**data)
             classes[class_template.class_id] = class_template
-            logger.info(f"Loaded class: {class_template.class_id} ({class_template.name})")
-            
+            logger.info(
+                f"Loaded class: {class_template.class_id} ({class_template.name})"
+            )
+
         except (yaml.YAMLError, KeyError, TypeError) as e:
             logger.error(f"Error loading class from {yaml_file}: {str(e)}")
             raise ValueError(f"Invalid class definition in {yaml_file.name}: {str(e)}")
-    
+
     if not classes:
         logger.warning(f"No classes loaded from {path}")
-    
+
     return classes
 
 
 async def load_abilities_from_yaml(path: Path) -> Dict[str, AbilityTemplate]:
     """
     Load all ability definitions from YAML files.
-    
+
     Each YAML file can contain multiple abilities under an "abilities" key.
-    
+
     Args:
         path: Path to directory containing ability YAML files (e.g., world_data/abilities/)
-        
+
     Returns:
         Dict mapping ability_id -> AbilityTemplate
-        
+
     Raises:
         FileNotFoundError: If path doesn't exist
         yaml.YAMLError: If YAML is malformed
         ValueError: If ability data is invalid
     """
     abilities = {}
-    
+
     if not path.exists():
         logger.warning(f"Abilities directory does not exist: {path}")
         return abilities
-    
+
     for yaml_file in sorted(path.glob("*.yaml")):
         if yaml_file.name.startswith("_"):
             # Skip schema/documentation files
             continue
-        
+
         try:
-            with open(yaml_file, 'r') as f:
+            with open(yaml_file, "r") as f:
                 data = yaml.safe_load(f)
-            
+
             if not data:
                 logger.warning(f"Empty YAML file: {yaml_file}")
                 continue
-            
+
             # Each YAML file contains an "abilities" list
             ability_list = data.get("abilities", [])
-            
+
             if not ability_list:
                 logger.warning(f"No abilities defined in {yaml_file.name}")
                 continue
-            
+
             for ability_data in ability_list:
                 try:
                     # Handle backward compatibility: convert behavior_id to behaviors list
-                    if "behavior_id" in ability_data and "behaviors" not in ability_data:
+                    if (
+                        "behavior_id" in ability_data
+                        and "behaviors" not in ability_data
+                    ):
                         # Legacy format: single behavior_id
                         behavior_id = ability_data.pop("behavior_id")
                         ability_data["behaviors"] = [behavior_id]
@@ -258,9 +274,9 @@ async def load_abilities_from_yaml(path: Path) -> Dict[str, AbilityTemplate]:
                         # New format: behaviors list already present
                         # Remove behavior_id if present to avoid confusion
                         ability_data.pop("behavior_id", None)
-                    
+
                     ability = AbilityTemplate(**ability_data)
-                    
+
                     # Validate that behaviors list is not empty
                     if not ability.behaviors:
                         logger.error(
@@ -268,18 +284,24 @@ async def load_abilities_from_yaml(path: Path) -> Dict[str, AbilityTemplate]:
                             f"Must have either behavior_id or behaviors field."
                         )
                         continue
-                    
+
                     # Check for duplicate IDs
                     if ability.ability_id in abilities:
                         logger.warning(
                             f"Duplicate ability ID: {ability.ability_id} "
                             f"(in {yaml_file.name}, also exists elsewhere)"
                         )
-                    
+
                     abilities[ability.ability_id] = ability
-                    behavior_info = " -> ".join(ability.behaviors) if len(ability.behaviors) > 1 else ability.behaviors[0]
-                    logger.info(f"Loaded ability: {ability.ability_id} ({ability.name}) - behaviors: {behavior_info}")
-                    
+                    behavior_info = (
+                        " -> ".join(ability.behaviors)
+                        if len(ability.behaviors) > 1
+                        else ability.behaviors[0]
+                    )
+                    logger.info(
+                        f"Loaded ability: {ability.ability_id} ({ability.name}) - behaviors: {behavior_info}"
+                    )
+
                 except (KeyError, TypeError) as e:
                     logger.error(
                         f"Error loading ability from {yaml_file.name}: {str(e)}"
@@ -287,14 +309,14 @@ async def load_abilities_from_yaml(path: Path) -> Dict[str, AbilityTemplate]:
                     raise ValueError(
                         f"Invalid ability definition in {yaml_file.name}: {str(e)}"
                     )
-        
+
         except yaml.YAMLError as e:
             logger.error(f"YAML error in {yaml_file}: {str(e)}")
             raise ValueError(f"Invalid YAML in {yaml_file.name}: {str(e)}")
-    
+
     if not abilities:
         logger.warning(f"No abilities loaded from {path}")
-    
+
     return abilities
 
 
@@ -302,9 +324,11 @@ async def load_abilities_from_yaml(path: Path) -> Dict[str, AbilityTemplate]:
 # AbilityExecutor - Validates and Executes Abilities
 # =============================================================================
 
+
 @dataclass
 class AbilityExecutionResult:
     """Result of executing an ability."""
+
     success: bool
     ability_id: str
     caster_id: str
@@ -319,53 +343,53 @@ class AbilityExecutionResult:
 class AbilityExecutor:
     """
     Validates and executes abilities.
-    
+
     Responsibilities:
     1. Validate ability use (learned, level, resources, cooldown)
     2. Resolve targets based on ability's target_type
     3. Apply cooldowns (personal + GCD)
     4. Retrieve and call behavior function
     5. Return standardized result
-    
+
     Single instance per game session, accessed via GameContext.
     """
-    
+
     def __init__(self, context: GameContext):
         """
         Initialize AbilityExecutor.
-        
+
         Args:
             context: GameContext providing access to world, class_system, etc.
         """
         self.context = context
-        
+
         # Cooldown tracking: {player_id: {ability_id: (cooldown_end_time, is_personal)}}
         self.cooldowns: Dict[str, Dict[str, Tuple[float, bool]]] = {}
-        
+
         # GCD tracking: {player_id: (gcd_end_time, category)}
         self.gcd_state: Dict[str, Tuple[float, str]] = {}
-        
+
         logger.info("AbilityExecutor initialized")
-    
+
     async def execute_ability(
         self,
         caster: WorldPlayer,
         ability_id: str,
         target_id: Optional[str] = None,
-        target_entity: Optional[WorldEntity] = None
+        target_entity: Optional[WorldEntity] = None,
     ) -> AbilityExecutionResult:
         """
         Execute an ability.
-        
+
         Main entry point for ability execution. Validates, resolves targets,
         applies cooldowns, and calls the behavior function.
-        
+
         Args:
             caster: The player casting the ability
             ability_id: The ability to cast
             target_id: Optional target ID (overrides target resolution)
             target_entity: Optional target entity (for passed-in targets)
-            
+
         Returns:
             AbilityExecutionResult with success status and details
         """
@@ -378,15 +402,15 @@ class AbilityExecutor:
                     caster.id, ability_id, ability_id, validation_error
                 )
                 await self.context.event_dispatcher.dispatch([error_event])
-                
+
                 return AbilityExecutionResult(
                     success=False,
                     ability_id=ability_id,
                     caster_id=caster.id,
                     message="",
-                    error=validation_error
+                    error=validation_error,
                 )
-            
+
             # Get ability template from ClassSystem
             ability = self.context.class_system.get_ability(ability_id)
             if not ability:
@@ -395,15 +419,15 @@ class AbilityExecutor:
                     caster.id, ability_id, ability_id, error_msg
                 )
                 await self.context.event_dispatcher.dispatch([error_event])
-                
+
                 return AbilityExecutionResult(
                     success=False,
                     ability_id=ability_id,
                     caster_id=caster.id,
                     message="",
-                    error=error_msg
+                    error=error_msg,
                 )
-            
+
             # 2. Resolve targets
             targets = self._resolve_targets(caster, ability, target_id, target_entity)
             if ability.requires_target and not targets:
@@ -412,22 +436,22 @@ class AbilityExecutor:
                     caster.id, ability_id, ability.name, error_msg
                 )
                 await self.context.event_dispatcher.dispatch([error_event])
-                
+
                 return AbilityExecutionResult(
                     success=False,
                     ability_id=ability_id,
                     caster_id=caster.id,
                     message="",
-                    error=error_msg
+                    error=error_msg,
                 )
-            
+
             # Emit ability_cast event (cast has started)
             target_ids = [t.id for t in targets] if targets else []
             cast_event = self.context.event_dispatcher.ability_cast(
                 caster.id, ability_id, ability.name, target_ids
             )
             await self.context.event_dispatcher.dispatch([cast_event])
-            
+
             # 3. Apply resource costs
             if ability.costs:
                 resource_events = []
@@ -441,23 +465,33 @@ class AbilityExecutor:
                         )
                         # Create resource_update event
                         resources_payload = {}
-                        for rid in caster.character_sheet.resource_pools.keys() if caster.character_sheet else []:
+                        for rid in (
+                            caster.character_sheet.resource_pools.keys()
+                            if caster.character_sheet
+                            else []
+                        ):
                             rpool = caster.get_resource_pool(rid)
                             if rpool:
                                 resources_payload[rid] = {
                                     "current": rpool.current,
                                     "max": rpool.max,
-                                    "percent": (rpool.current / rpool.max * 100) if rpool.max > 0 else 0
+                                    "percent": (
+                                        (rpool.current / rpool.max * 100)
+                                        if rpool.max > 0
+                                        else 0
+                                    ),
                                 }
                         if resources_payload:
-                            resource_event = self.context.event_dispatcher.resource_update(
-                                caster.id, resources_payload
+                            resource_event = (
+                                self.context.event_dispatcher.resource_update(
+                                    caster.id, resources_payload
+                                )
                             )
                             resource_events.append(resource_event)
-                
+
                 if resource_events:
                     await self.context.event_dispatcher.dispatch(resource_events)
-            
+
             # 4. Execute behavior chain
             # Support both single behavior and multi-behavior chains
             behavior_results = []
@@ -465,7 +499,7 @@ class AbilityExecutor:
             combined_damage = 0
             combined_effects = []
             combined_messages = []
-            
+
             for behavior_id in ability.behaviors:
                 behavior_fn = self.context.class_system.get_behavior(behavior_id)
                 if not behavior_fn:
@@ -475,15 +509,15 @@ class AbilityExecutor:
                         caster.id, ability_id, ability.name, error_msg
                     )
                     await self.context.event_dispatcher.dispatch([error_event])
-                    
+
                     return AbilityExecutionResult(
                         success=False,
                         ability_id=ability_id,
                         caster_id=caster.id,
                         message="",
-                        error=error_msg
+                        error=error_msg,
                     )
-                
+
                 # Execute this behavior in the chain
                 if targets:
                     # Pass multiple targets for AoE, single target otherwise
@@ -500,7 +534,7 @@ class AbilityExecutor:
                     behavior_result = await behavior_fn(
                         caster, caster, ability, self.context.combat_system
                     )
-                
+
                 # Collect results from this behavior
                 if not behavior_result.success:
                     # If any behavior in the chain fails, abort
@@ -508,20 +542,23 @@ class AbilityExecutor:
                         f"Behavior {behavior_id} failed in chain for {ability_id}: {behavior_result.error}"
                     )
                     error_event = self.context.event_dispatcher.ability_error(
-                        caster.id, ability_id, ability.name, behavior_result.error or "Behavior failed"
+                        caster.id,
+                        ability_id,
+                        ability.name,
+                        behavior_result.error or "Behavior failed",
                     )
                     await self.context.event_dispatcher.dispatch([error_event])
-                    
+
                     return AbilityExecutionResult(
                         success=False,
                         ability_id=ability_id,
                         caster_id=caster.id,
                         message="",
-                        error=behavior_result.error
+                        error=behavior_result.error,
                     )
-                
+
                 behavior_results.append(behavior_result)
-                
+
                 # Aggregate results from all behaviors in chain
                 if behavior_result.targets_hit:
                     combined_targets_hit.update(behavior_result.targets_hit)
@@ -531,76 +568,100 @@ class AbilityExecutor:
                     combined_effects.extend(behavior_result.effects_applied)
                 if behavior_result.message:
                     combined_messages.append(behavior_result.message)
-            
+
             # Combine all behavior results into final result
             behavior_result = behavior_results[0]  # Use first result as base
             behavior_result.targets_hit = list(combined_targets_hit)
             behavior_result.damage_dealt = combined_damage
             behavior_result.effects_applied = combined_effects
-            behavior_result.message = " ".join(combined_messages) if combined_messages else behavior_result.message
-            
+            behavior_result.message = (
+                " ".join(combined_messages)
+                if combined_messages
+                else behavior_result.message
+            )
+
             # 5. Check for target deaths and trigger retaliation after behavior chain execution
             death_events = []
             if targets and combined_damage > 0:
                 for target in targets if isinstance(targets, list) else [targets]:
                     if not target.is_alive():
-                        logger.info(f"Target {target.name} killed by {ability_id} from {caster.name}")
-                        target_death_events = await self.context.combat_system.handle_death(
-                            target.id, caster.id
+                        logger.info(
+                            f"Target {target.name} killed by {ability_id} from {caster.name}"
+                        )
+                        target_death_events = (
+                            await self.context.combat_system.handle_death(
+                                target.id, caster.id
+                            )
                         )
                         death_events.extend(target_death_events)
-                        
+
                         # Clear caster's combat state if target was their combat target
-                        if hasattr(caster, 'combat') and caster.combat.target_id == target.id:
+                        if (
+                            hasattr(caster, "combat")
+                            and caster.combat.target_id == target.id
+                        ):
                             caster.combat.clear_combat()
                     else:
                         # Target survived - trigger retaliation/combat engagement
                         world = self.context.world
-                        
+
                         # If target is a player, make them auto-retaliate (if not already in combat)
                         if target.id in world.players:
-                            if hasattr(target, 'combat') and not target.combat.is_in_combat():
+                            if (
+                                hasattr(target, "combat")
+                                and not target.combat.is_in_combat()
+                            ):
                                 try:
-                                    retaliation_events = self.context.combat_system.start_attack_entity(
-                                        target.id, caster.id
+                                    retaliation_events = (
+                                        self.context.combat_system.start_attack_entity(
+                                            target.id, caster.id
+                                        )
                                     )
                                     if retaliation_events:
-                                        await self.context.event_dispatcher.dispatch(retaliation_events)
+                                        await self.context.event_dispatcher.dispatch(
+                                            retaliation_events
+                                        )
                                 except Exception as e:
                                     logger.warning(f"Player retaliation failed: {e}")
-                        
+
                         # If target is an NPC, trigger engine hooks so AI behaviors can respond
                         elif target.id in world.npcs and self.context.engine:
-                            await self.context.engine._trigger_npc_combat_start(target.id, caster.id)
-            
+                            await self.context.engine._trigger_npc_combat_start(
+                                target.id, caster.id
+                            )
+
             # 6. Apply cooldowns
             self._apply_cooldowns(caster, ability)
-            
+
             # Emit cooldown_update event
             cooldown_remaining = self.get_ability_cooldown(caster.id, ability_id)
             cooldown_event = self.context.event_dispatcher.cooldown_update(
                 caster.id, ability_id, cooldown_remaining
             )
-            
+
             # Emit ability_cast_complete event
             complete_event = self.context.event_dispatcher.ability_cast_complete(
-                caster.id, ability_id, ability.name, True, behavior_result.message,
+                caster.id,
+                ability_id,
+                ability.name,
+                True,
+                behavior_result.message,
                 damage_dealt=behavior_result.damage_dealt,
-                targets_hit=behavior_result.targets_hit
+                targets_hit=behavior_result.targets_hit,
             )
-            
+
             # Dispatch ability completion events FIRST, then death events
             # This ensures the hit message appears before the death message
-            await self.context.event_dispatcher.dispatch([cooldown_event, complete_event])
-            
+            await self.context.event_dispatcher.dispatch(
+                [cooldown_event, complete_event]
+            )
+
             # Dispatch death events after ability completion
             if death_events:
                 await self.context.event_dispatcher.dispatch(death_events)
-            
-            logger.info(
-                f"{caster.name} cast {ability_id}: {behavior_result.message}"
-            )
-            
+
+            logger.info(f"{caster.name} cast {ability_id}: {behavior_result.message}")
+
             return AbilityExecutionResult(
                 success=True,
                 ability_id=ability_id,
@@ -609,9 +670,9 @@ class AbilityExecutor:
                 damage_dealt=behavior_result.damage_dealt,
                 targets_hit=behavior_result.targets_hit,
                 effects_applied=behavior_result.effects_applied,
-                cooldown_applied=behavior_result.cooldown_applied
+                cooldown_applied=behavior_result.cooldown_applied,
             )
-        
+
         except Exception as e:
             logger.error(f"Error executing ability {ability_id}: {e}", exc_info=True)
             error_msg = f"Ability execution failed: {str(e)}"
@@ -622,19 +683,21 @@ class AbilityExecutor:
                 await self.context.event_dispatcher.dispatch([error_event])
             except Exception as dispatch_err:
                 logger.error(f"Failed to dispatch error event: {dispatch_err}")
-            
+
             return AbilityExecutionResult(
                 success=False,
                 ability_id=ability_id,
                 caster_id=caster.id,
                 message="",
-                error=error_msg
+                error=error_msg,
             )
-    
-    def _validate_ability_use(self, caster: WorldPlayer, ability_id: str) -> Optional[str]:
+
+    def _validate_ability_use(
+        self, caster: WorldPlayer, ability_id: str
+    ) -> Optional[str]:
         """
         Validate that a player can use an ability.
-        
+
         Checks:
         - Player has a character sheet (class chosen)
         - Ability is learned
@@ -642,38 +705,38 @@ class AbilityExecutor:
         - Player has enough resources
         - Personal cooldown is ready
         - GCD is ready
-        
+
         Args:
             caster: The player attempting to cast
             ability_id: The ability ID
-            
+
         Returns:
             Error message if validation fails, None if valid
         """
         # Check character sheet
         if not caster.has_character_sheet():
             return "You must choose a class first"
-        
+
         # Check ability learned
         if ability_id not in caster.get_learned_abilities():
             return f"You haven't learned {ability_id}"
-        
+
         # Get ability template
         ability = self.context.class_system.get_ability(ability_id)
         if not ability:
             return f"Unknown ability: {ability_id}"
-        
+
         # Check level
         if caster.level < ability.required_level:
             return f"You must be level {ability.required_level} to use {ability_id}"
-        
+
         # Check resources
         if ability.costs:
             for resource_id, cost in ability.costs.items():
                 pool = caster.get_resource_pool(resource_id)
                 if not pool or pool.current < cost:
                     return f"Not enough {resource_id} (need {cost}, have {pool.current if pool else 0})"
-        
+
         # Check personal cooldown
         current_time = time.time()
         if caster.id in self.cooldowns:
@@ -682,7 +745,7 @@ class AbilityExecutor:
                 if current_time < cooldown_end:
                     remaining = cooldown_end - current_time
                     return f"{ability_id} is on cooldown for {remaining:.1f}s"
-        
+
         # Check GCD
         if caster.id in self.gcd_state:
             gcd_end, category = self.gcd_state[caster.id]
@@ -691,31 +754,31 @@ class AbilityExecutor:
                 if ability.gcd_category == category:
                     remaining = gcd_end - current_time
                     return f"Global cooldown active for {remaining:.1f}s"
-        
+
         return None
-    
+
     def _resolve_targets(
         self,
         caster: WorldPlayer,
         ability: AbilityTemplate,
         target_id: Optional[str],
-        target_entity: Optional[WorldEntity]
+        target_entity: Optional[WorldEntity],
     ) -> List[WorldEntity]:
         """
         Resolve targets for an ability based on its target_type.
-        
+
         Target types:
         - "self": The caster
         - "enemy": A single enemy (requires target_id or target_entity)
         - "ally": A single ally (requires target_id or target_entity)
         - "room": All entities in the room
-        
+
         Args:
             caster: The caster
             ability: The ability template
             target_id: Optional explicit target ID
             target_entity: Optional explicit target entity
-            
+
         Returns:
             List of target entities (empty if no valid targets)
         """
@@ -723,12 +786,12 @@ class AbilityExecutor:
         caster_room = world.rooms.get(caster.room_id)
         if not caster_room:
             return []
-        
+
         target_type = ability.target_type or "self"
-        
+
         if target_type == "self":
             return [caster]
-        
+
         elif target_type == "enemy":
             # Single enemy target
             if target_entity:
@@ -738,7 +801,7 @@ class AbilityExecutor:
                 if target and target.room_id == caster.room_id:
                     return [target]
             return []
-        
+
         elif target_type == "ally":
             # Single ally target (including self)
             if target_entity:
@@ -748,7 +811,7 @@ class AbilityExecutor:
                 if target and target.room_id == caster.room_id:
                     return [target]
             return []
-        
+
         elif target_type == "room":
             # All entities in room (typically enemies for combat abilities)
             targets = []
@@ -757,23 +820,23 @@ class AbilityExecutor:
                 if entity and entity.id != caster.id:
                     targets.append(entity)
             return targets
-        
+
         return []
-    
+
     def _apply_cooldowns(self, caster: WorldPlayer, ability: AbilityTemplate) -> None:
         """
         Apply personal cooldown and GCD after ability execution.
-        
+
         Args:
             caster: The caster
             ability: The ability template
         """
         current_time = time.time()
-        
+
         # Initialize cooldown tracking for this player if needed
         if caster.id not in self.cooldowns:
             self.cooldowns[caster.id] = {}
-        
+
         # Apply personal cooldown
         if ability.cooldown > 0:
             cooldown_end = current_time + ability.cooldown
@@ -782,7 +845,7 @@ class AbilityExecutor:
                 f"{caster.name} ability {ability.ability_id} on cooldown "
                 f"for {ability.cooldown}s"
             )
-        
+
         # Apply GCD
         if ability.gcd_category:
             # Get GCD duration from class template
@@ -797,11 +860,11 @@ class AbilityExecutor:
                         f"{caster.name} GCD ({ability.gcd_category}) "
                         f"for {gcd_duration}s"
                     )
-    
+
     def clear_cooldown(self, caster_id: str, ability_id: str) -> None:
         """
         Manually clear a cooldown (for admin/debug).
-        
+
         Args:
             caster_id: The player ID
             ability_id: The ability ID
@@ -809,49 +872,52 @@ class AbilityExecutor:
         if caster_id in self.cooldowns and ability_id in self.cooldowns[caster_id]:
             del self.cooldowns[caster_id][ability_id]
             logger.info(f"Cleared cooldown for {ability_id}")
-    
+
     def clear_gcd(self, caster_id: str) -> None:
         """
         Manually clear GCD (for admin/debug).
-        
+
         Args:
             caster_id: The player ID
         """
         if caster_id in self.gcd_state:
             del self.gcd_state[caster_id]
             logger.info(f"Cleared GCD for player {caster_id}")
-    
+
     def get_ability_cooldown(self, caster_id: str, ability_id: str) -> float:
         """
         Get remaining cooldown time in seconds.
-        
+
         Args:
             caster_id: The player ID
             ability_id: The ability ID
-            
+
         Returns:
             Seconds remaining (0 if not on cooldown)
         """
-        if caster_id not in self.cooldowns or ability_id not in self.cooldowns[caster_id]:
+        if (
+            caster_id not in self.cooldowns
+            or ability_id not in self.cooldowns[caster_id]
+        ):
             return 0.0
-        
+
         cooldown_end, _ = self.cooldowns[caster_id][ability_id]
         remaining = max(0.0, cooldown_end - time.time())
         return remaining
-    
+
     def get_gcd_remaining(self, caster_id: str) -> float:
         """
         Get remaining GCD time in seconds.
-        
+
         Args:
             caster_id: The player ID
-            
+
         Returns:
             Seconds remaining (0 if not on GCD)
         """
         if caster_id not in self.gcd_state:
             return 0.0
-        
+
         gcd_end, _ = self.gcd_state[caster_id]
         remaining = max(0.0, gcd_end - time.time())
         return remaining

@@ -106,7 +106,7 @@ CREATE TABLE room_state (
     updated_at TIMESTAMP
 );
 
--- NPC instance runtime state  
+-- NPC instance runtime state
 CREATE TABLE npc_state (
     instance_id VARCHAR PRIMARY KEY,
     template_id VARCHAR,
@@ -152,9 +152,9 @@ Leverage existing `TimeEventManager` for save scheduling:
 ```python
 class PersistenceSystem:
     """Handles periodic state snapshots."""
-    
+
     SAVE_INTERVAL_SECONDS = 60  # Configurable
-    
+
     def schedule_periodic_save(self, time_manager: TimeEventManager):
         """Schedule recurring save events."""
         time_manager.schedule_event(
@@ -166,7 +166,7 @@ class PersistenceSystem:
                 interval=self.SAVE_INTERVAL_SECONDS
             )
         )
-    
+
     async def _do_periodic_save(self):
         """Save all dirty state to database."""
         # Only save what's changed (dirty tracking)
@@ -290,10 +290,10 @@ class GroundItem:
     room_id: str
     dropped_at: float  # Unix timestamp
     decay_minutes: int = 60  # Default 1 hour, configurable
-    
+
 class ItemDecaySystem:
     DECAY_CHECK_INTERVAL = 300  # Check every 5 minutes
-    
+
     async def cleanup_decayed_items(self, world: World):
         """Remove items that have exceeded their decay time."""
         now = time.time()
@@ -354,7 +354,7 @@ class NPCTemplate:
 **Implementation**: Store `expires_at` absolute timestamp, not remaining duration.
 
 ```python
-@dataclass 
+@dataclass
 class PersistedEffect:
     effect_id: str
     effect_type: str  # buff, debuff, dot, hot

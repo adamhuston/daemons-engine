@@ -16,7 +16,7 @@ Player.data JSON Schema (Phase 9):
     # Existing fields (backward compatible)
     "character_class": "warrior",  # Old style, deprecated
     "level": 5,                    # Old style, deprecated
-    
+
     # Phase 9 new fields
     "class_id": "warrior",         # Class template ID
     "experience": 1200,             # Class-specific XP
@@ -60,15 +60,12 @@ Migration Notes:
 - One-time migration function will convert old players to new schema
 - ClassSystem runtime manager loads class/ability templates from YAML
 """
+
 from typing import Sequence, Union
 
-from alembic import op
-import sqlalchemy as sa
-
-
 # revision identifiers, used by Alembic.
-revision: str = 'g8h9i0j1k2l3'
-down_revision: Union[str, None] = 'a1b2c3d4e5f6'
+revision: str = "g8h9i0j1k2l3"
+down_revision: Union[str, None] = "a1b2c3d4e5f6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -76,10 +73,10 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """
     No database schema changes for Phase 9a.
-    
+
     Character class data is stored in the existing Player.data JSON column.
     The schema is documented above in the docstring.
-    
+
     A migration function (migrate_existing_players) will be called separately
     to initialize character sheets for existing players.
     """
@@ -89,7 +86,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     """
     Downgrade: removes Phase 9 fields from Player.data JSON.
-    
+
     This is a documentation-only migration, so downgrade is a no-op.
     If needed, a migration script would remove class_id, experience,
     learned_abilities, ability_loadout, and resource_pools from Player.data.

@@ -2,7 +2,7 @@
 
 _Last updated: 2025-11-28_
 
-This document is the high-level specification and context for the dungeon crawler project.  
+This document is the high-level specification and context for the dungeon crawler project.
 It is written to be friendly to both humans and LLMs reading the repository.
 
 ---
@@ -224,7 +224,7 @@ The `WorldEngine` instance is stored in `app.state` (or a global), and all WS co
     - `areas: dict[AreaId, WorldArea]`
     - `world_time: WorldTime` - Global time for rooms not in areas
 
-This layer is framework-agnostic (no FastAPI/SQLAlchemy here).  
+This layer is framework-agnostic (no FastAPI/SQLAlchemy here).
 It represents the "live world" in memory.
 
 ### 3.4 Game Systems
@@ -324,7 +324,7 @@ The game engine uses modular systems for different domains:
   - YAML-driven class and ability definitions
   - Integration with EffectSystem for ability effects
   - Hot-reload infrastructure for live class/ability updates
-  
+
 - **Persistence Layer** (`engine.py` methods): **(Phase 9i)**
   - `save_player_stats()` - Persist character sheet, resources, abilities to database
   - `_serialize_player_data()` - Serialize CharacterSheet to JSON format for Player.data column
@@ -332,7 +332,7 @@ The game engine uses modular systems for different domains:
   - Offline regen: `regen_amount = time_offline * regen_rate`
   - Auto-called on player disconnect (save) and reconnect (restore + regen)
   - Resources stored in Player.data JSON column under "resource_pools"
-  
+
 - **AbilityExecutor** (`abilities.py`): **(Phase 9e)**
   - Validates ability use (learned, level, resources, cooldown, GCD)
   - Resolves targets (single, AoE, self-targeted)
@@ -452,7 +452,7 @@ Supported commands (current):
 - **Effects:** `effects` / `status` - View active buffs/debuffs
 - **Emotes:** `smile`, `nod`, `laugh`, `cringe`, `smirk`, `frown`, `wink`, `lookaround`
 - **Time:** `time` - View current in-game time with area context
-- **Debug/Admin:** 
+- **Debug/Admin:**
     - `heal <player>`, `hurt <player>` - Modify player health
     - `bless <player>` - Apply +5 AC buff for 30 seconds
     - `poison <player>` - Apply DoT (5 damage every 3s for 15s)
@@ -520,7 +520,7 @@ Unknown commands produce a `"message"` event explaining the error.
 
 Message shape (printable output):
 
-``` 
+```
 {
   "type": "message",
   "player_id": "uuid-string",

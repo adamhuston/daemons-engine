@@ -338,12 +338,12 @@ class AdminAction:
 ```python
 class ContentReloader:
     """Handles runtime content updates without restart."""
-    
+
     def __init__(self, world: World, engine: WorldEngine):
         self.world = world
         self.engine = engine
         self._reload_lock = asyncio.Lock()
-    
+
     async def reload_all(self) -> ReloadResult:
         """Reload all YAML content."""
         async with self._reload_lock:
@@ -354,11 +354,11 @@ class ContentReloader:
             results['triggers'] = await self._reload_triggers()
             results['quests'] = await self._reload_quests()
             return ReloadResult(results)
-    
+
     async def _reload_rooms(self) -> dict:
         """
         Reload room definitions.
-        
+
         Strategy:
         - Update existing rooms in place (preserve player positions)
         - Add new rooms
@@ -366,10 +366,10 @@ class ContentReloader:
         """
         try:
             new_rooms = load_rooms_from_yaml()
-            
+
             updated = 0
             added = 0
-            
+
             for room_id, new_room in new_rooms.items():
                 if room_id in self.world.rooms:
                     # Update in place
@@ -383,9 +383,9 @@ class ContentReloader:
                     # Add new room
                     self.world.rooms[room_id] = new_room
                     added += 1
-            
+
             return {"status": "success", "updated": updated, "added": added}
-            
+
         except Exception as e:
             logger.error("room_reload_failed", error=str(e))
             return {"status": "failed", "error": str(e)}
@@ -411,23 +411,23 @@ class AdminActionType(str, Enum):
     MODIFY_STAT = "modify_stat"
     KICK_PLAYER = "kick_player"
     MUTE_PLAYER = "mute_player"
-    
+
     # Spawn actions
     SPAWN_ITEM = "spawn_item"
     SPAWN_NPC = "spawn_npc"
     DESPAWN_ITEM = "despawn_item"
     DESPAWN_NPC = "despawn_npc"
-    
+
     # World actions
     MODIFY_ROOM = "modify_room"
     FIRE_TRIGGER = "fire_trigger"
     TOGGLE_TRIGGER = "toggle_trigger"
-    
+
     # Account actions
     BAN_ACCOUNT = "ban_account"
     UNBAN_ACCOUNT = "unban_account"
     CHANGE_ROLE = "change_role"
-    
+
     # Server actions
     BROADCAST = "broadcast"
     RELOAD_CONTENT = "reload_content"
@@ -446,19 +446,19 @@ class ServerStatus:
     npcs_alive: int
     rooms_total: int
     rooms_occupied: int
-    
+
     # Performance
     commands_per_minute: float
     events_per_minute: float
     avg_command_latency_ms: float
-    
+
     # Time system
     scheduled_events: int
     next_event_in_seconds: float | None
-    
+
     # Memory (optional)
     memory_mb: float | None
-    
+
     # State
     maintenance_mode: bool
     last_content_reload: float | None
@@ -491,23 +491,23 @@ class ReloadSectionResult:
 class AdminAction(Base):
     """Audit log for administrative actions."""
     __tablename__ = "admin_actions"
-    
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     timestamp: Mapped[float] = mapped_column(Float, index=True)
-    
+
     admin_account_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("user_accounts.id"), index=True
     )
     admin_username: Mapped[str] = mapped_column(String(50))
-    
+
     action_type: Mapped[str] = mapped_column(String(50), index=True)
     target_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     target_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    
+
     parameters: Mapped[dict] = mapped_column(JSON, default=dict)
     result: Mapped[str] = mapped_column(String(20))  # success, failed, denied
     error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    
+
     # Relationship
     admin: Mapped["UserAccount"] = relationship()
 
@@ -515,16 +515,16 @@ class AdminAction(Base):
 class ServerMetricSnapshot(Base):
     """Periodic server metrics for historical analysis."""
     __tablename__ = "server_metrics"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     timestamp: Mapped[float] = mapped_column(Float, index=True)
-    
+
     players_online: Mapped[int] = mapped_column(Integer)
     npcs_alive: Mapped[int] = mapped_column(Integer)
     commands_per_minute: Mapped[float] = mapped_column(Float)
     avg_latency_ms: Mapped[float] = mapped_column(Float)
     memory_mb: Mapped[float] = mapped_column(Float)
-    
+
     # Indexed for time-range queries
     __table_args__ = (
         Index('ix_metrics_timestamp', 'timestamp'),

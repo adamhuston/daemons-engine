@@ -37,7 +37,7 @@ Notes:
 
 Running the sample client
 -------------------------
-The repository contains a Flet-based test client at `client/client.py`. 
+The repository contains a Flet-based test client at `client/client.py`.
 
 First, install Flet (if not already installed):
 
@@ -89,4 +89,3 @@ Troubleshooting & contact
 - If you see issues during startup, check the logs that Uvicorn prints for seeded IDs and engine initialization details.
 - Problems with migrations are often due to missing autogenerate targets—see `alembic.md` for config details.
 - For questions or guidance, open an issue or comment on PRs. For urgent issues, tag maintainers in the PR.
-

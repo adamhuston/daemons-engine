@@ -14,7 +14,7 @@ async def get_schemas(
 ):
     """
     Return all _schema.yaml files with metadata.
-    
+
     Response:
     {
       "version": "1.0.0",
@@ -50,7 +50,7 @@ async def upload_content(
     """
     Upload/update a YAML file.
     If validate_only=True, don't write to disk.
-    
+
     Response:
     {
       "success": true,
@@ -77,7 +77,7 @@ async def list_content_files(
 ):
     """
     List all YAML files in world_data/.
-    
+
     Response:
     {
       "files": [
@@ -108,7 +108,7 @@ async def download_content(
 ):
     """
     Download raw YAML content.
-    
+
     Response:
     {
       "content": "id: room_1_1_1\nname: Central Chamber\n...",
@@ -135,7 +135,7 @@ async def validate_references(
     """
     Validate that all references (room exits, item templates, NPC spawns)
     point to existing content.
-    
+
     Response:
     {
       "valid": false,
@@ -204,7 +204,7 @@ async def validate_content(
 async def get_schema_version():
     """
     Return current schema version.
-    
+
     Response:
     {
       "version": "1.0.0",
@@ -273,7 +273,7 @@ If server endpoints are slow to implement, the CMS could:
 ```python
 # Add these 3 endpoints to unblock CMS development:
 1. GET  /api/admin/schemas
-2. POST /api/admin/content/upload  
+2. POST /api/admin/content/upload
 3. GET  /api/admin/content/download
 ```
 

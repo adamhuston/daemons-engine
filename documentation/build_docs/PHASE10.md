@@ -193,11 +193,11 @@ npc_members:
 
 ## Backward Compatibility
 
-✅ Existing solo players unaffected (all features opt-in)  
-✅ say/emote commands unchanged  
-✅ No combat logic changes until faction integration (Phase 10.3)  
-✅ player_flags missing fields default gracefully  
-✅ Can run Phase 9 content without social system  
+✅ Existing solo players unaffected (all features opt-in)
+✅ say/emote commands unchanged
+✅ No combat logic changes until faction integration (Phase 10.3)
+✅ player_flags missing fields default gracefully
+✅ Can run Phase 9 content without social system
 
 ---
 

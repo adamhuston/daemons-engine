@@ -10,7 +10,7 @@ Located in `backend/world_data/{subdirectory}/_schema.yaml`
 Each schema file documents the structure, fields, and examples for its content type:
 
 1. **areas/_schema.yaml** - Geographic regions with time systems and environmental properties
-2. **rooms/_schema.yaml** - Individual locations with exits, triggers, and descriptions  
+2. **rooms/_schema.yaml** - Individual locations with exits, triggers, and descriptions
 3. **items/_schema.yaml** - Item templates (weapons, armor, consumables, containers)
 4. **item_instances/_schema.yaml** - Specific pre-placed item instances
 5. **npcs/_schema.yaml** - NPC templates (enemies, merchants, quest givers)
@@ -74,7 +74,7 @@ Areas
 Item Templates
   └── Item Instances (based on templates)
 
-NPC Templates  
+NPC Templates
   ├── NPC Instances (based on templates)
   ├── NPC Spawns (configuration for instances)
   ├── Dialogues (attached to templates)
@@ -148,7 +148,7 @@ Players (Database Only)
 
 ### Content Organization
 
-1. **Naming Conventions**: 
+1. **Naming Conventions**:
    - Prefix IDs with type: `area_`, `room_`, `item_`, `npc_`, `quest_`
    - Use descriptive names: `npc_goblin_scout` not `npc_001`
 
@@ -194,7 +194,7 @@ Players (Database Only)
 ```
 backend/world_data/
 ├── areas/_schema.yaml
-├── rooms/_schema.yaml  
+├── rooms/_schema.yaml
 ├── items/_schema.yaml
 ├── item_instances/_schema.yaml
 ├── npcs/_schema.yaml

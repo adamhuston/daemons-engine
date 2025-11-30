@@ -15,7 +15,7 @@ Phase X introduces a comprehensive quest system that enables structured narrativ
 class TriggerSystem:
     def fire_event(self, room: WorldRoom, event: str, ctx: TriggerContext) -> list[Event]
     def fire_command(self, room: WorldRoom, raw_command: str, ctx: TriggerContext) -> list[Event]
-    
+
 # Conditions: flag_set, has_item, level, health_percent, in_combat, has_effect, entity_present, player_count
 # Actions: message_player, message_room, set_flag, damage, heal, apply_effect, spawn_npc, despawn_npc,
 #          open_exit, close_exit, spawn_item, give_item, take_item, enable_trigger, disable_trigger
@@ -149,14 +149,14 @@ class QuestObjective:
     id: str
     type: ObjectiveType
     description: str
-    
+
     # Type-specific parameters
     target_template_id: str | None = None  # NPC or item template
     target_room_id: RoomId | None = None   # For VISIT objectives
     target_npc_name: str | None = None     # For TALK/DELIVER
     required_count: int = 1                 # For KILL/COLLECT
     command_pattern: str | None = None     # For INTERACT
-    
+
     # Display
     hidden: bool = False                   # Don't show in journal until discovered
     optional: bool = False                 # Not required for completion
@@ -177,36 +177,36 @@ class QuestTemplate:
     id: str
     name: str
     description: str
-    
+
     # Quest giver
     giver_npc_template: str | None = None  # NPC who gives quest
     giver_room_id: RoomId | None = None    # Or location-based
-    
+
     # Requirements to see/accept quest
     prerequisites: list[str] = field(default_factory=list)      # Quest IDs
     level_requirement: int = 1
     required_items: list[str] = field(default_factory=list)     # Must have to accept
     required_flags: dict[str, Any] = field(default_factory=dict)
-    
+
     # Objectives
     objectives: list[QuestObjective] = field(default_factory=list)
-    
+
     # Completion
     turn_in_npc_template: str | None = None  # NPC to turn in to (None = auto-complete)
     turn_in_room_id: RoomId | None = None    # Or location-based turn-in
     rewards: QuestReward = field(default_factory=QuestReward)
-    
+
     # Metadata
     category: str = "main"                   # main, side, daily, repeatable
     repeatable: bool = False
     cooldown_hours: float = 0                # For repeatable quests
     time_limit_minutes: float | None = None  # Optional time limit
-    
+
     # Dialogue
     accept_dialogue: str = "Quest accepted."
     progress_dialogue: str = "Still working on it?"
     complete_dialogue: str = "Well done!"
-    
+
     # Triggers on state changes
     on_accept_actions: list[dict] = field(default_factory=list)
     on_complete_actions: list[dict] = field(default_factory=list)
@@ -217,31 +217,31 @@ class QuestProgress:
     """Player's progress on a specific quest."""
     quest_id: str
     status: QuestStatus = QuestStatus.NOT_AVAILABLE
-    
+
     # Objective tracking: objective_id -> current_count
     objective_progress: dict[str, int] = field(default_factory=dict)
-    
+
     # Timing
     accepted_at: float | None = None
     completed_at: float | None = None
     turned_in_at: float | None = None
-    
+
     # For repeatable quests
     completion_count: int = 0
     last_completed_at: float | None = None
 
-@dataclass  
+@dataclass
 class DialogueNode:
     """A node in an NPC dialogue tree."""
     id: str
     text: str  # What NPC says (supports {player.name} substitution)
-    
+
     # Player response options
     options: list[DialogueOption] = field(default_factory=list)
-    
+
     # Conditions to show this node
     conditions: list[TriggerCondition] = field(default_factory=list)
-    
+
     # Actions when this node is displayed
     actions: list[TriggerAction] = field(default_factory=list)
 
@@ -252,11 +252,11 @@ class DialogueOption:
     next_node: str | None = None                 # Next dialogue node ID
     conditions: list[TriggerCondition] = field(default_factory=list)
     actions: list[TriggerAction] = field(default_factory=list)
-    
+
     # Quest integration
     accept_quest: str | None = None              # Quest ID to accept
     turn_in_quest: str | None = None             # Quest ID to turn in
-    
+
     # Visibility
     hidden_if_unavailable: bool = True           # Hide if conditions fail
 
@@ -266,7 +266,7 @@ class DialogueTree:
     npc_template_id: str
     nodes: dict[str, DialogueNode] = field(default_factory=dict)
     entry_node: str = "greet"                    # Starting node ID
-    
+
     # Context-sensitive entry points
     entry_overrides: list[tuple[list[TriggerCondition], str]] = field(default_factory=list)
 ```
@@ -277,15 +277,15 @@ class DialogueTree:
 @dataclass
 class WorldPlayer:
     # ... existing fields ...
-    
+
     # Quest tracking
     quest_progress: dict[str, QuestProgress] = field(default_factory=dict)
     completed_quests: set[str] = field(default_factory=set)  # For quick lookup
-    
+
     # Dialogue state
     active_dialogue: str | None = None           # Current dialogue tree ID
     dialogue_node: str | None = None             # Current node in tree
-    
+
     # Player flags (persistent state)
     player_flags: dict[str, Any] = field(default_factory=dict)
 ```
@@ -295,125 +295,125 @@ class WorldPlayer:
 ```python
 class QuestSystem:
     """Manages quest templates, player progress, and quest-related events."""
-    
+
     def __init__(self, ctx: GameContext):
         self.ctx = ctx
         self.templates: dict[str, QuestTemplate] = {}
         self.dialogue_trees: dict[str, DialogueTree] = {}
         self._register_objective_handlers()
-    
+
     # === Template Management ===
-    
+
     def register_quest(self, template: QuestTemplate) -> None:
         """Register a quest template."""
         self.templates[template.id] = template
-    
+
     def register_dialogue(self, tree: DialogueTree) -> None:
         """Register an NPC dialogue tree."""
         self.dialogue_trees[tree.npc_template_id] = tree
-    
+
     # === Quest State Management ===
-    
+
     def get_quest_status(self, player_id: PlayerId, quest_id: str) -> QuestStatus:
         """Get player's current status on a quest."""
         ...
-    
+
     def check_availability(self, player_id: PlayerId, quest_id: str) -> bool:
         """Check if a quest is available to a player."""
         ...
-    
+
     def accept_quest(self, player_id: PlayerId, quest_id: str) -> list[Event]:
         """Player accepts a quest."""
         ...
-    
+
     def update_objective(
-        self, 
-        player_id: PlayerId, 
-        quest_id: str, 
-        objective_id: str, 
+        self,
+        player_id: PlayerId,
+        quest_id: str,
+        objective_id: str,
         delta: int = 1
     ) -> list[Event]:
         """Update progress on an objective."""
         ...
-    
+
     def check_completion(self, player_id: PlayerId, quest_id: str) -> bool:
         """Check if all required objectives are complete."""
         ...
-    
+
     def turn_in_quest(self, player_id: PlayerId, quest_id: str) -> list[Event]:
         """Turn in a completed quest for rewards."""
         ...
-    
+
     def fail_quest(self, player_id: PlayerId, quest_id: str) -> list[Event]:
         """Fail a quest (optional, for timed/escort quests)."""
         ...
-    
+
     # === Event Observers ===
-    
+
     def on_npc_killed(
-        self, 
-        player_id: PlayerId, 
+        self,
+        player_id: PlayerId,
         npc: WorldNpc
     ) -> list[Event]:
         """Called when player kills an NPC. Updates KILL objectives."""
         ...
-    
+
     def on_item_acquired(
-        self, 
-        player_id: PlayerId, 
-        item_template_id: str, 
+        self,
+        player_id: PlayerId,
+        item_template_id: str,
         quantity: int
     ) -> list[Event]:
         """Called when player picks up an item. Updates COLLECT objectives."""
         ...
-    
+
     def on_room_entered(
-        self, 
-        player_id: PlayerId, 
+        self,
+        player_id: PlayerId,
         room_id: RoomId
     ) -> list[Event]:
         """Called when player enters a room. Updates VISIT objectives."""
         ...
-    
+
     def on_npc_talked(
-        self, 
-        player_id: PlayerId, 
+        self,
+        player_id: PlayerId,
         npc: WorldNpc
     ) -> list[Event]:
         """Called when player talks to NPC. Updates TALK objectives."""
         ...
-    
+
     # === Dialogue System ===
-    
+
     def start_dialogue(
-        self, 
-        player_id: PlayerId, 
+        self,
+        player_id: PlayerId,
         npc: WorldNpc
     ) -> list[Event]:
         """Initiate dialogue with an NPC."""
         ...
-    
+
     def select_option(
-        self, 
-        player_id: PlayerId, 
+        self,
+        player_id: PlayerId,
         option_index: int
     ) -> list[Event]:
         """Player selects a dialogue option."""
         ...
-    
+
     def end_dialogue(self, player_id: PlayerId) -> list[Event]:
         """End the current dialogue."""
         ...
-    
+
     # === Journal/UI ===
-    
+
     def get_quest_log(self, player_id: PlayerId) -> list[dict]:
         """Get formatted quest log for player."""
         ...
-    
+
     def get_objective_display(
-        self, 
-        player_id: PlayerId, 
+        self,
+        player_id: PlayerId,
         quest_id: str
     ) -> list[str]:
         """Get formatted objective list for a quest."""
@@ -442,7 +442,7 @@ class QuestSystem:
 
 Elder Marcus turns to face you.
 
-"Ah, a traveler! These are dark times. Goblins have overrun the 
+"Ah, a traveler! These are dark times. Goblins have overrun the
 eastern mines, and we desperately need someone to clear them out."
 
   [1] "I'll help you deal with the goblins."
@@ -490,32 +490,32 @@ quests:
     name: "Clear the Mines"
     description: "Elder Marcus has asked you to clear the goblin infestation from the Eastern Mines."
     category: main
-    
+
     giver_npc_template: elder_marcus
     turn_in_npc_template: elder_marcus
-    
+
     level_requirement: 1
-    
+
     objectives:
       - id: kill_goblins
         type: kill
         description: "Kill Goblin Warriors"
         target_template_id: goblin_warrior
         required_count: 10
-    
+
     rewards:
       experience: 150
       items:
         - ["gold_coins", 25]
         - ["minor_health_potion", 3]
-    
+
     accept_dialogue: |
       "Excellent! Venture into the Eastern Mines and slay 10 Goblin Warriors.
       Return to me when the deed is done."
-    
+
     progress_dialogue: |
       "Have you cleared the mines yet? We cannot rest while those beasts remain."
-    
+
     complete_dialogue: |
       "You've done it! The mines are safe once more. Please, take this reward
       as a token of our gratitude."
@@ -529,34 +529,34 @@ quests:
     name: "Alchemist's Supplies"
     description: "The alchemist needs rare herbs from the Whispering Woods."
     category: side
-    
+
     giver_npc_template: alchemist_vera
     turn_in_npc_template: alchemist_vera
-    
+
     level_requirement: 3
     prerequisites:
       - clear_the_mines  # Must complete first quest
-    
+
     objectives:
       - id: collect_moonpetal
         type: collect
         description: "Collect Moonpetal Flowers"
         target_template_id: moonpetal_flower
         required_count: 5
-        
+
       - id: collect_shadowmoss
         type: collect
         description: "Collect Shadowmoss"
         target_template_id: shadowmoss
         required_count: 3
-        
+
       - id: avoid_wolves
         type: kill
         description: "Defeat Forest Wolves (if attacked)"
         target_template_id: forest_wolf
         required_count: 0  # Optional
         optional: true
-    
+
     rewards:
       experience: 200
       items:
@@ -577,41 +577,41 @@ quests:
     name: "Secrets of the Tower"
     description: "Explore the abandoned wizard's tower and uncover its mysteries."
     category: main
-    
+
     giver_npc_template: mysterious_stranger
-    
+
     level_requirement: 5
     prerequisites:
       - alchemist_supplies
     required_items:
       - wizard_key  # Must have obtained this
-    
+
     objectives:
       - id: enter_tower
         type: visit
         description: "Enter the Wizard's Tower"
         target_room_id: wizard_tower_foyer
-        
+
       - id: find_study
         type: visit
         description: "Find the Wizard's Study"
         target_room_id: wizard_study
         hidden: true  # Revealed after entering tower
-        
+
       - id: read_journal
         type: interact
         description: "Read the Wizard's Journal"
         target_room_id: wizard_study
         command_pattern: "read journal"
         hidden: true
-        
+
       - id: discover_secret
         type: interact
         description: "???"  # Truly hidden until discovered
         target_room_id: wizard_study
         command_pattern: "press hidden switch"
         hidden: true
-    
+
     # No turn-in NPC - auto-completes
     rewards:
       experience: 500
@@ -619,7 +619,7 @@ quests:
         - ["wizard_staff", 1]
       flags:
         tower_secrets_known: true
-    
+
     on_complete_actions:
       - type: message_player
         params:
@@ -641,7 +641,7 @@ quest_chains:
       - goblin_scouts          # Level 3-5
       - find_goblin_camp       # Level 5-7
       - defeat_goblin_chief    # Level 7-10 (boss)
-    
+
     # Rewards for completing the chain
     chain_rewards:
       experience: 1000
@@ -658,7 +658,7 @@ quest_chains:
 dialogues:
   - npc_template_id: elder_marcus
     entry_node: greet
-    
+
     # Context-sensitive greetings
     entry_overrides:
       - conditions:
@@ -669,13 +669,13 @@ dialogues:
           - type: quest_status
             params: { quest_id: "clear_the_mines", status: "in_progress" }
         node: greet_quest_progress
-    
+
     nodes:
       greet:
         text: |
           Elder Marcus looks up from his work, his weathered face creasing with concern.
-          
-          "Ah, a traveler! These are dark times. Goblins have overrun the 
+
+          "Ah, a traveler! These are dark times. Goblins have overrun the
           eastern mines, and we desperately need someone to clear them out."
         options:
           - text: "I'll help you deal with the goblins."
@@ -687,7 +687,7 @@ dialogues:
             next_node: mine_history
           - text: "Farewell."
             next_node: null  # Ends dialogue
-      
+
       quest_accepted:
         text: |
           "Excellent! Venture into the Eastern Mines and slay 10 Goblin Warriors.
@@ -695,10 +695,10 @@ dialogues:
         options:
           - text: "I'll return when it's done."
             next_node: null
-      
+
       discuss_reward:
         text: |
-          "We may be a humble village, but we can offer gold and potions for your 
+          "We may be a humble village, but we can offer gold and potions for your
           trouble. More importantly, you'll have our eternal gratitude."
         options:
           - text: "Very well, I'll help."
@@ -706,11 +706,11 @@ dialogues:
             next_node: quest_accepted
           - text: "I need to think about it."
             next_node: null
-      
+
       mine_history:
         text: |
           "The Eastern Mines were once our livelihood—rich veins of iron and copper.
-          Three weeks ago, goblins emerged from the deeper tunnels. We've lost 
+          Three weeks ago, goblins emerged from the deeper tunnels. We've lost
           good miners to those beasts."
         options:
           - text: "I'll clear them out for you."
@@ -718,37 +718,37 @@ dialogues:
             next_node: quest_accepted
           - text: "That's terrible. Farewell."
             next_node: null
-      
+
       greet_quest_progress:
         text: |
-          "Have you cleared the mines yet? Every night we hear their drums 
+          "Have you cleared the mines yet? Every night we hear their drums
           echoing from the tunnels. Please, hurry."
         options:
           - text: "I'm working on it."
             next_node: null
           - text: "How many goblins are left?"
             next_node: progress_check
-      
+
       progress_check:
         text: "{quest.clear_the_mines.objectives.kill_goblins.remaining} goblins remain in the mines. Stay vigilant."
         options:
           - text: "I'll finish the job."
             next_node: null
-      
+
       greet_quest_complete:
         text: |
           Elder Marcus's eyes light up as you approach.
-          
-          "You've done it! I can see it in your eyes—the mines are clear! 
+
+          "You've done it! I can see it in your eyes—the mines are clear!
           Please, accept this reward. You've saved our village."
         options:
           - text: "It was my pleasure."
             turn_in_quest: clear_the_mines
             next_node: after_turn_in
-      
+
       after_turn_in:
         text: |
-          "If you seek more adventure, speak with Alchemist Vera. She mentioned 
+          "If you seek more adventure, speak with Alchemist Vera. She mentioned
           needing help gathering rare ingredients. Safe travels, hero."
         actions:
           - type: set_flag
@@ -769,7 +769,7 @@ dialogues:
 async def _process_death(self, entity: WorldEntity, killer: WorldEntity) -> list[Event]:
     events = []
     # ... existing death logic ...
-    
+
     # Notify quest system if player killed an NPC
     if isinstance(killer, WorldPlayer) and isinstance(entity, WorldNpc):
         quest_events = await self.ctx.quest_system.on_npc_killed(
@@ -777,7 +777,7 @@ async def _process_death(self, entity: WorldEntity, killer: WorldEntity) -> list
             npc=entity
         )
         events.extend(quest_events)
-    
+
     return events
 ```
 
@@ -788,7 +788,7 @@ async def _process_death(self, entity: WorldEntity, killer: WorldEntity) -> list
 async def _pickup_item(self, player_id: PlayerId, item_name: str) -> list[Event]:
     events = []
     # ... existing pickup logic ...
-    
+
     # Notify quest system
     if item:
         quest_events = await self.ctx.quest_system.on_item_acquired(
@@ -797,7 +797,7 @@ async def _pickup_item(self, player_id: PlayerId, item_name: str) -> list[Event]
             quantity=item.quantity
         )
         events.extend(quest_events)
-    
+
     return events
 ```
 
@@ -807,14 +807,14 @@ async def _pickup_item(self, player_id: PlayerId, item_name: str) -> list[Event]
 # In WorldEngine._move_player() - after trigger hooks
 async def _move_player(self, player_id: PlayerId, direction: str) -> list[Event]:
     # ... existing movement ...
-    
+
     # Quest VISIT objective tracking
     quest_events = await self.ctx.quest_system.on_room_entered(
         player_id=player_id,
         room_id=new_room.id
     )
     events.extend(quest_events)
-    
+
     return events
 ```
 
@@ -827,7 +827,7 @@ def dispatch(self, player_id: PlayerId, raw: str) -> list[Event]:
     player = self.ctx.world.players.get(player_id)
     if player and player.active_dialogue:
         return self._handle_dialogue_input(player_id, raw)
-    
+
     # ... existing command routing ...
 ```
 
@@ -839,24 +839,24 @@ def dispatch(self, player_id: PlayerId, raw: str) -> list[Event]:
 # New model for quest progress persistence
 class QuestProgress(Base):
     __tablename__ = "quest_progress"
-    
+
     id: Mapped[int] = mapped_column(primary_key=True)
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"))
     quest_id: Mapped[str] = mapped_column(String(100))
     status: Mapped[str] = mapped_column(String(50))
-    
+
     # JSON fields for flexible storage
     objective_progress: Mapped[dict] = mapped_column(JSON, default=dict)
-    
+
     # Timestamps
     accepted_at: Mapped[float | None] = mapped_column(Float, nullable=True)
     completed_at: Mapped[float | None] = mapped_column(Float, nullable=True)
     turned_in_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    
+
     # For repeatable quests
     completion_count: Mapped[int] = mapped_column(Integer, default=0)
     last_completed_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    
+
     # Composite unique constraint
     __table_args__ = (
         UniqueConstraint("player_id", "quest_id", name="uq_player_quest"),
@@ -865,10 +865,10 @@ class QuestProgress(Base):
 # Extend Player model
 class Player(Base):
     # ... existing fields ...
-    
+
     # Player flags (persistent state)
     player_flags: Mapped[dict] = mapped_column(JSON, default=dict)
-    
+
     # Relationship
     quest_progress: Mapped[list["QuestProgress"]] = relationship(back_populates="player")
 ```
@@ -1009,11 +1009,11 @@ quests:
 ```python
 class QuestGenerator:
     """Generate procedural quests based on world state."""
-    
+
     def generate_bounty(self, area: WorldArea) -> QuestTemplate:
         """Create a kill quest for NPCs in area."""
         ...
-    
+
     def generate_fetch(self, requester: WorldNpc) -> QuestTemplate:
         """Create a collection quest based on NPC needs."""
         ...
@@ -1026,11 +1026,11 @@ quests:
   - id: dragon_raid
     name: "Slay the Dragon"
     category: raid
-    
+
     party_requirements:
       min_players: 3
       max_players: 5
-      
+
     # Objectives tracked per-player
     shared_objectives:
       - id: slay_dragon

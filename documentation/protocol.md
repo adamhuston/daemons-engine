@@ -1251,6 +1251,619 @@ Hot-reload character classes and abilities from YAML.
 }
 ```
 
+#### Schema Registry (Phase 12.1)
+
+The Schema Registry provides API access to all YAML schema definitions (_schema.yaml files) for CMS integration and TypeScript type generation.
+
+##### GET /api/admin/schemas
+Get all schema definitions with optional filtering.
+
+**Requires:** MODERATOR+
+
+**Query Parameters:**
+- `content_type` (optional): Filter by content type (e.g., "classes", "items", "rooms")
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "detail": "Retrieved 13 schemas",
+  "count": 13,
+  "schemas": [
+    {
+      "content_type": "classes",
+      "file_path": "C:\\...\\world_data\\classes\\_schema.yaml",
+      "content": "# Class Schema Documentation\n# Reference for content creators...",
+      "checksum": "8b99261438de2991012f263d897199e837ab208ab61cc392b9f1d48c027d626f",
+      "last_modified": "2025-11-29T11:23:27.825053",
+      "size_bytes": 2588
+    }
+    // ... more schemas
+  ],
+  "filter_applied": null
+}
+```
+
+**Example Filtered Request:**
+```
+GET /api/admin/schemas?content_type=classes
+```
+
+**Available Schema Types:**
+- `abilities` - Ability/spell definitions
+- `areas` - World region definitions
+- `classes` - Character class definitions
+- `dialogues` - NPC dialogue trees
+- `factions` - Faction and reputation systems
+- `item_instances` - Specific item spawns
+- `items` - Item template definitions
+- `npc_spawns` - NPC spawn configurations
+- `npcs` - NPC template definitions
+- `quest_chains` - Linked quest series
+- `quests` - Quest definitions
+- `rooms` - Room definitions
+- `triggers` - Event trigger definitions
+
+##### GET /api/admin/schemas/version
+Get schema version information for cache invalidation.
+
+**Requires:** MODERATOR+
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "version": "1.0.0",
+  "engine_version": "0.12.1",
+  "last_modified": "2025-11-29T21:30:37.107781",
+  "schema_count": 13
+}
+```
+
+**Use Case:** CMS clients can poll this endpoint to detect schema changes and invalidate cached TypeScript types.
+
+##### POST /api/admin/schemas/reload
+Hot-reload all schema definitions from disk.
+
+**Requires:** GAME_MASTER+ (Permission.SERVER_COMMANDS)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "detail": "Reloaded 13 schemas",
+  "schemas_loaded": 13,
+  "version": "1.0.0",
+  "engine_version": "0.12.1",
+  "last_modified": "2025-11-29T21:30:37.107781"
+}
+```
+
+#### File Management (Phase 12.2)
+
+The File Management API provides secure access to YAML content files for editing and management.
+
+##### GET /api/admin/content/files
+List all YAML files in world_data directory.
+
+**Requires:** MODERATOR+
+
+**Query Parameters:**
+- `content_type` (optional): Filter by content type (e.g., "classes", "items", "rooms")
+- `include_schema_files` (optional): Include _schema.yaml files (default: false)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "detail": "Retrieved 73 files",
+  "count": 73,
+  "files": [
+    {
+      "file_path": "classes/warrior.yaml",
+      "content_type": "classes",
+      "size_bytes": 1245,
+      "last_modified": "2025-11-29T11:23:27.825053"
+    }
+    // ... more files
+  ],
+  "stats": {
+    "total": 73,
+    "classes": 3,
+    "items": 7,
+    "npcs": 4,
+    "rooms": 36,
+    "quests": 2
+    // ... other content types
+  },
+  "filter_applied": null
+}
+```
+
+##### GET /api/admin/content/download
+Download a specific YAML file.
+
+**Requires:** MODERATOR+
+
+**Query Parameters:**
+- `file_path`: Relative path from world_data root (e.g., "classes/warrior.yaml")
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "file_path": "classes/warrior.yaml",
+  "content": "# Warrior Class\\nclass_id: warrior\\nname: Warrior\\n...",
+  "checksum": "a1b2c3d4e5f6...",
+  "last_modified": "2025-11-29T11:23:27.825053",
+  "size_bytes": 1245
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid or unsafe file path (path traversal attempt)
+- `404 Not Found`: File not found
+
+##### POST /api/admin/content/upload
+Upload or update a YAML file.
+
+**Requires:** GAME_MASTER+ (Permission.SERVER_COMMANDS)
+
+**Request Body:**
+```json
+{
+  "file_path": "classes/my_class.yaml",
+  "content": "# My Custom Class\\nclass_id: my_class\\n...",
+  "validate_only": false
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "detail": "File written successfully",
+  "file_path": "classes/my_class.yaml",
+  "checksum": "a1b2c3d4e5f6...",
+  "file_written": true,
+  "errors": []
+}
+```
+
+**Validation-Only Mode:**
+Set `validate_only: true` to validate YAML syntax without writing to disk.
+
+**Error Response (400):**
+```json
+{
+  "success": false,
+  "detail": "Validation failed",
+  "errors": [
+    "Invalid YAML syntax: mapping values are not allowed here in ..."
+  ],
+  "file_written": false
+}
+```
+
+**Security Features:**
+- Path traversal attack prevention
+- Atomic file operations (temp file + rename)
+- YAML syntax validation
+- Automatic parent directory creation
+
+##### DELETE /api/admin/content/file
+Delete a YAML file.
+
+**Requires:** GAME_MASTER+ (Permission.SERVER_COMMANDS)
+
+**Query Parameters:**
+- `file_path`: Relative path from world_data root
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "detail": "File deleted successfully",
+  "file_path": "classes/old_class.yaml"
+}
+```
+
+**Protection:**
+- Schema files (_schema.yaml) cannot be deleted
+- Path traversal attempts are blocked
+
+##### GET /api/admin/content/stats
+Get file statistics.
+
+**Requires:** MODERATOR+
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "stats": {
+    "total": 73,
+    "classes": 3,
+    "items": 7,
+    "npcs": 4,
+    "rooms": 36,
+    "quests": 2,
+    "abilities": 5,
+    "areas": 3,
+    "dialogues": 2,
+    "factions": 4,
+    "item_instances": 0,
+    "npc_spawns": 3,
+    "quest_chains": 1,
+    "triggers": 3,
+    "unknown": 0
+  }
+}
+```
+
+---
+
+### Phase 12.3: Enhanced Validation API
+
+Enhanced validation with detailed error reporting for real-time CMS feedback.
+
+##### POST /api/admin/content/validate-enhanced
+Comprehensive YAML validation with line/column errors.
+
+**Requires:** MODERATOR+
+
+**Request:**
+```json
+{
+  "yaml_content": "class_id: warrior\nname: \"unclosed quote\n",
+  "content_type": "classes",
+  "check_references": true,
+  "file_path": "classes/warrior.yaml"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": false,
+  "valid": false,
+  "errors": [
+    {
+      "severity": "error",
+      "message": "YAML syntax error: found unexpected end of stream (while scanning a quoted scalar)",
+      "line": 2,
+      "column": 7,
+      "field_path": null,
+      "error_type": "syntax",
+      "suggestion": "Check YAML indentation and special characters"
+    }
+  ],
+  "warnings": [],
+  "content_type": "classes",
+  "file_path": "classes/warrior.yaml",
+  "error_count": 1,
+  "warning_count": 0
+}
+```
+
+**Validation Features:**
+- **Syntax validation**: YAML parsing with line/column error extraction
+- **Schema validation**: Required fields and type checking for 11 content types
+- **Reference validation**: Cross-content link checking (room exits, abilities, etc.)
+- **Error types**: `syntax`, `schema`, `reference`, `validation`
+- **Warning types**: `deprecated`, `style`, `performance`, `general`
+
+**Example - Missing Required Fields:**
+```json
+{
+  "valid": false,
+  "errors": [
+    {
+      "severity": "error",
+      "message": "Missing required field: 'description'",
+      "field_path": "description",
+      "error_type": "schema",
+      "suggestion": "Add 'description' field to the YAML file"
+    },
+    {
+      "severity": "error",
+      "message": "Missing required field: 'base_stats'",
+      "field_path": "base_stats",
+      "error_type": "schema",
+      "suggestion": "Add 'base_stats' field to the YAML file"
+    }
+  ],
+  "content_type": "classes"
+}
+```
+
+**Example - Broken References:**
+```json
+{
+  "valid": false,
+  "errors": [
+    {
+      "severity": "error",
+      "message": "Exit 'north' points to non-existent room 'tavern_upstairs'",
+      "field_path": "exits.north",
+      "error_type": "reference",
+      "suggestion": "Create room 'tavern_upstairs' or fix the exit destination"
+    },
+    {
+      "severity": "error",
+      "message": "Class references non-existent ability 'super_slash'",
+      "field_path": "available_abilities",
+      "error_type": "reference",
+      "suggestion": "Create ability 'super_slash' or remove from available_abilities"
+    }
+  ],
+  "content_type": "rooms"
+}
+```
+
+##### POST /api/admin/content/validate-references
+Reference-only validation (check cross-content links).
+
+**Requires:** MODERATOR+
+
+**Request:**
+```json
+{
+  "yaml_content": "room_id: inn\nexits:\n  north: nonexistent_room",
+  "content_type": "rooms",
+  "file_path": "rooms/inn.yaml"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": false,
+  "valid": false,
+  "errors": [
+    {
+      "severity": "error",
+      "message": "Exit 'north' points to non-existent room 'nonexistent_room'",
+      "field_path": "exits.north",
+      "error_type": "reference",
+      "suggestion": "Create room 'nonexistent_room' or fix the exit destination"
+    }
+  ],
+  "warnings": [],
+  "content_type": "rooms",
+  "file_path": "rooms/inn.yaml",
+  "cache_built": true,
+  "cached_entities": {
+    "rooms": 36,
+    "items": 7,
+    "npcs": 4,
+    "abilities": 5,
+    "quests": 2,
+    "classes": 3,
+    "areas": 3,
+    "factions": 4,
+    "dialogues": 2
+  }
+}
+```
+
+**Validated References by Content Type:**
+- **Rooms**: exits → room_ids, area_id → area_ids
+- **Classes**: available_abilities → ability_ids
+- **NPCs**: faction_id → faction_ids, dialogue_id → dialogue_ids
+- **Quests**: (objectives reference NPCs, items, etc.)
+
+##### POST /api/admin/content/rebuild-reference-cache
+Rebuild the reference validation cache.
+
+**Requires:** GAME_MASTER+
+
+**Use Case:** Call after bulk content changes to refresh the entity index.
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "detail": "Reference cache rebuilt successfully",
+  "cached_entities": {
+    "rooms": 36,
+    "items": 7,
+    "npcs": 4,
+    "abilities": 5,
+    "quests": 2,
+    "classes": 3,
+    "areas": 3,
+    "factions": 4,
+    "dialogues": 2,
+    "triggers": 3,
+    "quest_chains": 1
+  }
+}
+```
+
+---
+
+### Phase 12.4: Content Querying API
+
+Content search, dependency analysis, and health metrics for CMS.
+
+##### GET /api/admin/content/search
+Full-text search across YAML content files.
+
+**Requires:** MODERATOR+
+
+**Query Parameters:**
+- `q`: Search query string (required)
+- `content_type`: Optional filter by content type
+- `limit`: Max results (default: 50, max: 200)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "query": "warrior",
+  "content_type_filter": null,
+  "result_count": 4,
+  "results": [
+    {
+      "content_type": "classes",
+      "file_path": "classes/warrior.yaml",
+      "entity_id": "warrior",
+      "entity_name": "Warrior",
+      "match_field": "id",
+      "match_value": "warrior",
+      "context_snippet": "warrior",
+      "score": 10.0
+    },
+    {
+      "content_type": "abilities",
+      "file_path": "abilities/power_attack.yaml",
+      "entity_id": "power_attack",
+      "entity_name": "Power Attack",
+      "match_field": "description",
+      "match_value": "A powerful melee attack favored by warriors",
+      "context_snippet": "...powerful melee attack favored by warriors...",
+      "score": 1.0
+    }
+  ]
+}
+```
+
+**Search Features:**
+- Searches: entity IDs, names, descriptions
+- Relevance scoring: exact ID match (10.0) > exact match (5.0) > starts with (3.0) > contains (1.0)
+- Context snippets show surrounding text
+- Results sorted by score descending
+
+##### GET /api/admin/content/dependencies
+Get dependency graph for a specific entity.
+
+**Requires:** MODERATOR+
+
+**Query Parameters:**
+- `entity_type`: Content type (e.g., "rooms", "classes")
+- `entity_id`: Entity identifier
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "entity_type": "classes",
+  "entity_id": "warrior",
+  "entity_name": "Warrior",
+  "references": [
+    {
+      "target_type": "abilities",
+      "target_id": "slash",
+      "relationship": "has_ability",
+      "field_path": "available_abilities"
+    },
+    {
+      "target_type": "abilities",
+      "target_id": "power_attack",
+      "relationship": "has_ability",
+      "field_path": "available_abilities"
+    }
+  ],
+  "referenced_by": [],
+  "reference_count": 2,
+  "referenced_by_count": 0,
+  "is_orphaned": true,
+  "safe_to_delete": true,
+  "blocking_references": []
+}
+```
+
+**Dependency Relationships Tracked:**
+- **Rooms**: exits → rooms, area_id → areas
+- **Classes**: available_abilities → abilities
+- **NPCs**: faction_id → factions, dialogue_id → dialogues
+- **NPC Spawns**: npc_id → npcs, room_id → rooms
+- **Quest Chains**: quests → quests
+
+**Safe Delete Check:**
+- `safe_to_delete: true` - No entities depend on this one
+- `safe_to_delete: false` - Other entities reference this (see blocking_references)
+
+##### GET /api/admin/content/analytics
+Comprehensive content health metrics.
+
+**Requires:** MODERATOR+
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "total_entities": 73,
+  "entities_by_type": {
+    "rooms": 36,
+    "items": 7,
+    "npcs": 4,
+    "abilities": 5,
+    "quests": 2,
+    "classes": 3,
+    "areas": 3,
+    "factions": 4,
+    "dialogues": 2,
+    "triggers": 3,
+    "quest_chains": 1,
+    "npc_spawns": 3
+  },
+  "broken_reference_count": 2,
+  "broken_references": [
+    {
+      "source_type": "rooms",
+      "source_id": "tavern",
+      "target_type": "rooms",
+      "target_id": "tavern_upstairs",
+      "relationship": "exit",
+      "field_path": "exits.up"
+    }
+  ],
+  "orphaned_entity_count": 5,
+  "orphaned_entities": [
+    {"type": "items", "id": "old_sword"},
+    {"type": "npcs", "id": "unused_guard"}
+  ],
+  "average_references_per_entity": 2.3,
+  "most_referenced_entities": [
+    {"type": "rooms", "id": "town_square", "reference_count": 8},
+    {"type": "abilities", "id": "slash", "reference_count": 5}
+  ]
+}
+```
+
+**Analytics Metrics:**
+- **Broken References**: Links to non-existent entities (should be fixed)
+- **Orphaned Entities**: Nothing references these (candidates for cleanup)
+- **Most Referenced**: Popular entities that many others depend on
+- **Average References**: Overall connectivity metric
+
+**Use Cases:**
+- Content health monitoring
+- Finding cleanup opportunities
+- Impact analysis before deletion
+- Identifying important entities
+
+##### POST /api/admin/content/rebuild-dependency-graph
+Rebuild the dependency graph index.
+
+**Requires:** GAME_MASTER+
+
+**Use Case:** Call after bulk content changes to refresh the dependency index.
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "detail": "Dependency graph rebuilt successfully",
+  "entity_count": 73,
+  "dependency_count": 156
+}
+```
+
+---
+
 #### Account Management
 
 ##### GET /api/admin/accounts
@@ -1677,7 +2290,7 @@ class Targetable(Protocol):
     id: str
     name: str
     room_id: RoomId
-    
+
     def get_target_type(self) -> TargetableType: ...
 ```
 

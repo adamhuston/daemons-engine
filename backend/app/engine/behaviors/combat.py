@@ -1,6 +1,6 @@
 # backend/app/engine/behaviors/combat.py
 """Combat behavior scripts - control aggression and attack patterns."""
-from .base import behavior, BehaviorScript, BehaviorContext, BehaviorResult
+from .base import BehaviorContext, BehaviorResult, BehaviorScript, behavior
 
 
 @behavior(
@@ -10,20 +10,22 @@ from .base import behavior, BehaviorScript, BehaviorContext, BehaviorResult
     defaults={
         "aggro_on_sight": True,
         "attacks_first": True,
-    }
+    },
 )
 class Aggressive(BehaviorScript):
-    async def on_player_enter(self, ctx: BehaviorContext, player_id: str) -> BehaviorResult:
+    async def on_player_enter(
+        self, ctx: BehaviorContext, player_id: str
+    ) -> BehaviorResult:
         if not ctx.config.get("aggro_on_sight", True):
             return BehaviorResult.nothing()
-        
+
         player = ctx.world.players.get(player_id)
         player_name = player.name if player else "someone"
-        
+
         return BehaviorResult(
             handled=True,
             attack_target=player_id,
-            message=f"{ctx.npc.name} snarls and attacks {player_name}!"
+            message=f"{ctx.npc.name} snarls and attacks {player_name}!",
         )
 
 
@@ -34,17 +36,19 @@ class Aggressive(BehaviorScript):
     defaults={
         "aggro_on_sight": False,
         "attacks_if_attacked": True,
-    }
+    },
 )
 class Defensive(BehaviorScript):
-    async def on_damaged(self, ctx: BehaviorContext, attacker_id: str, damage: int) -> BehaviorResult:
+    async def on_damaged(
+        self, ctx: BehaviorContext, attacker_id: str, damage: int
+    ) -> BehaviorResult:
         if not ctx.config.get("attacks_if_attacked", True):
             return BehaviorResult.nothing()
-        
+
         return BehaviorResult(
             handled=True,
             attack_target=attacker_id,
-            message=f"{ctx.npc.name} retaliates!"
+            message=f"{ctx.npc.name} retaliates!",
         )
 
 
@@ -55,16 +59,19 @@ class Defensive(BehaviorScript):
     defaults={
         "aggro_on_sight": False,
         "attacks_if_attacked": False,
-    }
+    },
 )
 class Pacifist(BehaviorScript):
-    async def on_player_enter(self, ctx: BehaviorContext, player_id: str) -> BehaviorResult:
+    async def on_player_enter(
+        self, ctx: BehaviorContext, player_id: str
+    ) -> BehaviorResult:
         # Override aggressive behavior - do nothing
         return BehaviorResult.handled()
-    
-    async def on_damaged(self, ctx: BehaviorContext, attacker_id: str, damage: int) -> BehaviorResult:
+
+    async def on_damaged(
+        self, ctx: BehaviorContext, attacker_id: str, damage: int
+    ) -> BehaviorResult:
         # Don't retaliate
         return BehaviorResult.handled(
             message=f"{ctx.npc.name} cowers but does not fight back."
         )
-

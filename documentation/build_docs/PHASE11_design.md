@@ -1,4 +1,4 @@
-I'll research the Phase 11 requirements and create a design document. Let me start by examining the existing phase documentation and the current system architecture. 
+I'll research the Phase 11 requirements and create a design document. Let me start by examining the existing phase documentation and the current system architecture.
 
 Read [](file:///c%3A/Users/adam.huston/Documents/Development/1126/PHASE11.md)
 
@@ -22,13 +22,13 @@ Searched for regex `class WorldRoom|room_flags|ambient|lighting|dark` (`**/backe
 
 Searched codebase for "room description look command visibility see perceive environment", 26 results
 
-Now let me check what other phases have been completed to understand the progression: 
+Now let me check what other phases have been completed to understand the progression:
 
 Read [](file:///c%3A/Users/adam.huston/Documents/Development/1126/roadmap.md#400-400), lines 400 to 600
 
 Searched for regex `class Room|class Area` (`**/backend/app/models.py`), 4 results
 
-Let me look at the Area and Room models to understand lighting capabilities: 
+Let me look at the Area and Room models to understand lighting capabilities:
 
 Read [](file:///c%3A/Users/adam.huston/Documents/Development/1126/backend/app/models.py#101-101), lines 101 to 160
 
@@ -36,7 +36,7 @@ Read [](file:///c%3A/Users/adam.huston/Documents/Development/1126/backend/app/mo
 
 Searched for regex `light|dark|visibility` (`**/backend/world_data/rooms/*.yaml`), no results
 
-Now let me examine the existing utility abilities to understand how light/darkness currently work: 
+Now let me examine the existing utility abilities to understand how light/darkness currently work:
 
 Read [](file:///c%3A/Users/adam.huston/Documents/Development/1126/backend/world_data/abilities/utility.yaml#1-1), lines 1 to 200
 
@@ -58,7 +58,7 @@ Phase 11 implements a **comprehensive lighting and visibility system** that tran
 - **Area ambient_lighting** field in database (Phase 2) - currently cosmetic only
 - **Utility abilities** for light/darkness (Phase 9j+):
   - `light` - Personal light aura (300s duration)
-  - `daylight` - Room-wide illumination (600s duration) 
+  - `daylight` - Room-wide illumination (600s duration)
   - `darkness` - Shadow effects (180s duration)
   - These currently only track effects in `player.active_effects` but don't affect visibility
 - **Room descriptions** are always fully visible regardless of lighting conditions
@@ -112,14 +112,14 @@ Each room's effective light level is computed from multiple sources:
 def calculate_room_light_level(room: WorldRoom, area: WorldArea, players: list[WorldPlayer]) -> int:
     """
     Calculate effective light level (0-100) for a room.
-    
+
     Sources (additive):
     - Area ambient_lighting (base): 0-60
     - Time-of-day modifier: -20 to +20
     - Player light spells: +0 to +50 per spell
     - Item light sources: +10 to +30 per torch/lantern
     - Darkness effects: -50 to -100
-    
+
     Returns: Clamped to 0-100 range
     """
 ```
@@ -161,7 +161,7 @@ Different content requires different light levels to perceive:
 | 51-75 | Full description | Visible | Full info | Full details | Normal gameplay |
 | 76-100 | Enhanced description* | Visible | Full info + hidden** | Full details | Reveals secrets |
 
-\* Enhanced: Trigger action `reveal_hidden_description` if light_level >= 80  
+\* Enhanced: Trigger action `reveal_hidden_description` if light_level >= 80
 \*\* Hidden NPCs/items with `hidden: true` flag become visible
 
 ### 3. Database Schema Extensions
@@ -203,19 +203,19 @@ class LightingSystem:
     def __init__(self, world: World, time_manager: TimeEventManager):
         self.world = world
         self.time_manager = time_manager
-    
+
     def calculate_room_light(self, room: WorldRoom) -> int:
         """Calculate current effective light level."""
-        
+
     def update_light_source(self, room_id: str, source_id: str, level: int, duration: float):
         """Add/update a light source (spell, torch)."""
-        
+
     def remove_light_source(self, room_id: str, source_id: str):
         """Remove expired light source."""
-        
+
     def get_visible_description(self, room: WorldRoom, light_level: int) -> str:
         """Return appropriate description based on light."""
-        
+
     def filter_visible_entities(self, entities: List[Entity], light_level: int) -> List[Entity]:
         """Filter entities by visibility threshold."""
 ```

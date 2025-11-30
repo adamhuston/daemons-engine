@@ -199,28 +199,28 @@ class ClassTemplate:
     class_id: str                  # "warrior", "mage", "rogue"
     name: str                       # Display name
     description: str                # Flavor text
-    
+
     # Base stats (level 1)
     base_stats: Dict[str, int]     # {"strength": 12, "dexterity": 10, ...}
-    
+
     # Stat growth per level
     stat_growth: Dict[str, StatGrowth]  # How each stat progresses
-    
+
     # Starting resources (at level 1)
     starting_resources: Dict[str, int]  # {"health": 100, "mana": 50}
-    
+
     # Resource definitions for this class (custom regen rates, modifiers)
     resources: Dict[str, ResourceDef]   # Overrides/adds resources
-    
+
     # Abilities available to this class
     available_abilities: List[str]  # ["slash", "power_attack", "whirlwind"]
-    
+
     # Ability slots unlock per level
     ability_slots: Dict[int, int]  # {1: 2, 5: 3, 10: 4} slots at levels
-    
+
     # Global cooldown (GCD) configuration per ability category
     gcd_config: Dict[str, float] = None  # {"melee": 1.0, "spell": 1.5, "shared": 1.0}
-    
+
     # Flavor
     icon: Optional[str]
     keywords: List[str]
@@ -235,38 +235,38 @@ class AbilityTemplate:
     ability_id: str                # "slash", "fireball", "heal"
     name: str                       # Display name
     description: str                # Flavor text
-    
+
     # Classification
     ability_type: str              # "active", "passive", "reactive"
     ability_category: str          # "melee", "ranged", "magic", "utility"
-    
+
     # Resource costs
     costs: Dict[str, int]          # {"mana": 30, "health": 0}
-    
+
     # Cooldown mechanics
     cooldown: float                # Seconds between uses (personal cooldown)
     gcd_category: str              # GCD category: "melee", "spell", "shared", or null
-    
+
     # Effect execution
     behavior_id: str               # "slash_behavior", "fireball_behavior"
     effects: List[str]             # Effect template IDs to apply (via EffectSystem)
-    
+
     # Targeting
     target_type: str               # "self", "enemy", "ally", "room"
     target_range: int              # 0 = self, 1+ = distance (rooms)
-    
+
     # Execution requirements
     requires_target: bool
     requires_los: bool             # Line of sight
     can_use_while_moving: bool
-    
+
     # Unlock condition
     required_level: int            # Minimum level to learn
     required_class: Optional[str]  # Restricted to specific class, or null for any
-    
+
     # Scaling (optional)
     scaling: Dict[str, float] = None  # {"strength": 1.2, "intelligence": 0.5, "level": 0.1}
-    
+
     # UI/flavor
     icon: Optional[str]
     animation: Optional[str]
@@ -309,14 +309,14 @@ class CharacterSheet:
     class_id: str
     level: int
     experience: int
-    
+
     # Computed from class_template + stat effects:
     # effective_stats: Dict[str, int]  (calculated on-the-fly, not stored)
-    
+
     # Learned abilities
     learned_abilities: Set[str]    # Can be equipped in ability slots
     ability_loadout: List[AbilitySlot]  # Currently equipped (ordered)
-    
+
     # Resources (mana, rage, etc.)
     resource_pools: Dict[str, ResourcePool]
 
@@ -324,10 +324,10 @@ class CharacterSheet:
 @dataclass
 class WorldPlayer(WorldEntity):
     # ... existing fields ...
-    
+
     # Phase 9 additions (optional - players without classes still work)
     character_sheet: Optional[CharacterSheet] = None
-    
+
     # For backward compatibility, also support:
     # character_class: Optional[str] = None  (deprecated, prefer character_sheet.class_id)
     # level: Optional[int] = None            (deprecated, prefer character_sheet.level)
@@ -524,16 +524,16 @@ abilities:
 
 class ClassSystem:
     """Manages class and ability data at runtime"""
-    
+
     def __init__(self, context: GameContext):
         self.context = context
         self.class_templates: Dict[str, ClassTemplate] = {}
         self.ability_templates: Dict[str, AbilityTemplate] = {}
         self.behavior_registry: Dict[str, Callable] = {}
-        
+
         # Register built-in behaviors
         self._register_core_behaviors()
-    
+
     async def load_content(self, world_data_path: Path):
         """Load all class and ability definitions from YAML"""
         self.class_templates = await load_classes_from_yaml(
@@ -542,44 +542,44 @@ class ClassSystem:
         self.ability_templates = await load_abilities_from_yaml(
             world_data_path / "abilities"
         )
-    
+
     def get_class(self, class_id: str) -> ClassTemplate:
         """Retrieve a class template by ID"""
         if class_id not in self.class_templates:
             raise ValueError(f"Unknown class: {class_id}")
         return self.class_templates[class_id]
-    
+
     def get_ability(self, ability_id: str) -> AbilityTemplate:
         """Retrieve an ability template by ID"""
         if ability_id not in self.ability_templates:
             raise ValueError(f"Unknown ability: {ability_id}")
         return self.ability_templates[ability_id]
-    
+
     def register_behavior(self, behavior_id: str, handler: Callable):
         """
         Register a behavior function.
-        
+
         Behaviors can be registered at startup or dynamically via admin API.
         """
         self.behavior_registry[behavior_id] = handler
-    
+
     def get_behavior(self, behavior_id: str) -> Optional[Callable]:
         """Retrieve a registered behavior function"""
         return self.behavior_registry.get(behavior_id)
-    
+
     def _register_core_behaviors(self):
         """Register built-in ability behaviors"""
         from .ability_behaviors import core
-        
+
         self.register_behavior("melee_attack", core.melee_attack_behavior)
         self.register_behavior("power_attack_behavior", core.power_attack_behavior)
         self.register_behavior("rally_passive", core.rally_passive_behavior)
         # ... etc
-    
+
     def reload_behaviors(self):
         """
         Reload behaviors from custom.py (called by Phase 8 hot-reload).
-        
+
         Useful for admins iterating on custom ability behavior scripts.
         """
         try:
@@ -618,10 +618,10 @@ async def melee_attack_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
     caster = behavior_ctx.caster
     target = behavior_ctx.targets[0]
     context = behavior_ctx.context
-    
+
     # Calculate damage using scaling from ability template
     base_damage = caster.get_effective_stat("strength") * 1.0
-    
+
     # Apply ability scaling if defined
     if behavior_ctx.ability.scaling:
         for stat, multiplier in behavior_ctx.ability.scaling.items():
@@ -629,11 +629,11 @@ async def melee_attack_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
                 base_damage *= (1 + multiplier)
             elif stat == "level":
                 base_damage += caster.character_sheet.level * multiplier
-    
+
     # Add variance
     variance = random.randint(0, int(base_damage * 0.2))
     total_damage = int(base_damage + variance)
-    
+
     # Apply through combat system
     events = await context.combat_system.deal_damage(
         attacker=caster,
@@ -642,7 +642,7 @@ async def melee_attack_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
         damage_type="physical",
         ability_id="slash"
     )
-    
+
     return events
 
 async def power_attack_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
@@ -650,11 +650,11 @@ async def power_attack_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
     caster = behavior_ctx.caster
     target = behavior_ctx.targets[0]
     context = behavior_ctx.context
-    
+
     base_damage = caster.get_effective_stat("strength") * 1.5
     variance = random.randint(0, int(base_damage * 0.3))
     total_damage = int(base_damage + variance)
-    
+
     events = await context.combat_system.deal_damage(
         attacker=caster,
         target=target,
@@ -662,15 +662,15 @@ async def power_attack_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
         damage_type="physical",
         ability_id="power_attack"
     )
-    
+
     return events
 
 async def rally_passive_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
     """Passive: if above 50% health, gain +10% armor"""
     caster = behavior_ctx.caster
-    
+
     health_pct = caster.current_health / caster.max_health
-    
+
     if health_pct > 0.5:
         # Apply armor buff via EffectSystem
         effect = Effect(
@@ -682,7 +682,7 @@ async def rally_passive_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
             applied_at=time.time()
         )
         caster.apply_effect(effect)
-    
+
     return []  # Passive effects don't generate immediate events
 ```
 
@@ -705,24 +705,24 @@ async def fireball_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
     caster = behavior_ctx.caster
     context = behavior_ctx.context
     target_room = context.world.rooms[caster.room_id]
-    
+
     events = []
     base_damage = caster.get_effective_stat("intelligence") * 1.5
-    
+
     # Apply scaling if defined in ability template
     if behavior_ctx.ability.scaling:
         for stat, multiplier in behavior_ctx.ability.scaling.items():
             if stat == "intelligence":
                 base_damage *= (1 + multiplier)
-    
+
     # AoE damage to all enemies in room
     for player_id in target_room.players:
         if player_id == caster.id:
             continue  # Skip caster
-        
+
         target = context.world.players[player_id]
         damage = int(base_damage + random.randint(-10, 10))
-        
+
         room_events = await context.combat_system.deal_damage(
             attacker=caster,
             target=target,
@@ -731,7 +731,7 @@ async def fireball_behavior(behavior_ctx: BehaviorContext) -> List[dict]:
             ability_id="fireball"
         )
         events.extend(room_events)
-    
+
     return events
 ```
 
@@ -764,10 +764,10 @@ The executor validates ability use, deducts costs, manages cooldowns/GCD, and tr
 ```python
 class AbilityExecutor:
     """Validates and executes abilities"""
-    
+
     def __init__(self, context: GameContext):
         self.context = context
-    
+
     async def execute_ability(
         self,
         player_id: str,
@@ -776,21 +776,21 @@ class AbilityExecutor:
     ) -> List[dict]:
         """
         Execute an ability for a player.
-        
+
         Returns list of events to dispatch.
         Generates error events if validation fails.
         """
         events = []
         player = self.context.world.players[player_id]
         ability = self.context.class_system.get_ability(ability_id)
-        
+
         # Validation checks
         validation_error = self._validate_ability_use(
             player, ability, target_id
         )
         if validation_error:
             return [self._error_event(player_id, validation_error)]
-        
+
         # Deduct costs
         for resource_id, cost in ability.costs.items():
             pool = player.character_sheet.resource_pools[resource_id]
@@ -802,12 +802,12 @@ class AbilityExecutor:
                 "current": pool.current,
                 "max": pool.max
             })
-        
+
         # Find targets based on ability targeting rules
         targets = self._resolve_targets(player, ability, target_id)
         if ability.requires_target and not targets:
             return [self._error_event(player_id, f"No valid target for {ability.name}")]
-        
+
         # Execute behavior (core ability logic)
         behavior = self.context.class_system.get_behavior(ability.behavior_id)
         if not behavior:
@@ -815,25 +815,25 @@ class AbilityExecutor:
                 player_id,
                 f"Ability {ability_id} has no behavior registered"
             )]
-        
+
         behavior_ctx = BehaviorContext(
             context=self.context,
             caster=player,
             ability=ability,
             targets=targets
         )
-        
+
         try:
             behavior_events = await behavior(behavior_ctx)
             events.extend(behavior_events)
         except Exception as e:
             return [self._error_event(player_id, f"Ability execution error: {str(e)}")]
-        
+
         # Mark ability as used (cooldown + GCD)
         self._apply_cooldowns(player, ability)
-        
+
         return events
-    
+
     def _validate_ability_use(
         self,
         player: WorldPlayer,
@@ -841,18 +841,18 @@ class AbilityExecutor:
         target_id: Optional[str]
     ) -> Optional[str]:
         """Check if ability can be used. Return error message if not."""
-        
+
         if not player.character_sheet:
             return "You don't have a class yet"
-        
+
         # Check if learned
         if ability.ability_id not in player.character_sheet.learned_abilities:
             return f"You haven't learned {ability.name}"
-        
+
         # Check level
         if player.character_sheet.level < ability.required_level:
             return f"Requires level {ability.required_level}"
-        
+
         # Check resources
         for resource_id, cost in ability.costs.items():
             if resource_id not in player.character_sheet.resource_pools:
@@ -860,7 +860,7 @@ class AbilityExecutor:
             pool = player.character_sheet.resource_pools[resource_id]
             if pool.current < cost:
                 return f"Insufficient {resource_id} ({pool.current}/{cost})"
-        
+
         # Check personal cooldown
         for slot in player.character_sheet.ability_loadout:
             if slot.ability_id == ability.ability_id:
@@ -868,13 +868,13 @@ class AbilityExecutor:
                 if time_since_use < ability.cooldown:
                     remaining = ability.cooldown - time_since_use
                     return f"{ability.name} is on cooldown ({remaining:.1f}s remaining)"
-        
+
         # Check target requirements
         if ability.requires_target and not target_id:
             return f"{ability.name} requires a target"
-        
+
         return None
-    
+
     def _resolve_targets(
         self,
         caster: WorldPlayer,
@@ -882,22 +882,22 @@ class AbilityExecutor:
         target_id: Optional[str]
     ) -> List[WorldPlayer]:
         """Resolve ability targets based on target_type"""
-        
+
         if ability.target_type == "self":
             return [caster]
-        
+
         elif ability.target_type == "enemy":
             target = self.context.world.players.get(target_id)
             if not target or target.room_id != caster.room_id:
                 return []
             return [target]
-        
+
         elif ability.target_type == "ally":
             target = self.context.world.players.get(target_id)
             if not target or target.room_id != caster.room_id:
                 return []
             return [target]
-        
+
         elif ability.target_type == "room":
             room = self.context.world.rooms[caster.room_id]
             return [
@@ -905,18 +905,18 @@ class AbilityExecutor:
                 for p_id in room.players
                 if p_id != caster.id
             ]
-        
+
         return []
-    
+
     def _apply_cooldowns(self, player: WorldPlayer, ability: AbilityTemplate):
         """Mark ability as used (personal cooldown) and apply GCD"""
-        
+
         # Update personal cooldown
         for slot in player.character_sheet.ability_loadout:
             if slot.ability_id == ability.ability_id:
                 slot.last_used_at = time.time()
                 break
-        
+
         # Apply GCD to all abilities in same category (if configured)
         if ability.gcd_category:
             gcd_time = player.character_sheet.class_id  # Get from class template
@@ -924,7 +924,7 @@ class AbilityExecutor:
                 player.character_sheet.class_id
             )
             gcd_duration = class_template.gcd_config.get(ability.gcd_category, 0)
-            
+
             # Mark all abilities in same GCD category as recently used
             for slot in player.character_sheet.ability_loadout:
                 if not slot.ability_id:
@@ -932,7 +932,7 @@ class AbilityExecutor:
                 slot_ability = self.context.class_system.get_ability(slot.ability_id)
                 if slot_ability.gcd_category == ability.gcd_category:
                     slot.last_used_at = time.time() - (ability.cooldown - gcd_duration)
-    
+
     def _error_event(self, player_id: str, message: str) -> dict:
         """Generate an error event"""
         return {
@@ -954,16 +954,16 @@ Update `app/engine/engine.py`:
 class WorldEngine:
     def __init__(self, ...):
         # ... existing init ...
-        
+
         # Initialize ClassSystem
         self.class_system = ClassSystem(context)
-        
+
         # Initialize AbilityExecutor
         self.ability_executor = AbilityExecutor(context)
-    
+
     async def startup(self):
         # ... existing startup ...
-        
+
         # Load class and ability content
         await self.class_system.load_content(
             Path("world_data")
@@ -987,54 +987,54 @@ async def cmd_cast_ability(engine, player_id, args):
             player_id,
             "Usage: cast <ability-name> [target]"
         )]
-    
+
     ability_name = args[0].lower()
     target_name = args[1] if len(args) > 1 else None
-    
+
     # Resolve ability by name (case-insensitive)
     ability_id = None
     for a_id, a_tmpl in engine.class_system.ability_templates.items():
         if a_tmpl.name.lower() == ability_name:
             ability_id = a_id
             break
-    
+
     if not ability_id:
         return [engine._message_event(
             player_id,
             f"Unknown ability: {ability_name}"
         )]
-    
+
     # Execute ability
     events = await engine.ability_executor.execute_ability(
         player_id, ability_id, target_name
     )
-    
+
     return events
 
 @cmd("abilities", "skills")
 async def cmd_list_abilities(engine, player_id, args):
     """List available abilities"""
     player = engine.world.players[player_id]
-    
+
     if not player.character_sheet:
         return [engine._message_event(player_id, "You don't have a class yet")]
-    
+
     class_template = engine.class_system.get_class(player.character_sheet.class_id)
-    
+
     msg = f"=== {class_template.name} Abilities ===\n"
-    
+
     for slot in player.character_sheet.ability_loadout:
         if not slot.ability_id:
             msg += f"[{slot.slot_id}] - (empty)\n"
             continue
-        
+
         ability = engine.class_system.get_ability(slot.ability_id)
         time_since_use = time.time() - slot.last_used_at
         is_ready = time_since_use >= ability.cooldown
-        
+
         status = "✓ ready" if is_ready else f"{ability.cooldown - time_since_use:.1f}s"
         msg += f"[{slot.slot_id}] {ability.name} - {status}\n"
-    
+
     return [engine._message_event(player_id, msg)]
 ```
 
@@ -1078,7 +1078,7 @@ async def reload_classes(current_user: UserAccount = Depends(requires_role("GAME
     try:
         await engine.class_system.load_content(Path("world_data"))
         engine.class_system.reload_behaviors()
-        
+
         return {
             "status": "ok",
             "message": "Classes, abilities, and behaviors reloaded",
@@ -1169,7 +1169,7 @@ async def save_player_resources(player: WorldPlayer, db_session):
     """Serialize resource pools to player.data JSON"""
     if not player.character_sheet:
         return
-    
+
     resources_data = {}
     for resource_id, pool in player.character_sheet.resource_pools.items():
         resources_data[resource_id] = {
@@ -1177,7 +1177,7 @@ async def save_player_resources(player: WorldPlayer, db_session):
             "max": pool.max,
             "last_regen_tick": pool.last_regen_tick
         }
-    
+
     # Store in player.data JSON column
     player_record = await db_session.get(Player, player.id)
     player_record.data["resource_pools"] = resources_data
@@ -1191,26 +1191,26 @@ async def restore_player_resources(player: WorldPlayer, player_record: Player):
     """Restore resource pools from saved data"""
     if not player.character_sheet:
         return
-    
+
     class_template = context.class_system.get_class(player.character_sheet.class_id)
-    
+
     # Get saved resource data
     saved_resources = player_record.data.get("resource_pools", {})
-    
+
     # Restore each resource
     for resource_id in class_template.resources:
         resource_def = class_template.resources[resource_id]
         saved_data = saved_resources.get(resource_id, {})
-        
+
         # Offline regen: calculate regen during disconnect time
         time_offline = time.time() - (player_record.last_disconnect or time.time())
         offline_regen = resource_def.regen_rate * (time_offline / 60)  # per minute
-        
+
         current = min(
             saved_data.get("current", resource_def.max_amount) + offline_regen,
             resource_def.max_amount
         )
-        
+
         pool = ResourcePool(
             resource_id=resource_id,
             current=int(current),
@@ -1231,9 +1231,9 @@ async def restore_player_resources(player: WorldPlayer, player_record: Player):
 # In app/models.py
 class Player(Base):
     __tablename__ = "players"
-    
+
     # ... existing fields ...
-    
+
     # Phase 9: Class and abilities
     data: Dict = Column(JSON, default={})  # Stores:
     # {
@@ -1276,22 +1276,22 @@ async def migrate_existing_players():
                 )
             )
         )
-        
+
         for player_record in result.scalars():
             old_class = player_record.data.get("character_class")
             old_level = player_record.data.get("level", 1)
-            
+
             if not old_class:
                 # Assign default class if missing
                 old_class = "adventurer"
-            
+
             # Get class template
             try:
                 class_template = engine.class_system.get_class(old_class)
             except ValueError:
                 # Class was deleted, use default
                 class_template = engine.class_system.get_class("adventurer")
-            
+
             # Create CharacterSheet
             player_record.data["class_id"] = class_template.class_id
             player_record.data["level"] = old_level
@@ -1309,7 +1309,7 @@ async def migrate_existing_players():
                 }
                 for resource_id, amount in class_template.starting_resources.items()
             }
-            
+
             await session.commit()
 ```
 

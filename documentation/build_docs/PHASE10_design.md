@@ -132,19 +132,19 @@ class Group:
     member_ids: Set[PlayerId] = field(default_factory=set)  # Including leader
     created_at: float = field(default_factory=time.time)
     last_activity: float = field(default_factory=time.time)
-    
+
     # Auto-disband after 30 minutes of inactivity
     INACTIVITY_TIMEOUT = 1800.0
-    
+
     def is_leader(self, player_id: PlayerId) -> bool:
         return player_id == self.leader_id
-    
+
     def is_member(self, player_id: PlayerId) -> bool:
         return player_id in self.member_ids
-    
+
     def is_stale(self, current_time: float) -> bool:
         return (current_time - self.last_activity) > self.INACTIVITY_TIMEOUT
-    
+
     def member_count(self) -> int:
         return len(self.member_ids)
 ```
@@ -179,23 +179,23 @@ class Clan:
     created_at: float = field(default_factory=time.time)
     treasury: int = 0                    # Shared clan currency (future)
     permissions: Dict[ClanRank, Set[str]] = field(default_factory=dict)  # Rank → perms
-    
+
     # Clan levels/prestige (future)
     level: int = 1
     experience: int = 0
-    
+
     def get_rank(self, player_id: PlayerId) -> ClanRank | None:
         if player_id not in self.members:
             return None
         return self.members[player_id].rank
-    
+
     def is_leader(self, player_id: PlayerId) -> bool:
         return player_id == self.leader_id
-    
+
     def can_invite(self, actor_id: PlayerId) -> bool:
         rank = self.get_rank(actor_id)
         return rank in (ClanRank.LEADER, ClanRank.OFFICER)
-    
+
     def member_count(self) -> int:
         return len(self.members)
 ```
@@ -218,19 +218,19 @@ class Faction:
     id: str                              # e.g., "crimson_guard", "council_of_elders"
     name: str
     description: str
-    
+
     # Settings
     color: str = "#FFFFFF"               # Display color for faction
     emblem: str = "🛡️"                  # Emoji/symbol
-    
+
     # NPC faction memberships (loaded from YAML)
     npc_members: Set[NpcTemplateId] = field(default_factory=set)  # Template IDs
-    
+
     # Rules
     player_joinable: bool = True         # Can players join via commands?
     max_members: int = 1000
     require_level: int = 1               # Min level to join
-    
+
     # Metadata
     created_at: float = field(default_factory=time.time)
     creator_id: PlayerId | None = None   # Player who created (if player-created)
@@ -242,7 +242,7 @@ class FactionStanding:
     reputation: int = 0                  # -100 to +100
     joined_at: float | None = None       # None if never joined
     rank: str | None = None              # Optional: member, officer, etc.
-    
+
     def get_alignment(self) -> FactionAlignment:
         if self.reputation >= 50:
             return FactionAlignment.ALLIED
@@ -254,7 +254,7 @@ class FactionStanding:
             return FactionAlignment.UNFRIENDLY
         else:
             return FactionAlignment.HOSTILE
-    
+
     def alignment_text(self) -> str:
         align = self.get_alignment()
         emojis = {
@@ -278,7 +278,7 @@ class FollowRelationship:
     follower_id: PlayerId
     following_id: PlayerId
     since: float = field(default_factory=time.time)
-    
+
     # Auto-unfollow if following player goes offline for X minutes
     MAX_OFFLINE_TIME = 300.0  # 5 minutes
 ```
@@ -304,7 +304,7 @@ group disband                 # Disband group (leader only)
 group members                 # List group members
 group rename <name>           # Rename group (leader only)
 
-# Clan Management  
+# Clan Management
 clan create <name>            # Create new clan (requires payment?)
 clan invite <player>          # Invite to clan
 clan leave                     # Leave clan
@@ -317,7 +317,7 @@ clan disband                   # Disband clan (leader only)
 faction list                   # List all factions
 faction info <faction_id>      # View faction details
 faction join <faction_id>      # Join a faction
-faction leave <faction_id>     # Leave a faction  
+faction leave <faction_id>     # Leave a faction
 faction standing               # View your standings with all factions
 faction standing <faction>     # View specific faction standing
 
@@ -369,24 +369,24 @@ Manages ephemeral groups:
 ```python
 class GroupSystem:
     """Runtime manager for player groups/parties."""
-    
+
     groups: Dict[str, Group] = {}  # group_id -> Group
     player_to_group: Dict[PlayerId, str] = {}  # Quick lookup
-    
+
     async def create_group(self, ctx: GameContext, leader_id: PlayerId, name: str = "") -> Group
     async def invite_player(self, ctx: GameContext, group_id: str, player_id: PlayerId) -> bool
     async def remove_player(self, ctx: GameContext, group_id: str, player_id: PlayerId) -> bool
     async def disband_group(self, ctx: GameContext, group_id: str) -> bool
     async def get_group(self, group_id: str) -> Group | None
     async def get_player_group(self, player_id: PlayerId) -> Group | None
-    
+
     async def clean_stale_groups(self, ctx: GameContext, current_time: float) -> None
         """Remove groups that have been inactive for > 30 minutes."""
-    
-    async def broadcast_to_group(self, ctx: GameContext, group_id: str, 
+
+    async def broadcast_to_group(self, ctx: GameContext, group_id: str,
                                  message: str, exclude: PlayerId | None = None) -> List[Event]
-    
-    async def handle_player_move(self, ctx: GameContext, player_id: PlayerId, 
+
+    async def handle_player_move(self, ctx: GameContext, player_id: PlayerId,
                                  new_room_id: RoomId) -> List[Event]
         """When a player moves, move all followers with them."""
 ```
@@ -398,20 +398,20 @@ Manages persistent clans. Data loaded from DB at startup:
 ```python
 class ClanSystem:
     """Persistent manager for player clans."""
-    
+
     clans: Dict[str, Clan] = {}  # clan_id -> Clan
     player_to_clan: Dict[PlayerId, str] = {}  # Quick lookup
-    
+
     async def create_clan(self, ctx: GameContext, leader_id: PlayerId, name: str) -> Clan | None
     async def invite_player(self, ctx: GameContext, clan_id: str, player_id: PlayerId) -> bool
     async def remove_player(self, ctx: GameContext, clan_id: str, player_id: PlayerId) -> bool
     async def promote_member(self, ctx: GameContext, clan_id: str, player_id: PlayerId, rank: ClanRank) -> bool
     async def get_clan(self, clan_id: str) -> Clan | None
     async def get_player_clan(self, player_id: PlayerId) -> Clan | None
-    
-    async def broadcast_to_clan(self, ctx: GameContext, clan_id: str, 
+
+    async def broadcast_to_clan(self, ctx: GameContext, clan_id: str,
                                message: str, exclude: PlayerId | None = None) -> List[Event]
-    
+
     # Persistence hooks
     async def save_clan(self, ctx: GameContext, clan: Clan) -> None
     async def load_clans_from_db(self, ctx: GameContext) -> Dict[str, Clan]
@@ -424,31 +424,31 @@ Manages faction memberships and player standings:
 ```python
 class FactionSystem:
     """Manager for world factions and player standings."""
-    
+
     factions: Dict[str, Faction] = {}  # faction_id -> Faction
     npc_faction_cache: Dict[NpcTemplateId, Set[str]] = {}  # NPC template → factions
-    
+
     async def load_factions_from_yaml(self, yaml_dir: str) -> Dict[str, Faction]
     async def add_player_to_faction(self, ctx: GameContext, player_id: PlayerId, faction_id: str) -> bool
     async def remove_player_from_faction(self, ctx: GameContext, player_id: PlayerId, faction_id: str) -> bool
-    
-    async def modify_faction_standing(self, ctx: GameContext, player_id: PlayerId, 
+
+    async def modify_faction_standing(self, ctx: GameContext, player_id: PlayerId,
                                       faction_id: str, delta: int) -> FactionAlignment
         """Adjust player's reputation with faction."""
-    
-    async def get_faction_standing(self, ctx: GameContext, player_id: PlayerId, 
+
+    async def get_faction_standing(self, ctx: GameContext, player_id: PlayerId,
                                     faction_id: str) -> FactionStanding
-    
+
     async def get_all_standings(self, ctx: GameContext, player_id: PlayerId) -> Dict[str, FactionStanding]
-    
-    async def broadcast_to_faction(self, ctx: GameContext, faction_id: str, 
+
+    async def broadcast_to_faction(self, ctx: GameContext, faction_id: str,
                                    message: str, exclude: PlayerId | None = None) -> List[Event]
-    
+
     # NPC interaction
     def get_npc_factions(self, npc_template_id: NpcTemplateId) -> Set[str]
         """Return all factions this NPC template belongs to."""
-    
-    async def is_faction_enemy(self, ctx: GameContext, player_id: PlayerId, 
+
+    async def is_faction_enemy(self, ctx: GameContext, player_id: PlayerId,
                                npc_template_id: NpcTemplateId) -> bool
         """Check if player and NPC are in opposing factions."""
 ```
@@ -470,7 +470,7 @@ CREATE TABLE clans (
     treasury INTEGER DEFAULT 0,
     created_at FLOAT NOT NULL,
     yaml_managed BOOLEAN DEFAULT 0,
-    
+
     FOREIGN KEY (leader_id) REFERENCES players(id)
 );
 
@@ -481,7 +481,7 @@ CREATE TABLE clan_members (
     rank TEXT NOT NULL,
     joined_at FLOAT NOT NULL,
     contribution_points INTEGER DEFAULT 0,
-    
+
     FOREIGN KEY (clan_id) REFERENCES clans(id) ON DELETE CASCADE,
     FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
     UNIQUE(clan_id, player_id)
@@ -498,14 +498,14 @@ CREATE TABLE factions (
     require_level INTEGER DEFAULT 1,
     created_at FLOAT NOT NULL,
     creator_id TEXT,
-    
+
     FOREIGN KEY (creator_id) REFERENCES players(id)
 );
 
 CREATE TABLE faction_npc_members (
     faction_id TEXT NOT NULL,
     npc_template_id TEXT NOT NULL,
-    
+
     PRIMARY KEY (faction_id, npc_template_id),
     FOREIGN KEY (faction_id) REFERENCES factions(id) ON DELETE CASCADE
 );
@@ -516,10 +516,10 @@ CREATE TABLE faction_npc_members (
 ```python
 class Player(Base):
     # ... existing fields ...
-    
+
     # Social system (Phase 10)
     player_flags: Mapped[dict] = mapped_column(JSON, default=dict)
-    
+
     # Expected structure:
     # {
     #     "group_id": "group-uuid" or None,

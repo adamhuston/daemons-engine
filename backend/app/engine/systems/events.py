@@ -11,11 +11,12 @@ Extracted from WorldEngine for modularity.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, List, Dict, Any, Set
+
+from typing import TYPE_CHECKING, Any, Dict, List, Set
 
 if TYPE_CHECKING:
-    from .context import GameContext
     from ..world import PlayerId, RoomId
+    from .context import GameContext
 
 
 # Type alias for events (message dicts sent to players)
@@ -25,24 +26,24 @@ Event = Dict[str, Any]
 class EventDispatcher:
     """
     Manages event construction and routing to players.
-    
+
     Features:
     - Creates typed events with proper scope (player, room, all)
     - Routes events to appropriate player queues
     - Handles exclusions and payloads
     - Provides stat update emissions for UI sync
-    
+
     Usage:
         dispatcher = EventDispatcher(ctx)
         event = dispatcher.msg_to_player(player_id, "Hello!")
         await dispatcher.dispatch([event])
     """
-    
+
     def __init__(self, ctx: "GameContext") -> None:
         self.ctx = ctx
-    
+
     # ---------- Event Construction ----------
-    
+
     def msg_to_player(
         self,
         player_id: "PlayerId",
@@ -52,12 +53,12 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a per-player message event.
-        
+
         Args:
             player_id: The player to send to
             text: The message text (supports markdown)
             payload: Optional additional data
-        
+
         Returns:
             An event dict ready to dispatch
         """
@@ -70,7 +71,7 @@ class EventDispatcher:
         if payload:
             ev["payload"] = payload
         return ev
-    
+
     def msg_to_room(
         self,
         room_id: "RoomId",
@@ -81,13 +82,13 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a room-broadcast message event.
-        
+
         Args:
             room_id: The room to broadcast to
             text: The message text (supports markdown)
             exclude: Set of player IDs to exclude from broadcast
             payload: Optional additional data
-        
+
         Returns:
             An event dict ready to dispatch
         """
@@ -102,7 +103,7 @@ class EventDispatcher:
         if payload:
             ev["payload"] = payload
         return ev
-    
+
     def stat_update(
         self,
         player_id: "PlayerId",
@@ -110,11 +111,11 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a stat_update event for UI synchronization.
-        
+
         Args:
             player_id: The player to update
             stats: Dict of stat values (health, energy, AC, level, etc.)
-        
+
         Returns:
             A stat_update event dict
         """
@@ -125,25 +126,25 @@ class EventDispatcher:
             "payload": stats,
         }
         return ev
-    
+
     def emit_stat_update(self, player_id: "PlayerId") -> List[Event]:
         """
         Generate a stat update event from current player state.
-        
+
         Args:
             player_id: The player to generate stats for
-        
+
         Returns:
             List containing stat_update event (or empty if player not found)
         """
         if player_id not in self.ctx.world.players:
             return []
-        
+
         player = self.ctx.world.players[player_id]
-        
+
         # Calculate current effective stats
         effective_ac = player.get_effective_armor_class()
-        
+
         payload = {
             "health": player.current_health,
             "max_health": player.max_health,
@@ -153,30 +154,30 @@ class EventDispatcher:
             "level": player.level,
             "experience": player.experience,
         }
-        
+
         return [self.stat_update(player_id, payload)]
-    
+
     # ---------- Event Dispatch ----------
-    
+
     async def dispatch(self, events: List[Event]) -> None:
         """
         Route events to the appropriate player queues.
-        
+
         Handles:
         - player-scoped messages (direct to one player)
         - room-scoped messages (to all players in a room)
         - group-scoped messages (to all members in a group)
         - tell-scoped messages (to sender and recipient only)
         - all-scoped messages (broadcast to everyone)
-        
+
         Args:
             events: List of event dicts to dispatch
         """
         for ev in events:
             print(f"EventDispatcher: routing event: {ev!r}")
-            
+
             scope = ev.get("scope", "player")
-            
+
             if scope == "player":
                 target = ev.get("player_id")
                 if not target:
@@ -184,15 +185,13 @@ class EventDispatcher:
                 q = self.ctx._listeners.get(target)
                 if q is None:
                     continue
-                
+
                 # Strip engine-internal keys before sending, but keep player_id
                 wire_event = {
-                    k: v
-                    for k, v in ev.items()
-                    if k not in ("scope", "exclude")
+                    k: v for k, v in ev.items() if k not in ("scope", "exclude")
                 }
                 await q.put(wire_event)
-            
+
             elif scope == "room":
                 room_id = ev.get("room_id")
                 if not room_id:
@@ -200,148 +199,134 @@ class EventDispatcher:
                 room = self.ctx.world.rooms.get(room_id)
                 if room is None:
                     continue
-                
+
                 exclude = set(ev.get("exclude", []))
-                
+
                 # Get player IDs from unified entity set
                 player_ids = self._get_player_ids_in_room(room_id)
-                
+
                 for pid in player_ids:
                     if pid in exclude:
                         continue
-                    
+
                     # Skip sleeping players for room messages (they don't hear/see)
                     player = self.ctx.world.players.get(pid)
                     if player and player.is_sleeping:
                         continue
-                    
+
                     q = self.ctx._listeners.get(pid)
                     if q is None:
                         continue
-                    
+
                     wire_event = {
-                        k: v
-                        for k, v in ev.items()
-                        if k not in ("scope", "exclude")
+                        k: v for k, v in ev.items() if k not in ("scope", "exclude")
                     }
                     wire_event["player_id"] = pid
                     await q.put(wire_event)
-            
+
             elif scope == "group":
                 group_id = ev.get("group_id")
                 if not group_id or not self.ctx.group_system:
                     continue
-                
+
                 group = self.ctx.group_system.get_group(group_id)
                 if not group:
                     continue
-                
+
                 # Send to all group members
                 for pid in group.members:
                     q = self.ctx._listeners.get(pid)
                     if q is None:
                         continue
-                    
+
                     wire_event = {
-                        k: v
-                        for k, v in ev.items()
-                        if k not in ("scope", "exclude")
+                        k: v for k, v in ev.items() if k not in ("scope", "exclude")
                     }
                     wire_event["player_id"] = pid
                     await q.put(wire_event)
-            
+
             elif scope == "tell":
                 sender_id = ev.get("sender_id")
                 recipient_id = ev.get("recipient_id")
-                
+
                 if not sender_id or not recipient_id:
                     continue
-                
+
                 # Send to sender
                 q = self.ctx._listeners.get(sender_id)
                 if q is not None:
                     wire_event = {
-                        k: v
-                        for k, v in ev.items()
-                        if k not in ("scope", "exclude")
+                        k: v for k, v in ev.items() if k not in ("scope", "exclude")
                     }
                     wire_event["player_id"] = sender_id
                     await q.put(wire_event)
-                
+
                 # Send to recipient
                 q = self.ctx._listeners.get(recipient_id)
                 if q is not None:
                     wire_event = {
-                        k: v
-                        for k, v in ev.items()
-                        if k not in ("scope", "exclude")
+                        k: v for k, v in ev.items() if k not in ("scope", "exclude")
                     }
                     wire_event["player_id"] = recipient_id
                     await q.put(wire_event)
-            
+
             elif scope == "clan":
                 clan_id = ev.get("clan_id")
                 if not clan_id or not self.ctx.clan_system:
                     continue
-                
+
                 clan = self.ctx.clan_system.clans.get(clan_id)
                 if not clan:
                     continue
-                
+
                 # Send to all clan members
                 for pid in clan.members:
                     q = self.ctx._listeners.get(pid)
                     if q is None:
                         continue
-                    
+
                     wire_event = {
-                        k: v
-                        for k, v in ev.items()
-                        if k not in ("scope", "exclude")
+                        k: v for k, v in ev.items() if k not in ("scope", "exclude")
                     }
                     wire_event["player_id"] = pid
                     await q.put(wire_event)
-            
+
             elif scope == "faction":
                 faction_id = ev.get("faction_id")
                 if not faction_id or not self.ctx.faction_system:
                     continue
-                
+
                 # Get all players in faction
                 standing_dict = self.ctx.faction_system.player_standings
                 faction_members = {
-                    pid for (pid, fid), standing in standing_dict.items()
+                    pid
+                    for (pid, fid), standing in standing_dict.items()
                     if fid == faction_id and standing.joined_at is not None
                 }
-                
+
                 # Send to all faction members who are online
                 for pid in faction_members:
                     q = self.ctx._listeners.get(pid)
                     if q is None:
                         continue
-                    
+
                     wire_event = {
-                        k: v
-                        for k, v in ev.items()
-                        if k not in ("scope", "exclude")
+                        k: v for k, v in ev.items() if k not in ("scope", "exclude")
                     }
                     wire_event["player_id"] = pid
                     await q.put(wire_event)
-            
+
             elif scope == "all":
                 exclude = set(ev.get("exclude", []))
                 for pid, q in self.ctx._listeners.items():
                     if pid in exclude:
                         continue
                     wire_event = {
-                        k: v
-                        for k, v in ev.items()
-                        if k not in ("scope", "exclude")
+                        k: v for k, v in ev.items() if k not in ("scope", "exclude")
                     }
                     wire_event["player_id"] = pid
                     await q.put(wire_event)
 
-    
     def ability_cast(
         self,
         caster_id: "PlayerId",
@@ -352,14 +337,14 @@ class EventDispatcher:
     ) -> Event:
         """
         Create an ability_cast event when an ability is used.
-        
+
         Args:
             caster_id: Player who cast the ability
             ability_id: The ability ID
             ability_name: Human-readable ability name
             target_ids: List of target player IDs affected
             room_id: Room where ability was cast (for room-scoped events)
-        
+
         Returns:
             An ability_cast event dict
         """
@@ -374,7 +359,7 @@ class EventDispatcher:
         if room_id:
             ev["room_id"] = room_id
         return ev
-    
+
     def ability_error(
         self,
         player_id: "PlayerId",
@@ -384,13 +369,13 @@ class EventDispatcher:
     ) -> Event:
         """
         Create an ability_error event when ability use fails.
-        
+
         Args:
             player_id: Player who attempted the ability
             ability_id: The ability ID
             ability_name: Human-readable ability name
             error_message: Why the ability failed
-        
+
         Returns:
             An ability_error event dict
         """
@@ -403,7 +388,7 @@ class EventDispatcher:
             "error": error_message,
         }
         return ev
-    
+
     def ability_cast_complete(
         self,
         caster_id: "PlayerId",
@@ -416,7 +401,7 @@ class EventDispatcher:
     ) -> Event:
         """
         Create an ability_cast_complete event when ability execution finishes.
-        
+
         Args:
             caster_id: Player who cast the ability
             ability_id: The ability ID
@@ -425,7 +410,7 @@ class EventDispatcher:
             message: Result message
             damage_dealt: Optional total damage dealt
             targets_hit: Optional number of targets hit
-        
+
         Returns:
             An ability_cast_complete event dict
         """
@@ -437,7 +422,7 @@ class EventDispatcher:
             payload["damage_dealt"] = damage_dealt
         if targets_hit is not None:
             payload["targets_hit"] = targets_hit
-        
+
         ev: Event = {
             "type": "ability_cast_complete",
             "scope": "player",
@@ -447,7 +432,7 @@ class EventDispatcher:
             "payload": payload,
         }
         return ev
-    
+
     def cooldown_update(
         self,
         player_id: "PlayerId",
@@ -456,12 +441,12 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a cooldown_update event when ability cooldown is applied.
-        
+
         Args:
             player_id: Player who cast the ability
             ability_id: The ability ID
             cooldown_remaining: Seconds remaining on cooldown
-        
+
         Returns:
             A cooldown_update event dict
         """
@@ -473,7 +458,7 @@ class EventDispatcher:
             "cooldown_remaining": cooldown_remaining,
         }
         return ev
-    
+
     def resource_update(
         self,
         player_id: "PlayerId",
@@ -481,11 +466,11 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a resource_update event when player resources change.
-        
+
         Args:
             player_id: The player whose resources changed
             resources: Dict mapping resource_id -> {current, max, percent}
-        
+
         Returns:
             A resource_update event dict
         """
@@ -496,7 +481,7 @@ class EventDispatcher:
             "payload": resources,
         }
         return ev
-    
+
     def ability_learned(
         self,
         player_id: "PlayerId",
@@ -505,12 +490,12 @@ class EventDispatcher:
     ) -> Event:
         """
         Create an ability_learned event when player learns a new ability.
-        
+
         Args:
             player_id: The player who learned the ability
             ability_id: The ability ID
             ability_name: Human-readable ability name
-        
+
         Returns:
             An ability_learned event dict
         """
@@ -522,9 +507,9 @@ class EventDispatcher:
             "ability_name": ability_name,
         }
         return ev
-    
+
     # ---------- Social Events ----------
-    
+
     def group_message(
         self,
         group_id: str,
@@ -534,13 +519,13 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a group message event.
-        
+
         Args:
             group_id: The group ID
             sender_id: The sender's player ID
             sender_name: The sender's player name
             text: The message text
-        
+
         Returns:
             A group_message event dict
         """
@@ -553,7 +538,7 @@ class EventDispatcher:
             "text": text,
         }
         return ev
-    
+
     def tell_message(
         self,
         sender_id: "PlayerId",
@@ -563,13 +548,13 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a tell/private message event.
-        
+
         Args:
             sender_id: The sender's player ID
             sender_name: The sender's player name
             recipient_id: The recipient's player ID
             text: The message text
-        
+
         Returns:
             A tell_message event dict (routed to sender and recipient only)
         """
@@ -582,7 +567,7 @@ class EventDispatcher:
             "text": text,
         }
         return ev
-    
+
     def follow_event(
         self,
         follower_id: "PlayerId",
@@ -592,13 +577,13 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a follow event.
-        
+
         Args:
             follower_id: The player starting/stopping to follow
             follower_name: The follower's player name
             followed_id: The player being followed
             action: "started_following" or "stopped_following"
-        
+
         Returns:
             A follow_event dict
         """
@@ -611,7 +596,7 @@ class EventDispatcher:
             "action": action,
         }
         return ev
-    
+
     def clan_message(
         self,
         clan_id: int,
@@ -621,13 +606,13 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a clan message event.
-        
+
         Args:
             clan_id: The clan ID
             sender_id: The sender's player ID
             sender_name: The sender's player name
             text: The message text
-        
+
         Returns:
             A clan_message event dict
         """
@@ -640,7 +625,7 @@ class EventDispatcher:
             "text": text,
         }
         return ev
-    
+
     def faction_message(
         self,
         faction_id: str,
@@ -650,13 +635,13 @@ class EventDispatcher:
     ) -> Event:
         """
         Create a faction message event.
-        
+
         Args:
             faction_id: The faction ID
             sender_id: The sender's player ID
             sender_name: The sender's player name
             text: The message text
-        
+
         Returns:
             A faction_message event dict
         """
@@ -671,11 +656,10 @@ class EventDispatcher:
         return ev
 
     # ---------- Helpers ----------
-    
+
     def _get_player_ids_in_room(self, room_id: "RoomId") -> Set["PlayerId"]:
         """Get all player IDs in a room from the unified entities set."""
         room = self.ctx.world.rooms.get(room_id)
         if not room:
             return set()
         return {eid for eid in room.entities if eid in self.ctx.world.players}
-

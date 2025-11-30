@@ -12,13 +12,11 @@ Provides Prometheus-compatible metrics for monitoring:
 Metrics are exposed via GET /api/admin/server/metrics endpoint.
 """
 
-from prometheus_client import (
-    Counter, Gauge, Histogram, Info, Summary,
-    generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry
-)
-from typing import Optional
 import time
+from typing import Optional
 
+from prometheus_client import (CONTENT_TYPE_LATEST, CollectorRegistry, Counter,
+                               Gauge, Histogram, Info, generate_latest)
 
 # ============================================================================
 # Custom Registry
@@ -33,9 +31,7 @@ METRICS_REGISTRY = CollectorRegistry()
 # ============================================================================
 
 server_info = Info(
-    "daemons_server",
-    "Daemons MUD Engine server information",
-    registry=METRICS_REGISTRY
+    "daemons_server", "Daemons MUD Engine server information", registry=METRICS_REGISTRY
 )
 
 
@@ -46,26 +42,26 @@ server_info = Info(
 players_online = Gauge(
     "daemons_players_online",
     "Number of players currently connected",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 players_total = Counter(
     "daemons_players_total",
     "Total number of player connections since server start",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 players_in_combat = Gauge(
     "daemons_players_in_combat",
     "Number of players currently in combat",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 player_session_duration = Histogram(
     "daemons_player_session_duration_seconds",
     "Duration of player sessions in seconds",
     buckets=[60, 300, 600, 1800, 3600, 7200, 14400, 28800],  # 1min to 8hr
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 
@@ -76,37 +72,37 @@ player_session_duration = Histogram(
 npcs_alive = Gauge(
     "daemons_npcs_alive",
     "Number of living NPCs in the world",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 npcs_total = Gauge(
     "daemons_npcs_total",
     "Total number of NPCs in the world (alive + dead)",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 rooms_total = Gauge(
     "daemons_rooms_total",
     "Total number of rooms in the world",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 rooms_occupied = Gauge(
     "daemons_rooms_occupied",
     "Number of rooms with at least one player",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 areas_total = Gauge(
     "daemons_areas_total",
     "Total number of areas in the world",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 items_total = Gauge(
     "daemons_items_total",
     "Total number of item instances in the world",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 
@@ -117,32 +113,32 @@ items_total = Gauge(
 combat_sessions_active = Gauge(
     "daemons_combat_sessions_active",
     "Number of active combat sessions",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 combat_sessions_total = Counter(
     "daemons_combat_sessions_total",
     "Total combat sessions since server start",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 combat_damage_dealt = Counter(
     "daemons_combat_damage_dealt_total",
     "Total damage dealt in combat",
     ["attacker_type"],  # player, npc
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 npc_deaths = Counter(
     "daemons_npc_deaths_total",
     "Total NPC deaths since server start",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 player_deaths = Counter(
     "daemons_player_deaths_total",
     "Total player deaths since server start",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 
@@ -154,7 +150,7 @@ commands_processed = Counter(
     "daemons_commands_processed_total",
     "Total commands processed by type",
     ["command"],
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 command_latency = Histogram(
@@ -162,20 +158,20 @@ command_latency = Histogram(
     "Command processing latency in seconds",
     ["command"],
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0],
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 scheduled_events = Gauge(
     "daemons_scheduled_events",
     "Number of events scheduled in the time manager",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 events_processed = Counter(
     "daemons_events_processed_total",
     "Total events processed by type",
     ["event_type"],
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 
@@ -188,19 +184,19 @@ tick_duration = Histogram(
     "Game tick processing duration in seconds",
     ["tick_type"],  # npc_ai, respawn, combat, etc.
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5],
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 websocket_messages_sent = Counter(
     "daemons_websocket_messages_sent_total",
     "Total WebSocket messages sent to clients",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 websocket_messages_received = Counter(
     "daemons_websocket_messages_received_total",
     "Total WebSocket messages received from clients",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 db_query_duration = Histogram(
@@ -208,7 +204,7 @@ db_query_duration = Histogram(
     "Database query duration in seconds",
     ["operation"],  # select, insert, update, delete
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5],
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 
@@ -220,14 +216,14 @@ content_reloads = Counter(
     "daemons_content_reloads_total",
     "Total content reload operations by type",
     ["content_type"],  # areas, rooms, items, npcs, npc_spawns
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 content_reload_errors = Counter(
     "daemons_content_reload_errors_total",
     "Total content reload errors by type",
     ["content_type"],
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 
@@ -238,13 +234,13 @@ content_reload_errors = Counter(
 server_uptime = Gauge(
     "daemons_server_uptime_seconds",
     "Server uptime in seconds",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 maintenance_mode = Gauge(
     "daemons_maintenance_mode",
     "1 if maintenance mode is enabled, 0 otherwise",
-    registry=METRICS_REGISTRY
+    registry=METRICS_REGISTRY,
 )
 
 
@@ -259,13 +255,15 @@ def init_metrics(version: str = "unknown", environment: str = "development") -> 
     """Initialize metrics with server information."""
     global _server_start_time
     _server_start_time = time.time()
-    
-    server_info.info({
-        "version": version,
-        "environment": environment,
-        "engine": "daemons",
-        "started_at": str(_server_start_time)
-    })
+
+    server_info.info(
+        {
+            "version": version,
+            "environment": environment,
+            "engine": "daemons",
+            "started_at": str(_server_start_time),
+        }
+    )
 
 
 def update_server_uptime() -> None:
@@ -285,7 +283,7 @@ def update_world_metrics(
     total_items: int,
     active_combats: int,
     pending_events: int,
-    is_maintenance: bool
+    is_maintenance: bool,
 ) -> None:
     """Update all world state metrics at once."""
     players_online.set(online_players)
@@ -373,7 +371,7 @@ def record_db_query(operation: str, duration_seconds: float) -> None:
 def get_metrics() -> bytes:
     """
     Generate Prometheus-format metrics output.
-    
+
     Returns:
         bytes: Prometheus text format metrics
     """

@@ -70,26 +70,26 @@ async def my_spell_behavior(caster, target, ability_template, combat_system, **c
     # Get attack bonus from caster
     spell_attack = caster.get_spell_attack_bonus()
     target_ac = target.get_effective_armor_class()
-    
+
     # Make attack roll using centralized mechanics
     is_hit, roll, total, is_crit = d20.make_attack_roll(spell_attack, target_ac)
-    
+
     if not is_hit:
         return BehaviorResult(
             success=True,
             message=f"Your spell misses! (rolled {roll}+{spell_attack}={total} vs AC {target_ac})"
         )
-    
+
     # Calculate damage
     import random
     base_damage = random.randint(1, 8)
     int_mod = caster.get_ability_modifier(caster.get_effective_intelligence())
     damage = base_damage + int_mod
-    
+
     # Apply critical hit damage
     if is_crit:
         damage = d20.calculate_critical_damage(damage, int_mod)
-    
+
     # ...
 ```
 
@@ -156,7 +156,7 @@ from app.engine.systems import d20
 # Use standard DCs
 if player_roll >= d20.DC_HARD:  # 20
     # Success on hard check
-    
+
 # Or calculate dynamic DCs
 flee_dc = d20.calculate_dynamic_dc(base_dc=15, modifier=-5)  # DC 10 (easier)
 ```

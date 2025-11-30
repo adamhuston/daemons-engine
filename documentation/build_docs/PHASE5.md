@@ -145,7 +145,7 @@ class RoomTrigger:
     cooldown: float = 0.0  # Minimum seconds between firings
     max_fires: int = -1  # -1 = unlimited
     enabled: bool = True
-    
+
     # Event-specific fields
     command_pattern: str | None = None  # For on_command: "pull *", "press button"
     timer_interval: float | None = None  # For on_timer: seconds between fires
@@ -166,11 +166,11 @@ class TriggerState:
 @dataclass
 class WorldRoom:
     # ... existing fields ...
-    
+
     # New trigger support
     triggers: list[RoomTrigger] = field(default_factory=list)
     trigger_states: dict[str, TriggerState] = field(default_factory=dict)
-    
+
     # Dynamic state (can be modified by triggers)
     dynamic_exits: dict[Direction, RoomId] = field(default_factory=dict)  # Overrides
     dynamic_description: str | None = None  # Override base description
@@ -183,7 +183,7 @@ class WorldRoom:
 @dataclass
 class WorldArea:
     # ... existing fields ...
-    
+
     # New metadata
     recommended_level: tuple[int, int] = (1, 10)  # Min, max level
     theme: str = "default"  # For ambient generation, music, etc.
@@ -198,34 +198,34 @@ Following our established pattern, we create a new system:
 ```python
 class TriggerSystem:
     """Manages room triggers and their execution."""
-    
+
     def __init__(self, ctx: GameContext):
         self.ctx = ctx
         self.condition_handlers: dict[str, ConditionHandler] = {}
         self.action_handlers: dict[str, ActionHandler] = {}
         self._register_builtin_conditions()
         self._register_builtin_actions()
-    
+
     def fire_trigger(
-        self, 
-        room_id: RoomId, 
-        event: str, 
+        self,
+        room_id: RoomId,
+        event: str,
         context: TriggerContext
     ) -> list[Event]:
         """Check and fire triggers for a room event."""
         ...
-    
+
     def check_conditions(
-        self, 
-        conditions: list[TriggerCondition], 
+        self,
+        conditions: list[TriggerCondition],
         context: TriggerContext
     ) -> bool:
         """Evaluate all conditions (AND logic by default)."""
         ...
-    
+
     def execute_actions(
-        self, 
-        actions: list[TriggerAction], 
+        self,
+        actions: list[TriggerAction],
         context: TriggerContext
     ) -> list[Event]:
         """Execute a list of actions, respecting delays."""
@@ -363,7 +363,7 @@ rooms:
             params: { name: "gate_open", value: true }
           - type: open_exit
             params: { direction: "north", target_room: "dungeon_depths" }
-          
+
       - id: gate_already_open
         event: on_command
         command_pattern: "pull lever"
@@ -439,8 +439,8 @@ rooms:
         timer_initial_delay: 10.0
         actions:
           - type: message_room
-            params: 
-              text: 
+            params:
+              text:
                 - "👻 A chill runs down your spine as unintelligible whispers fill the air..."
                 - "📚 Books rustle on the shelves, though there is no wind..."
                 - "🕯️ The shadows seem to deepen momentarily..."
@@ -520,25 +520,25 @@ The TriggerSystem will be invoked at key points in the engine:
 # In WorldEngine._move_player()
 async def _move_player(self, player_id: PlayerId, direction: str) -> List[Event]:
     # ... existing movement logic ...
-    
+
     # Fire exit triggers on old room
     events.extend(await self.trigger_system.fire_event(
-        old_room_id, "on_exit", 
+        old_room_id, "on_exit",
         TriggerContext(player_id=player_id, direction=direction)
     ))
-    
+
     # Fire enter triggers on new room
     events.extend(await self.trigger_system.fire_event(
         new_room_id, "on_enter",
         TriggerContext(player_id=player_id, direction=direction)
     ))
-    
+
     return events
 
 # In CommandRouter dispatch, for unrecognized commands
 def dispatch(self, player_id: PlayerId, raw: str) -> List[Event]:
     # ... existing command matching ...
-    
+
     if not matched:
         # Check for room command triggers
         player = self.ctx.world.players.get(player_id)
@@ -549,7 +549,7 @@ def dispatch(self, player_id: PlayerId, raw: str) -> List[Event]:
             )
             if trigger_events:
                 return trigger_events
-    
+
     # Fall through to "unknown command"
     return [self._msg_to_player(player_id, "You mutter something unintelligible.")]
 ```
@@ -564,14 +564,14 @@ def _start_room_timers(self, room: WorldRoom):
     for trigger in room.triggers:
         if trigger.event == "on_timer" and trigger.enabled:
             state = room.trigger_states.get(trigger.id, TriggerState())
-            
+
             event_id = self.ctx.time_manager.schedule(
                 delay=trigger.timer_initial_delay,
                 callback=self._make_timer_callback(room.id, trigger.id),
                 recurring=True,
                 interval=trigger.timer_interval
             )
-            
+
             state.timer_event_id = event_id
             room.trigger_states[trigger.id] = state
 ```

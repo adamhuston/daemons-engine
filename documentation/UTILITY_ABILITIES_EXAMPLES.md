@@ -248,9 +248,9 @@ async def my_utility_behavior(
     """Your utility ability implementation."""
     try:
         duration = ability_template.metadata.get("duration", 60.0)
-        
+
         # Perform ability logic here
-        
+
         return UtilityResult(
             success=True,
             message=f"{caster.name} used ability!",

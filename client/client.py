@@ -1,11 +1,9 @@
 # client_flet/client.py
 import json
-import asyncio
-import httpx
 
 import flet as ft
+import httpx
 import websockets
-
 
 BASE_URL = "http://127.0.0.1:8000"
 WS_URL = "ws://127.0.0.1:8000/ws/game"
@@ -15,14 +13,14 @@ WS_AUTH_URL = "ws://127.0.0.1:8000/ws/game/auth"
 def main(page: ft.Page):
     page.title = "Dungeon Flet Stub"
     page.vertical_alignment = ft.MainAxisAlignment.START
-    
+
     # Load custom fonts
     page.fonts = {
         "IM Fell English": "fonts/IM_Fell_English/IMFellEnglish-Regular.ttf",
         "IM Fell English Italic": "fonts/IM_Fell_English/IMFellEnglish-Italic.ttf",
         "Staatliches": "fonts/Staatliches/Staatliches-Regular.ttf",
     }
-    
+
     # Set default font for the page (optional)
     page.theme = ft.Theme(font_family="Consolas")
 
@@ -64,11 +62,13 @@ def main(page: ft.Page):
         password=True,
         can_reveal_password=True,
     )
-    
+
     login_button = ft.ElevatedButton("Login", icon=ft.Icons.LOGIN)
     register_button = ft.ElevatedButton("Register", icon=ft.Icons.PERSON_ADD)
-    connect_button = ft.ElevatedButton("Connect", icon=ft.Icons.PLAY_ARROW, disabled=True)
-    
+    connect_button = ft.ElevatedButton(
+        "Connect", icon=ft.Icons.PLAY_ARROW, disabled=True
+    )
+
     # HP status display
     hp_status = ft.Text(
         value="HP: --/--",
@@ -77,14 +77,14 @@ def main(page: ft.Page):
         size=14,
         font_family="Staatliches",
     )
-    
+
     # User info display
     user_info = ft.Text(
         value="Not logged in",
         color=ft.Colors.GREY,
         size=12,
     )
-    
+
     command_field = ft.TextField(
         label="Command",
         hint_text='Type commands like "look", "north", or \'say hello\'',
@@ -98,7 +98,10 @@ def main(page: ft.Page):
     auth_row = ft.Row([username_field, password_field, login_button, register_button])
     legacy_row = ft.Row([player_id_field, connect_button])
     mode_row = ft.Row([auth_mode, connect_button])
-    status_row = ft.Row([status_text, user_info, hp_status], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+    status_row = ft.Row(
+        [status_text, user_info, hp_status],
+        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+    )
 
     page.add(mode_row, auth_row, legacy_row, status_row, output_view, input_row)
 
@@ -114,34 +117,34 @@ def main(page: ft.Page):
         "role": None,
         "in_game": False,  # True once we're past character selection and in the game world
     }
-    
+
     def update_mode_visibility(e=None):
         """Update UI based on connection mode."""
         is_auth = auth_mode.value == "authenticated"
         auth_row.visible = is_auth
         legacy_row.visible = not is_auth
-        
+
         # Enable connect button based on mode
         if is_auth:
             connect_button.disabled = state["access_token"] is None
         else:
             connect_button.disabled = False
         page.update()
-    
+
     auth_mode.on_change = update_mode_visibility
     update_mode_visibility()  # Initial setup
 
     async def do_login(username: str, password: str) -> bool:
         """Attempt to login and get access token."""
         append_line(f"[auth] Logging in as {username}...")
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{BASE_URL}/auth/login",
-                    json={"username": username, "password": password}
+                    json={"username": username, "password": password},
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     state["access_token"] = data["access_token"]
@@ -149,17 +152,22 @@ def main(page: ft.Page):
                     state["user_id"] = data["user_id"]
                     state["username"] = data["username"]
                     state["role"] = data["role"]
-                    
-                    user_info.value = f"Logged in as: {data['username']} ({data['role']})"
+
+                    user_info.value = (
+                        f"Logged in as: {data['username']} ({data['role']})"
+                    )
                     user_info.color = ft.Colors.GREEN
                     connect_button.disabled = False
-                    append_line(f"[auth] Login successful! Role: {data['role']}", ft.Colors.GREEN)
-                    
+                    append_line(
+                        f"[auth] Login successful! Role: {data['role']}",
+                        ft.Colors.GREEN,
+                    )
+
                     page.update()
-                    
+
                     # Auto-connect to WebSocket after login
                     await connect_ws_auth()
-                    
+
                     return True
                 else:
                     error = response.json().get("detail", "Login failed")
@@ -172,17 +180,20 @@ def main(page: ft.Page):
     async def do_register(username: str, password: str) -> bool:
         """Register a new account."""
         append_line(f"[auth] Registering account: {username}...")
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{BASE_URL}/auth/register",
-                    json={"username": username, "password": password}
+                    json={"username": username, "password": password},
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
-                    append_line(f"[auth] Account created! User ID: {data['user_id']}", ft.Colors.GREEN)
+                    append_line(
+                        f"[auth] Account created! User ID: {data['user_id']}",
+                        ft.Colors.GREEN,
+                    )
                     append_line("[auth] Now logging in...", ft.Colors.GREY)
                     # Auto-login after registration
                     return await do_login(username, password)
@@ -201,13 +212,13 @@ def main(page: ft.Page):
         if state["connected"]:
             append_line("[system] Already connected.")
             return
-        
+
         if not state["access_token"]:
             append_line("[system] Please login first.")
             return
 
         url = f"{WS_AUTH_URL}?token={state['access_token']}"
-        append_line(f"[system] Connecting with authentication...")
+        append_line("[system] Connecting with authentication...")
         status_text.value = "Connecting..."
         page.update()
 
@@ -240,7 +251,10 @@ def main(page: ft.Page):
                 if ev_type == "auth_success":
                     state["in_game"] = True
                     status_text.value = "Connected (In Game)"
-                    append_line(f"[auth] Connected as player {ev.get('player_id')}", ft.Colors.GREEN)
+                    append_line(
+                        f"[auth] Connected as player {ev.get('player_id')}",
+                        ft.Colors.GREEN,
+                    )
                     page.update()
                 elif ev_type == "character_menu":
                     # Server-side character selection menu
@@ -259,12 +273,15 @@ def main(page: ft.Page):
                         state["current_health"] = payload["health"]
                     if "max_health" in payload:
                         state["max_health"] = payload["max_health"]
-                    
-                    if state["current_health"] is not None and state["max_health"] is not None:
+
+                    if (
+                        state["current_health"] is not None
+                        and state["max_health"] is not None
+                    ):
                         current = state["current_health"]
                         maximum = state["max_health"]
                         hp_status.value = f"HP: {current}/{maximum}"
-                        
+
                         health_pct = current / maximum if maximum > 0 else 0
                         if health_pct > 0.6:
                             hp_status.color = ft.Colors.GREEN
@@ -272,12 +289,14 @@ def main(page: ft.Page):
                             hp_status.color = ft.Colors.YELLOW
                         else:
                             hp_status.color = ft.Colors.RED
-                        
+
                         page.update()
                 elif ev_type == "quit":
                     # Graceful disconnect - server handles returning to character selection
                     # The server will send a new character_menu after quit
-                    append_line("[system] Returning to character selection...", ft.Colors.CYAN)
+                    append_line(
+                        "[system] Returning to character selection...", ft.Colors.CYAN
+                    )
                     state["in_game"] = False
                     hp_status.value = "HP: --/--"
                     hp_status.color = ft.Colors.GREEN
@@ -306,32 +325,34 @@ def main(page: ft.Page):
         spans = []
         i = 0
         current_text = ""
-        
+
         while i < len(text):
             # Check for **bold**
-            if i < len(text) - 1 and text[i:i+2] == '**':
+            if i < len(text) - 1 and text[i : i + 2] == "**":
                 if current_text:
                     spans.append(ft.TextSpan(current_text))
                     current_text = ""
                 # Find closing **
-                end = text.find('**', i + 2)
+                end = text.find("**", i + 2)
                 if end != -1:
-                    bold_text = text[i+2:end]
-                    spans.append(ft.TextSpan(bold_text, ft.TextStyle(weight=ft.FontWeight.BOLD)))
+                    bold_text = text[i + 2 : end]
+                    spans.append(
+                        ft.TextSpan(bold_text, ft.TextStyle(weight=ft.FontWeight.BOLD))
+                    )
                     i = end + 2
                     continue
                 else:
                     current_text += text[i]
                     i += 1
             # Check for *italic*
-            elif text[i] == '*':
+            elif text[i] == "*":
                 if current_text:
                     spans.append(ft.TextSpan(current_text))
                     current_text = ""
                 # Find closing *
-                end = text.find('*', i + 1)
+                end = text.find("*", i + 1)
                 if end != -1:
-                    italic_text = text[i+1:end]
+                    italic_text = text[i + 1 : end]
                     spans.append(ft.TextSpan(italic_text, ft.TextStyle(italic=True)))
                     i = end + 1
                     continue
@@ -341,26 +362,26 @@ def main(page: ft.Page):
             else:
                 current_text += text[i]
                 i += 1
-        
+
         if current_text:
             spans.append(ft.TextSpan(current_text))
-        
+
         return spans if spans else [ft.TextSpan(text)]
 
     def append_line(line: str, color: str = ft.Colors.WHITE) -> None:
         print(line)  # also to console
-        
+
         # Split multi-line messages and format each line
-        lines = line.split('\n')
+        lines = line.split("\n")
         for single_line in lines:
             # Parse markdown formatting in the line
             spans = parse_markdown_spans(single_line)
-            
+
             log_column.controls.append(
                 ft.Text(
                     spans=spans,
-                    selectable=True, 
-                    color=color, 
+                    selectable=True,
+                    color=color,
                     size=12,
                     font_family="Consolas",  # Option to use a custom font
                 )
@@ -413,13 +434,16 @@ def main(page: ft.Page):
                         state["current_health"] = payload["current_health"]
                     if "max_health" in payload:
                         state["max_health"] = payload["max_health"]
-                    
+
                     # Update HP status display
-                    if state["current_health"] is not None and state["max_health"] is not None:
+                    if (
+                        state["current_health"] is not None
+                        and state["max_health"] is not None
+                    ):
                         current = state["current_health"]
                         maximum = state["max_health"]
                         hp_status.value = f"HP: {current}/{maximum}"
-                        
+
                         # Color code based on health percentage
                         health_pct = current / maximum if maximum > 0 else 0
                         if health_pct > 0.6:
@@ -428,7 +452,7 @@ def main(page: ft.Page):
                             hp_status.color = ft.Colors.YELLOW
                         else:
                             hp_status.color = ft.Colors.RED
-                        
+
                         page.update()
                 elif ev_type == "respawn_countdown":
                     # Respawn countdown is handled via message events, ignore the data event
@@ -452,12 +476,12 @@ def main(page: ft.Page):
         cmd = cmd.strip()
         if not cmd:
             return
-        
+
         # Clear input field first
         command_field.value = ""
         command_field.focus()
         page.update()
-        
+
         # All commands are sent to the server (both in-game and character selection)
         ws = state["ws"]
         if not state["connected"] or ws is None:

@@ -1,6 +1,8 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import declarative_base
 from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
+                                    create_async_engine)
+from sqlalchemy.orm import declarative_base
 
 # SQLite database URL
 DATABASE_URL = "sqlite+aiosqlite:///./dungeon.db"  # dungeon.db will live in backend/
@@ -8,7 +10,7 @@ DATABASE_URL = "sqlite+aiosqlite:///./dungeon.db"  # dungeon.db will live in bac
 # Create async SQLAlchemy engine
 engine = create_async_engine(
     DATABASE_URL,
-    echo=False,      # True if you want to see SQL
+    echo=False,  # True if you want to see SQL
     future=True,
 )
 
@@ -20,6 +22,7 @@ AsyncSessionLocal = async_sessionmaker(
 
 # Base class for models
 Base = declarative_base()
+
 
 # Dependency to get async DB session
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

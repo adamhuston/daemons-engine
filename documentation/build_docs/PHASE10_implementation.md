@@ -6,7 +6,7 @@ Three sequential phases building social systems on top of existing EventDispatch
 
 ---
 
-## Phase 10.1: Groups & Tell Commands 
+## Phase 10.1: Groups & Tell Commands
 
 ### Core Implementation
 1. **GroupSystem** (`systems/group_system.py`)
@@ -232,17 +232,17 @@ registry.register("faction", FactionListCommand, ...)
 ## Deliverables Checklist
 
 ### Phase 10.1 ✅ COMPLETE
-- [x] GroupSystem 
-- [x] Group commands 
-- [x] Tell/reply/ignore commands 
-- [x] Follow commands 
-- [x] Yell command 
-- [x] Event types + routing 
+- [x] GroupSystem
+- [x] Group commands
+- [x] Tell/reply/ignore commands
+- [x] Follow commands
+- [x] Yell command
+- [x] Event types + routing
 - [x] Tests (80+ cases)
 - [x] Documentation (COMPLETION, QUICKREF, INTEGRATION guides)
 
 ### Phase 10.2 ✅ COMPLETE
-- [x] Migration file (i1j2k3l4m5n6_phase10_2_clans.py) 
+- [x] Migration file (i1j2k3l4m5n6_phase10_2_clans.py)
 - [x] Clan models (Clan, ClanMember with relationships)
 - [x] ClanSystem (load_clans_from_db, CRUD, rank permissions)
 - [x] Clan commands (create, invite, join, leave, promote, members, info, disband)

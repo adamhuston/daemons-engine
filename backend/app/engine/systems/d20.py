@@ -59,12 +59,13 @@ SLEEPING_AC_PENALTY = -5  # AC penalty while sleeping (you're defenseless)
 # Ability Modifiers
 # =============================================================================
 
+
 def calculate_ability_modifier(stat_value: int) -> int:
     """
     Calculate D20 ability modifier from a stat value.
-    
+
     Formula: (stat - ABILITY_BASELINE) // 2
-    
+
     Examples:
         10 -> +0
         12 -> +1
@@ -74,10 +75,10 @@ def calculate_ability_modifier(stat_value: int) -> int:
         20 -> +5
         8 -> -1
         6 -> -2
-    
+
     Args:
         stat_value: The ability score (strength, dex, int, etc.)
-        
+
     Returns:
         The modifier to add to d20 rolls
     """
@@ -88,22 +89,23 @@ def calculate_ability_modifier(stat_value: int) -> int:
 # Proficiency Bonus
 # =============================================================================
 
+
 def calculate_proficiency_bonus(level: int) -> int:
     """
     Calculate proficiency bonus based on character level.
-    
+
     Formula: BASE_PROFICIENCY + (level - 1) // PROFICIENCY_SCALE
-    
+
     Default progression (BASE=2, SCALE=4):
         Levels 1-4:  +2
         Levels 5-8:  +3
         Levels 9-12: +4
         Levels 13-16: +5
         Levels 17-20: +6
-    
+
     Args:
         level: Character level (1-20)
-        
+
     Returns:
         Proficiency bonus for the level
     """
@@ -114,19 +116,22 @@ def calculate_proficiency_bonus(level: int) -> int:
 # Attack Bonuses
 # =============================================================================
 
-def calculate_melee_attack_bonus(strength: int, level: int, finesse: bool = False, dexterity: int = 10) -> int:
+
+def calculate_melee_attack_bonus(
+    strength: int, level: int, finesse: bool = False, dexterity: int = 10
+) -> int:
     """
     Calculate melee attack bonus.
-    
+
     Formula: proficiency_bonus + ability_modifier
     Uses strength by default, or dexterity for finesse weapons.
-    
+
     Args:
         strength: Strength stat value
         level: Character level
         finesse: If True, use dexterity instead of strength
         dexterity: Dexterity stat value (only used if finesse=True)
-        
+
     Returns:
         Total melee attack bonus
     """
@@ -139,13 +144,13 @@ def calculate_melee_attack_bonus(strength: int, level: int, finesse: bool = Fals
 def calculate_spell_attack_bonus(intelligence: int, level: int) -> int:
     """
     Calculate spell attack bonus.
-    
+
     Formula: proficiency_bonus + intelligence_modifier
-    
+
     Args:
         intelligence: Intelligence stat value
         level: Character level
-        
+
     Returns:
         Total spell attack bonus
     """
@@ -157,15 +162,15 @@ def calculate_spell_attack_bonus(intelligence: int, level: int) -> int:
 def calculate_spell_save_dc(intelligence: int, level: int) -> int:
     """
     Calculate spell save difficulty class.
-    
+
     Formula: SPELL_DC_BASE + proficiency_bonus + intelligence_modifier
-    
+
     Targets must roll d20 + their save modifier >= this DC to resist.
-    
+
     Args:
         intelligence: Intelligence stat value
         level: Character level
-        
+
     Returns:
         Spell save DC
     """
@@ -178,13 +183,15 @@ def calculate_spell_save_dc(intelligence: int, level: int) -> int:
 # D20 Rolls
 # =============================================================================
 
-SaveType = Literal["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]
+SaveType = Literal[
+    "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"
+]
 
 
 def roll_d20() -> int:
     """
     Roll a d20.
-    
+
     Returns:
         Random integer from 1 to 20
     """
@@ -194,10 +201,10 @@ def roll_d20() -> int:
 def is_critical_hit(roll: int) -> bool:
     """
     Check if a d20 roll is a critical hit.
-    
+
     Args:
         roll: The d20 roll result (1-20)
-        
+
     Returns:
         True if the roll is a critical hit
     """
@@ -207,10 +214,10 @@ def is_critical_hit(roll: int) -> bool:
 def is_critical_miss(roll: int) -> bool:
     """
     Check if a d20 roll is a critical miss.
-    
+
     Args:
         roll: The d20 roll result (1-20)
-        
+
     Returns:
         True if the roll is a critical miss (auto-fail)
     """
@@ -220,11 +227,11 @@ def is_critical_miss(roll: int) -> bool:
 def make_attack_roll(bonus: int, target_ac: int) -> tuple[bool, int, int, bool]:
     """
     Make a complete attack roll against a target AC.
-    
+
     Args:
         bonus: Total attack bonus (proficiency + ability modifier)
         target_ac: Target's armor class
-        
+
     Returns:
         Tuple of (hit, roll, total, is_crit)
         - hit: True if attack hits
@@ -234,31 +241,28 @@ def make_attack_roll(bonus: int, target_ac: int) -> tuple[bool, int, int, bool]:
     """
     roll = roll_d20()
     total = roll + bonus
-    
+
     # Critical miss always fails
     if is_critical_miss(roll):
         return (False, roll, total, False)
-    
+
     # Critical hit always hits
     if is_critical_hit(roll):
         return (True, roll, total, True)
-    
+
     # Normal hit/miss
-    hit = (total >= target_ac)
+    hit = total >= target_ac
     return (hit, roll, total, False)
 
 
-def make_saving_throw(
-    save_modifier: int,
-    dc: int
-) -> tuple[bool, int, int]:
+def make_saving_throw(save_modifier: int, dc: int) -> tuple[bool, int, int]:
     """
     Make a saving throw against a DC.
-    
+
     Args:
         save_modifier: Total save modifier (ability mod + proficiency if proficient)
         dc: Difficulty class to beat
-        
+
     Returns:
         Tuple of (success, roll, total)
         - success: True if save succeeded
@@ -267,17 +271,17 @@ def make_saving_throw(
     """
     roll = roll_d20()
     total = roll + save_modifier
-    
+
     # Natural 1 always fails
     if is_critical_miss(roll):
         return (False, roll, total)
-    
+
     # Natural 20 always succeeds
     if is_critical_hit(roll):
         return (True, roll, total)
-    
+
     # Normal success/fail
-    success = (total >= dc)
+    success = total >= dc
     return (success, roll, total)
 
 
@@ -285,19 +289,20 @@ def make_saving_throw(
 # Damage Calculations
 # =============================================================================
 
+
 def calculate_critical_damage(base_damage: int, modifier: int) -> int:
     """
     Calculate critical hit damage.
-    
+
     If CRIT_DOUBLES_DICE is True:
         Doubles the dice damage (base_damage - modifier), then adds modifier back.
     Otherwise:
         Multiplies total damage by CRIT_MULTIPLIER.
-    
+
     Args:
         base_damage: Total damage including modifier
         modifier: The ability modifier that was added to base damage
-        
+
     Returns:
         Critical hit damage
     """
@@ -326,13 +331,13 @@ DC_NEARLY_IMPOSSIBLE = 30
 def calculate_dynamic_dc(base_dc: int, modifier: float = 0.0) -> int:
     """
     Calculate a dynamic DC with adjustments.
-    
+
     Useful for flee mechanics, contested checks, etc.
-    
+
     Args:
         base_dc: Starting difficulty class
         modifier: Adjustment to DC (negative = easier, positive = harder)
-        
+
     Returns:
         Adjusted DC (minimum 5)
     """
@@ -343,10 +348,11 @@ def calculate_dynamic_dc(base_dc: int, modifier: float = 0.0) -> int:
 # Advantage/Disadvantage (Future feature)
 # =============================================================================
 
+
 def roll_with_advantage() -> int:
     """
     Roll 2d20, take the higher result.
-    
+
     Returns:
         The higher of two d20 rolls
     """
@@ -356,7 +362,7 @@ def roll_with_advantage() -> int:
 def roll_with_disadvantage() -> int:
     """
     Roll 2d20, take the lower result.
-    
+
     Returns:
         The lower of two d20 rolls
     """

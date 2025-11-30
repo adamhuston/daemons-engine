@@ -14,7 +14,7 @@ Complete conversion of combat mechanics from custom formulas to proper D20 table
 
 ### Ability Modifiers
 - **Formula**: `(stat - 10) // 2`
-- **Examples**: 
+- **Examples**:
   - 10 stat → +0 modifier
   - 14 stat → +2 modifier
   - 18 stat → +4 modifier
@@ -22,7 +22,7 @@ Complete conversion of combat mechanics from custom formulas to proper D20 table
 
 ### Proficiency Bonus
 - **Formula**: `2 + (level - 1) // 4`
-- **Scaling**: 
+- **Scaling**:
   - Levels 1-4 → +2
   - Levels 5-8 → +3
   - Levels 9-12 → +4

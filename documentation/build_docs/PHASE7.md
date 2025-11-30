@@ -194,24 +194,24 @@ class UserAccount:
     email: str                  # Unique, for login and recovery
     username: str               # Display name, unique
     password_hash: str          # Argon2id hash
-    
+
     # Roles and permissions
     roles: set[UserRole] = field(default_factory=lambda: {UserRole.PLAYER})
-    
+
     # Account state
     is_active: bool = True      # Can login
     is_verified: bool = False   # Email verified
     is_banned: bool = False     # Account suspended
     ban_reason: str | None = None
     ban_expires_at: float | None = None
-    
+
     # Timestamps
     created_at: float = field(default_factory=time.time)
     last_login_at: float | None = None
-    
+
     # Settings
     preferences: dict[str, Any] = field(default_factory=dict)
-    
+
     # Characters
     character_ids: list[str] = field(default_factory=list)
     active_character_id: str | None = None
@@ -223,14 +223,14 @@ class RefreshToken:
     id: str                     # UUID, stored in token
     user_id: str                # Owner account
     token_hash: str             # SHA256 of actual token (we store hash, not token)
-    
+
     created_at: float
     expires_at: float
-    
+
     # Security metadata
     ip_address: str | None = None
     user_agent: str | None = None
-    
+
     # State
     is_revoked: bool = False
     revoked_at: float | None = None
@@ -254,35 +254,35 @@ class SecurityEvent:
 class UserAccount(Base):
     """User account for authentication."""
     __tablename__ = "user_accounts"
-    
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    
+
     # Roles stored as JSON array
     roles: Mapped[list] = mapped_column(JSON, default=["player"])
-    
+
     # Account state
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
     ban_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     ban_expires_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    
+
     # Timestamps
     created_at: Mapped[float] = mapped_column(Float, default=time.time)
     last_login_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    
+
     # Settings
     preferences: Mapped[dict] = mapped_column(JSON, default=dict)
-    
+
     # Character management
     active_character_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("players.id"), nullable=True
     )
     max_characters: Mapped[int] = mapped_column(Integer, default=3)
-    
+
     # Relationships
     characters: Mapped[list["Player"]] = relationship(
         back_populates="account",
@@ -295,28 +295,28 @@ class UserAccount(Base):
 class RefreshToken(Base):
     """Refresh tokens for session management."""
     __tablename__ = "refresh_tokens"
-    
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("user_accounts.id"))
     token_hash: Mapped[str] = mapped_column(String(64), index=True)  # SHA256
-    
+
     created_at: Mapped[float] = mapped_column(Float)
     expires_at: Mapped[float] = mapped_column(Float, index=True)
-    
+
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    
+
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
     revoked_at: Mapped[float | None] = mapped_column(Float, nullable=True)
     replaced_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    
+
     # Relationship
     user: Mapped["UserAccount"] = relationship(back_populates="refresh_tokens")
 
 class SecurityEvent(Base):
     """Audit log for security events."""
     __tablename__ = "security_events"
-    
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     timestamp: Mapped[float] = mapped_column(Float, index=True)
     event_type: Mapped[str] = mapped_column(String(50), index=True)
@@ -328,12 +328,12 @@ class SecurityEvent(Base):
 # Extend Player model
 class Player(Base):
     # ... existing fields ...
-    
+
     # Link to account
     account_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("user_accounts.id"), nullable=True
     )
-    
+
     # Relationship
     account: Mapped["UserAccount | None"] = relationship(
         back_populates="characters",
@@ -346,9 +346,9 @@ class Player(Base):
 ```python
 class AuthSystem:
     """Handles authentication, authorization, and session management."""
-    
+
     def __init__(
-        self, 
+        self,
         db_session_factory: Callable[[], AsyncSession],
         secret_key: str,
         access_token_expire_minutes: int = 15,
@@ -359,9 +359,9 @@ class AuthSystem:
         self.access_token_expire = timedelta(minutes=access_token_expire_minutes)
         self.refresh_token_expire = timedelta(days=refresh_token_expire_days)
         self.password_hasher = PasswordHasher()  # Argon2
-    
+
     # === Account Management ===
-    
+
     async def create_account(
         self,
         email: str,
@@ -371,11 +371,11 @@ class AuthSystem:
     ) -> tuple[UserAccount, list[Event]]:
         """Create a new user account."""
         ...
-    
+
     async def verify_email(self, token: str) -> bool:
         """Verify email address with token."""
         ...
-    
+
     async def change_password(
         self,
         user_id: str,
@@ -384,13 +384,13 @@ class AuthSystem:
     ) -> bool:
         """Change account password."""
         ...
-    
+
     async def reset_password_request(self, email: str) -> bool:
         """Initiate password reset flow."""
         ...
-    
+
     # === Authentication ===
-    
+
     async def login(
         self,
         email_or_username: str,
@@ -403,7 +403,7 @@ class AuthSystem:
         Returns: (access_token, refresh_token, user) or None if failed.
         """
         ...
-    
+
     async def refresh_access_token(
         self,
         refresh_token: str,
@@ -416,34 +416,34 @@ class AuthSystem:
         Returns: (new_access_token, new_refresh_token) or None.
         """
         ...
-    
+
     async def logout(self, refresh_token: str) -> bool:
         """Revoke refresh token."""
         ...
-    
+
     async def logout_all_sessions(self, user_id: str) -> int:
         """Revoke all refresh tokens for user. Returns count revoked."""
         ...
-    
+
     def verify_access_token(self, token: str) -> dict | None:
         """
         Verify JWT and extract claims.
         Returns: {"user_id": ..., "roles": [...], "exp": ...} or None.
         """
         ...
-    
+
     # === Authorization ===
-    
+
     def has_role(self, user: UserAccount, role: UserRole) -> bool:
         """Check if user has a specific role."""
         return role in user.roles or UserRole.ADMIN in user.roles
-    
+
     def has_permission(self, user: UserAccount, permission: str) -> bool:
         """Check if user has a specific permission."""
         ...
-    
+
     # === Character Management ===
-    
+
     async def create_character(
         self,
         user_id: str,
@@ -452,7 +452,7 @@ class AuthSystem:
     ) -> Player | None:
         """Create a new character for an account."""
         ...
-    
+
     async def delete_character(
         self,
         user_id: str,
@@ -461,7 +461,7 @@ class AuthSystem:
     ) -> bool:
         """Delete a character (with confirmation)."""
         ...
-    
+
     async def switch_character(
         self,
         user_id: str,
@@ -469,9 +469,9 @@ class AuthSystem:
     ) -> Player | None:
         """Switch active character."""
         ...
-    
+
     # === Security Events ===
-    
+
     async def log_event(
         self,
         event_type: str,
@@ -482,7 +482,7 @@ class AuthSystem:
     ) -> None:
         """Log a security event."""
         ...
-    
+
     async def get_recent_events(
         self,
         user_id: str,
@@ -497,18 +497,18 @@ class AuthSystem:
 ```python
 class Permission(str, Enum):
     """Granular permissions for commands and actions."""
-    
+
     # Player permissions (default)
     PLAY = "play"                       # Basic gameplay
     CHAT = "chat"                       # Send messages
     TRADE = "trade"                     # Trade with players
-    
+
     # Moderator permissions
     MUTE_PLAYER = "mute_player"         # Mute chat
     KICK_PLAYER = "kick_player"         # Disconnect player
     VIEW_REPORTS = "view_reports"       # See player reports
     WARN_PLAYER = "warn_player"         # Issue warnings
-    
+
     # Game Master permissions
     TELEPORT = "teleport"               # Teleport self/others
     SPAWN_ITEM = "spawn_item"           # Create items
@@ -516,7 +516,7 @@ class Permission(str, Enum):
     MODIFY_STATS = "modify_stats"       # Edit player stats
     INVISIBLE = "invisible"             # Go invisible
     INVULNERABLE = "invulnerable"       # God mode
-    
+
     # Admin permissions
     MANAGE_ACCOUNTS = "manage_accounts" # Ban, unban, verify
     MANAGE_ROLES = "manage_roles"       # Assign roles
@@ -565,10 +565,10 @@ def requires_permission(permission: Permission):
             player = ctx.world.players.get(player_id)
             if not player or not player.account:
                 return [ctx.events.error(player_id, "You must be logged in.")]
-            
+
             if not ctx.auth.has_permission(player.account, permission):
                 return [ctx.events.error(player_id, "You don't have permission to do that.")]
-            
+
             return await func(ctx, player_id, args)
         return wrapper
     return decorator
@@ -674,22 +674,22 @@ async def websocket_game(
     if not claims:
         await ws.close(code=4001, reason="Invalid or expired token")
         return
-    
+
     user_id = claims["user_id"]
-    
+
     # Get user and active character
     async with db_session() as session:
         user = await session.get(UserAccount, user_id)
         if not user or not user.is_active or user.is_banned:
             await ws.close(code=4003, reason="Account unavailable")
             return
-        
+
         if not user.active_character_id:
             await ws.close(code=4004, reason="No active character")
             return
-        
+
         player = await session.get(Player, user.active_character_id)
-    
+
     # Proceed with connection
     await ws.accept()
     engine.register_player(player.id, ws, user=user)
@@ -709,9 +709,9 @@ class PasswordPolicy:
     REQUIRE_LOWERCASE = True
     REQUIRE_DIGIT = True
     REQUIRE_SPECIAL = False  # Optional for usability
-    
+
     COMMON_PASSWORDS_FILE = "data/common_passwords.txt"
-    
+
     @classmethod
     def validate(cls, password: str) -> tuple[bool, str | None]:
         """Validate password against policy. Returns (is_valid, error_message)."""
@@ -735,25 +735,25 @@ class PasswordPolicy:
 ```python
 class RateLimiter:
     """Rate limiting for security-sensitive operations."""
-    
+
     # Limits per IP address
     LOGIN_ATTEMPTS_PER_MINUTE = 5
     LOGIN_ATTEMPTS_PER_HOUR = 20
     REGISTRATION_PER_HOUR = 3
     PASSWORD_RESET_PER_HOUR = 3
-    
+
     # Limits per account
     FAILED_LOGINS_BEFORE_LOCKOUT = 5
     LOCKOUT_DURATION_MINUTES = 15
-    
+
     async def check_login_rate(self, ip: str, email: str) -> tuple[bool, str | None]:
         """Check if login attempt is allowed."""
         ...
-    
+
     async def record_failed_login(self, ip: str, email: str) -> None:
         """Record a failed login attempt."""
         ...
-    
+
     async def record_successful_login(self, ip: str, email: str) -> None:
         """Clear failed login counter on success."""
         ...
@@ -822,34 +822,34 @@ async def do_ban(ctx: GameContext, player_id: str, args: list[str]):
     """Ban a user account. Usage: ban <username> <duration> <reason>"""
     if len(args) < 3:
         return [ctx.events.error(player_id, "Usage: ban <username> <duration> <reason>")]
-    
+
     username, duration, *reason_parts = args
     reason = " ".join(reason_parts)
-    
+
     # Parse duration: "1h", "1d", "1w", "perm"
     expires_at = parse_duration(duration)
-    
+
     async with ctx.db_session() as session:
         user = await session.execute(
             select(UserAccount).where(UserAccount.username == username)
         )
         user = user.scalar_one_or_none()
-        
+
         if not user:
             return [ctx.events.error(player_id, f"User '{username}' not found.")]
-        
+
         user.is_banned = True
         user.ban_reason = reason
         user.ban_expires_at = expires_at
         await session.commit()
-        
+
         # Disconnect if online
         if user.active_character_id:
             await ctx.engine.disconnect_player(
                 user.active_character_id,
                 reason=f"Banned: {reason}"
             )
-        
+
         # Log event
         admin = ctx.world.players.get(player_id)
         await ctx.auth.log_event(
@@ -858,7 +858,7 @@ async def do_ban(ctx: GameContext, player_id: str, args: list[str]):
             ip_address="server",
             details={"admin": admin.name, "reason": reason, "expires": expires_at}
         )
-    
+
     return [ctx.events.message(player_id, f"User '{username}' has been banned.")]
 
 @cmd("teleport", aliases=["tp", "goto"])
@@ -943,19 +943,19 @@ class AuthConfig:
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    
+
     # Password
     MIN_PASSWORD_LENGTH: int = 8
     REQUIRE_EMAIL_VERIFICATION: bool = True
-    
+
     # Rate limiting
     LOGIN_ATTEMPTS_PER_MINUTE: int = 5
     LOCKOUT_AFTER_FAILURES: int = 5
     LOCKOUT_DURATION_MINUTES: int = 15
-    
+
     # Sessions
     MAX_SESSIONS_PER_USER: int = 5  # Max concurrent refresh tokens
-    
+
     # Characters
     DEFAULT_MAX_CHARACTERS: int = 3
 ```
@@ -975,7 +975,7 @@ class OAuthProvider(str, Enum):
 
 class LinkedAccount(Base):
     __tablename__ = "linked_accounts"
-    
+
     id: Mapped[str]
     user_id: Mapped[str]  # FK to UserAccount
     provider: Mapped[str]
@@ -990,7 +990,7 @@ class LinkedAccount(Base):
 # Future: TOTP-based 2FA
 class TwoFactorAuth(Base):
     __tablename__ = "two_factor_auth"
-    
+
     user_id: Mapped[str]
     secret: Mapped[str]  # Encrypted TOTP secret
     backup_codes: Mapped[list]  # Encrypted list
@@ -1003,7 +1003,7 @@ class TwoFactorAuth(Base):
 # Future: Long-lived API keys for automation
 class ApiKey(Base):
     __tablename__ = "api_keys"
-    
+
     id: Mapped[str]
     user_id: Mapped[str]
     key_hash: Mapped[str]

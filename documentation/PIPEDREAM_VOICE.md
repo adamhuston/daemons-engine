@@ -76,7 +76,7 @@ Create `app/engine/systems/voice.py`:
 ```python
 class VoiceSystem(GameSystem):
     """Manages proximity voice chat, voice state, and SFU coordination."""
-    
+
     def __init__(self, context: GameContext, voice_server_url: str):
         self.context = context
         self.voice_server_url = voice_server_url
@@ -84,7 +84,7 @@ class VoiceSystem(GameSystem):
         self.ambient_zones: dict[str, AmbientAudioZone] = {}
         # Cache of proximity groups (expensive to recalculate)
         self._proximity_cache: dict[str, set[str]] = {}
-    
+
     async def initialize_player_voice(self, player_id: str) -> VoiceState:
         """Generate voice session token and return SFU details."""
         # Call voice server to create ephemeral session
@@ -101,72 +101,72 @@ class VoiceSystem(GameSystem):
             current_voice_users=set()
         )
         self.voice_states[player_id] = state
-        
+
         # Notify proximity group that this player joined voice
         await self._update_proximity_group(player_id)
         return state
-    
+
     async def calculate_proximity_group(
-        self, 
-        player_id: str, 
+        self,
+        player_id: str,
         include_self: bool = True
     ) -> set[str]:
         """Find all players within earshot of this player."""
         player = self.context.world.players.get(player_id)
         if not player:
             return set()
-        
+
         nearby = set()
         room = self.context.world.rooms.get(player.room_id)
         if not room:
             return set()
-        
+
         # Same room = definitely in range
         for entity_id in room.entities:
             if entity_id == player_id and not include_self:
                 continue
             if entity_id in self.context.world.players:
                 nearby.add(entity_id)
-        
+
         # Optional: nearby rooms (vertical/adjacent with attenuation)
         # for direction in ["north", "south", "east", "west"]:
         #     exit_id = room.exits.get(direction)
         #     # Add players in adjacent room with falloff
-        
+
         return nearby
-    
+
     async def _update_proximity_group(self, player_id: str):
         """Recalculate and update who hears this player's voice."""
         proximity = await self.calculate_proximity_group(player_id)
         if player_id in self.voice_states:
             self.voice_states[player_id].current_voice_users = proximity
-        
+
         # Invalidate cache for affected players
         for other_id in proximity:
             self._proximity_cache.pop(other_id, None)
-    
+
     async def handle_movement(self, player_id: str, new_room_id: str):
         """Update voice state when player moves to new room."""
         await self._update_proximity_group(player_id)
-        
+
         # Notify voice server of room change (for spatial audio routing)
         await self._send_to_voice_server({
             "action": "player_moved",
             "player_id": player_id,
             "new_room_id": new_room_id
         })
-    
+
     async def handle_disconnect(self, player_id: str):
         """Clean up voice session on disconnect."""
         if player_id in self.voice_states:
             await self._close_voice_session(player_id)
             del self.voice_states[player_id]
-        
+
         # Notify nearby players that this voice user left
         for other_id in list(self._proximity_cache.keys()):
             if player_id in self._proximity_cache[other_id]:
                 self._proximity_cache[other_id].discard(player_id)
-    
+
     async def _create_voice_session(self, player_id: str) -> VoiceSession:
         """Request ephemeral voice session from SFU."""
         async with aiohttp.ClientSession() as session:
@@ -180,18 +180,18 @@ class VoiceSystem(GameSystem):
                     sfu_url=data["sfu_url"],
                     ice_servers=data["ice_servers"]
                 )
-    
+
     async def _close_voice_session(self, player_id: str):
         """Revoke ephemeral voice session."""
         if player_id not in self.voice_states:
             return
-        
+
         token = self.voice_states[player_id].session_token
         async with aiohttp.ClientSession() as session:
             await session.delete(
                 f"{self.voice_server_url}/api/sessions/{token}"
             )
-    
+
     async def _send_to_voice_server(self, payload: dict):
         """Send state updates to voice server for spatial routing."""
         async with aiohttp.ClientSession() as session:
@@ -254,12 +254,12 @@ class WorldEngine:
     def __init__(self, world: World, voice_server_url: str = None):
         self.world = world
         self.voice_system = (
-            VoiceSystem(self.context, voice_server_url) 
-            if voice_server_url 
+            VoiceSystem(self.context, voice_server_url)
+            if voice_server_url
             else None
         )
         # ... rest of init ...
-    
+
     async def _handle_player_connect(self, player_id: str):
         """Initialize voice session on connect."""
         if self.voice_system:
@@ -278,11 +278,11 @@ class WorldEngine:
                     )
                 }
             }])
-    
+
     async def _move_player(self, player_id: str, direction: str):
         """Existing movement logic + voice proximity update."""
         # ... existing move logic ...
-        
+
         if self.voice_system:
             await self.voice_system.handle_movement(player_id, new_room_id)
 ```
@@ -320,7 +320,7 @@ class VoiceServer:
         # Create room: game_room_{room_id}
         # Create participant: {player_id}
         # Return WebRTC offer + ICE candidates
-    
+
     async def update_room_state(room_id: str, state: dict):
         """Update room's spatial configuration."""
         # room_state = {
@@ -328,10 +328,10 @@ class VoiceServer:
         #   "attenuation_curve": (distance) -> volume
         # }
         # Apply to all active connections in room
-    
+
     async def mute_player(player_id: str):
         """Server-side mute (client sends silent packets)."""
-    
+
     async def list_active_participants(room_id: str) -> list[str]:
         """For debugging/monitoring."""
 ```
@@ -385,7 +385,7 @@ Add to `app/models.py`:
 class VoiceConfiguration(Base):
     """Per-room or per-area voice settings."""
     __tablename__ = "voice_configurations"
-    
+
     id = Column(String, primary_key=True)
     room_id = Column(String, ForeignKey("rooms.id"), nullable=True)
     area_id = Column(String, nullable=True)
@@ -397,7 +397,7 @@ class VoiceConfiguration(Base):
 class AmbientAudioDefinition(Base):
     """Maps zones to audio streams."""
     __tablename__ = "ambient_audio"
-    
+
     id = Column(String, primary_key=True)
     zone_id = Column(String, unique=True)
     room_ids = Column(JSON)  # [room_id, room_id, ...]
@@ -497,7 +497,7 @@ class AmbientAudioDefinition(Base):
 
 Before implementing, resolve:
 
-1. **Fallback behavior**: What happens if voice server is unavailable? 
+1. **Fallback behavior**: What happens if voice server is unavailable?
    - Option A: Graceful degrade (text chat only, log warning)
    - Option B: Block voice feature entirely, continue game normally
    - Recommendation: A (voice is optional luxury feature)

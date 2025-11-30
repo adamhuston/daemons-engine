@@ -95,7 +95,7 @@ alembic upgrade head
 # Example: Add level to Player
 class Player(Base):
     __tablename__ = "players"
-    
+
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True)
     current_room_id: Mapped[str] = mapped_column(String, ForeignKey("rooms.id"))
@@ -267,11 +267,11 @@ from app.models import Player
 def upgrade() -> None:
     # Add column
     op.add_column('players', sa.Column('health', sa.Integer(), nullable=True))
-    
+
     # Migrate data
     bind = op.get_bind()
     session = orm.Session(bind=bind)
-    
+
     # Set health=100 for all existing players
     session.execute(
         Player.__table__.update().values(health=100)

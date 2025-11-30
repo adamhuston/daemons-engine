@@ -6,32 +6,22 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import (
-    FastAPI,
-    Depends,
-    WebSocket,
-    WebSocketDisconnect,
-    Query,
-    HTTPException,
-    status,
-    Request,
-    Header,
-)
+from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request,
+                     WebSocket, WebSocketDisconnect, status)
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .db import engine, get_session, AsyncSessionLocal
-from .models import Base, Room, Player, PlayerInventory
-from .engine.loader import (
-    load_world, load_triggers_from_yaml,
-    load_quests_into_system, load_dialogues_into_system,
-    load_quest_chains_into_system,
-    restore_player_quest_progress
-)
+from .db import AsyncSessionLocal, engine, get_session
 from .engine.engine import WorldEngine
+from .engine.loader import (load_dialogues_into_system,
+                            load_quest_chains_into_system,
+                            load_quests_into_system, load_triggers_from_yaml,
+                            load_world, restore_player_quest_progress)
 from .engine.systems.auth import AuthSystem, verify_access_token
 from .metrics import init_metrics
+from .models import Base, Player, PlayerInventory
+from .routes.admin import router as admin_router
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +37,7 @@ async def lifespan(app: FastAPI):
     # Startup
     # 0) Initialize Prometheus metrics (Phase 8)
     init_metrics(version="1.0.0", environment="development")
-    
+
     # 1) Create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -61,11 +51,13 @@ async def lifespan(app: FastAPI):
     # 3) Load world into memory
     async with AsyncSession(engine) as session:
         world = await load_world(session)
-    
+
     # 3b) Load triggers from YAML into world objects
     load_triggers_from_yaml(world)
-    
-    logger.info("Loaded world: %d rooms, %d players", len(world.rooms), len(world.players))
+
+    logger.info(
+        "Loaded world: %d rooms, %d players", len(world.rooms), len(world.players)
+    )
     if len(world.rooms) > 0:
         sample_rooms = list(world.rooms.keys())[:5]
         logger.info("Sample room IDs: %s", sample_rooms)
@@ -74,19 +66,23 @@ async def lifespan(app: FastAPI):
     engine_instance = WorldEngine(world, db_session_factory=AsyncSessionLocal)
     app.state.world_engine = engine_instance
     app.state.engine_task = asyncio.create_task(engine_instance.game_loop())
-    
+
     # 4a) Load class/ability content into ClassSystem (Phase 9c)
     from pathlib import Path
+
     class_dir = Path(__file__).parent.parent / "world_data"
     await engine_instance.class_system.load_content(class_dir)
     logger.info("Loaded character classes and abilities from world_data")
-    
+
     # 4a1) Initialize character sheets for all players now that classes are loaded
     from .engine.world import CharacterSheet, ResourcePool
+
     for player in engine_instance.world.players.values():
         if player.character_class and not player.character_sheet:
             # Get class template
-            class_template = engine_instance.class_system.get_class(player.character_class)
+            class_template = engine_instance.class_system.get_class(
+                player.character_class
+            )
             if class_template:
                 # Initialize resource pools
                 resource_pools = {}
@@ -96,16 +92,18 @@ async def lifespan(app: FastAPI):
                         current=resource_def.max_amount,
                         max=resource_def.max_amount,
                         regen_per_second=resource_def.regen_rate,
-                        last_regen_tick=0.0
+                        last_regen_tick=0.0,
                     )
-                
+
                 # Get learned abilities from DB or default to first 3 available
                 learned_abilities = set()
-                if hasattr(player, 'player_flags') and player.player_flags:
-                    learned_abilities = set(player.player_flags.get('learned_abilities', []))
+                if hasattr(player, "player_flags") and player.player_flags:
+                    learned_abilities = set(
+                        player.player_flags.get("learned_abilities", [])
+                    )
                 if not learned_abilities and class_template.available_abilities:
                     learned_abilities = set(class_template.available_abilities[:3])
-                
+
                 # Create character sheet
                 player.character_sheet = CharacterSheet(
                     class_id=player.character_class,
@@ -115,33 +113,47 @@ async def lifespan(app: FastAPI):
                     ability_loadout=[],
                     resource_pools=resource_pools,
                 )
-                logger.info(f"Initialized character sheet for {player.name} ({player.character_class})")
-    
+                logger.info(
+                    f"Initialized character sheet for {player.name} ({player.character_class})"
+                )
+
     # 4a2) Load clans from database into ClanSystem (Phase 10.2)
     await engine_instance.clan_system.load_clans_from_db()
     logger.info("Loaded clans from database into ClanSystem")
-    
+
     # 4a3) Load factions from YAML into FactionSystem (Phase 10.3)
     from pathlib import Path
+
     factions_dir = Path(__file__).parent.parent / "world_data" / "factions"
     await engine_instance.faction_system.load_factions_from_yaml(str(factions_dir))
     logger.info("Loaded factions from YAML into FactionSystem")
-    
+
+    # 4a4) Load schemas from YAML into SchemaRegistry (Phase 12.1)
+    engine_instance.schema_registry.load_all_schemas()
+    logger.info(
+        f"Loaded {engine_instance.schema_registry.version.schema_count} schemas from world_data"
+    )
+
     # 4b) Create auth system (Phase 7)
     auth_system = AuthSystem(db_session_factory=AsyncSessionLocal)
     app.state.auth_system = auth_system
     engine_instance.ctx.auth_system = auth_system
-    
+
     # 4b) Load quests, dialogues, and quest chains into QuestSystem (Phase X)
     quest_count = load_quests_into_system(engine_instance.quest_system)
     dialogue_count = load_dialogues_into_system(engine_instance.quest_system)
     chain_count = load_quest_chains_into_system(engine_instance.quest_system)
-    logger.info("Loaded %d quests, %d dialogues, %d quest chains", quest_count, dialogue_count, chain_count)
-    
+    logger.info(
+        "Loaded %d quests, %d dialogues, %d quest chains",
+        quest_count,
+        dialogue_count,
+        chain_count,
+    )
+
     # 4c) Restore player quest progress from saved data
     for player in world.players.values():
         restore_player_quest_progress(engine_instance.quest_system, player)
-    
+
     # 5) Start time event system (Phase 2)
     await engine_instance.start_time_system()
 
@@ -158,7 +170,7 @@ async def lifespan(app: FastAPI):
     world_engine: Optional[WorldEngine] = getattr(app.state, "world_engine", None)
     if world_engine is not None:
         await world_engine.stop_time_system()
-    
+
     # Cancel the background engine loop gracefully on application shutdown
     engine_task: Optional[asyncio.Task] = getattr(app.state, "engine_task", None)
     if engine_task is not None:
@@ -172,7 +184,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Register admin routes (Phase 8)
-from .routes.admin import router as admin_router
 app.include_router(admin_router)
 
 
@@ -182,10 +193,10 @@ async def seed_world(session: AsyncSession) -> None:
     """
     # Start players in the center of the grid (1, 1, 1)
     start_room_id = "room_1_1_1"
-    
+
     player1_id = str(uuid.uuid4())
     player2_id = str(uuid.uuid4())
-    
+
     player1 = Player(
         id=player1_id,
         name="test_player",
@@ -199,7 +210,7 @@ async def seed_world(session: AsyncSession) -> None:
         data={},
     )
     session.add_all([player1, player2])
-    
+
     # Create inventory records for the new players (Phase 3)
     inventory1 = PlayerInventory(
         player_id=player1_id,
@@ -218,7 +229,9 @@ async def seed_world(session: AsyncSession) -> None:
     session.add_all([inventory1, inventory2])
 
     await session.commit()
-    logger.info("Seeded 2 test players with inventories: %s, %s", player1_id, player2_id)
+    logger.info(
+        "Seeded 2 test players with inventories: %s, %s", player1_id, player2_id
+    )
 
 
 def get_world_engine() -> WorldEngine:
@@ -233,6 +246,7 @@ def get_world_engine() -> WorldEngine:
 
 # ---------- HTTP Endpoints ----------
 
+
 @app.get("/")
 async def root():
     return {"message": "💀 Hello, Dungeon! 💀"}
@@ -242,10 +256,10 @@ async def root():
 async def public_metrics(request: Request):
     """
     Public Prometheus metrics endpoint for monitoring.
-    
+
     Returns metrics in Prometheus text exposition format.
     No authentication required (metrics are generally non-sensitive).
-    
+
     Metrics tracked:
     - Players online, total, in combat
     - NPCs alive and total
@@ -254,9 +268,8 @@ async def public_metrics(request: Request):
     - Command processing
     - Server uptime
     """
-    from app.metrics import update_world_metrics, REGISTRY
     from starlette.responses import Response
-    
+
     # Get engine instance if available
     engine_instance = getattr(request.app.state, "world_engine", None)
     if engine_instance:
@@ -267,29 +280,29 @@ async def public_metrics(request: Request):
         total_npcs = len(world.npcs)
         total_rooms = len(world.rooms)
         occupied_rooms = len([r for r in world.rooms.values() if r.entities])
-        
+
         # Update the metrics
-        from app.metrics import (
-            players_online, npcs_alive, npcs_total, 
-            rooms_total, rooms_occupied, areas_total
-        )
+        from app.metrics import (areas_total, npcs_alive, npcs_total,
+                                 players_online, rooms_occupied, rooms_total)
+
         players_online.set(online_players)
         npcs_alive.set(alive_npcs)
         npcs_total.set(total_npcs)
         rooms_total.set(total_rooms)
         rooms_occupied.set(occupied_rooms)
         areas_total.set(len(world.areas))
-    
+
     # Generate Prometheus exposition format
-    from prometheus_client import generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
+    from prometheus_client import CONTENT_TYPE_LATEST
     from prometheus_client import REGISTRY as prometheus_registry
-    
+    from prometheus_client import generate_latest
+
     metrics_content = generate_latest(prometheus_registry)
-    
+
     return Response(
         content=metrics_content,
         media_type=CONTENT_TYPE_LATEST,
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 
 
@@ -305,19 +318,21 @@ async def list_players(session: AsyncSession = Depends(get_session)):
 
 # ---------- Auth Endpoints (Phase 7) ----------
 
+
 def get_auth_system() -> AuthSystem:
     """Helper to retrieve the global AuthSystem instance from app.state."""
     auth_system: Optional[AuthSystem] = getattr(app.state, "auth_system", None)
     if auth_system is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Auth system not initialized"
+            detail="Auth system not initialized",
         )
     return auth_system
 
 
 class RegisterRequest(BaseModel):
     """Registration request body."""
+
     username: str = Field(..., min_length=3, max_length=32)
     password: str = Field(..., min_length=8, max_length=128)
     email: Optional[str] = Field(None, max_length=255)
@@ -325,6 +340,7 @@ class RegisterRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     """Registration response."""
+
     user_id: str
     username: str
     message: str
@@ -334,43 +350,42 @@ class RegisterResponse(BaseModel):
 async def register(
     request: RegisterRequest,
     req: Request,
-    auth_system: AuthSystem = Depends(get_auth_system)
+    auth_system: AuthSystem = Depends(get_auth_system),
 ):
     """
     Register a new user account.
-    
+
     Returns the user ID on success.
     """
     ip_address = req.client.host if req.client else None
-    
+
     account, error = await auth_system.create_account(
         username=request.username,
         password=request.password,
         email=request.email,
-        ip_address=ip_address
+        ip_address=ip_address,
     )
-    
+
     if not account:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error
-        )
-    
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+
     return RegisterResponse(
         user_id=account.id,
         username=account.username,
-        message="Account created successfully"
+        message="Account created successfully",
     )
 
 
 class LoginRequest(BaseModel):
     """Login request body."""
+
     username: str
     password: str
 
 
 class LoginResponse(BaseModel):
     """Login response with tokens."""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -385,32 +400,32 @@ async def login(
     request: LoginRequest,
     req: Request,
     user_agent: Optional[str] = Header(None),
-    auth_system: AuthSystem = Depends(get_auth_system)
+    auth_system: AuthSystem = Depends(get_auth_system),
 ):
     """
     Authenticate and get access/refresh tokens.
-    
+
     Use the access_token to connect via WebSocket.
     Use the refresh_token to get new access tokens when expired.
     """
     ip_address = req.client.host if req.client else None
-    
+
     result = await auth_system.login(
         username=request.username,
         password=request.password,
         ip_address=ip_address,
-        user_agent=user_agent
+        user_agent=user_agent,
     )
-    
+
     if result[0] is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=result[2],  # Error message
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     access_token, refresh_token, account = result
-    
+
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -418,17 +433,19 @@ async def login(
         user_id=account.id,
         username=account.username,
         role=account.role,
-        active_character_id=account.active_character_id
+        active_character_id=account.active_character_id,
     )
 
 
 class RefreshRequest(BaseModel):
     """Token refresh request body."""
+
     refresh_token: str
 
 
 class RefreshResponse(BaseModel):
     """Token refresh response."""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -439,40 +456,39 @@ async def refresh_token(
     request: RefreshRequest,
     req: Request,
     user_agent: Optional[str] = Header(None),
-    auth_system: AuthSystem = Depends(get_auth_system)
+    auth_system: AuthSystem = Depends(get_auth_system),
 ):
     """
     Refresh access token using refresh token.
-    
+
     This implements token rotation - the old refresh token is invalidated
     and a new one is returned.
     """
     ip_address = req.client.host if req.client else None
-    
+
     result = await auth_system.refresh_access_token(
         refresh_token=request.refresh_token,
         ip_address=ip_address,
-        user_agent=user_agent
+        user_agent=user_agent,
     )
-    
+
     if result[0] is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=result[1],  # Error message
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     access_token, new_refresh_token = result
-    
+
     return RefreshResponse(
-        access_token=access_token,
-        refresh_token=new_refresh_token,
-        token_type="bearer"
+        access_token=access_token, refresh_token=new_refresh_token, token_type="bearer"
     )
 
 
 class LogoutRequest(BaseModel):
     """Logout request body."""
+
     refresh_token: str
 
 
@@ -481,39 +497,39 @@ async def logout(
     request: LogoutRequest,
     req: Request,
     user_agent: Optional[str] = Header(None),
-    auth_system: AuthSystem = Depends(get_auth_system)
+    auth_system: AuthSystem = Depends(get_auth_system),
 ):
     """
     Logout by revoking the refresh token.
-    
+
     This invalidates the session for the device that sent the request.
     To logout from all devices, use /auth/logout-all.
     """
     ip_address = req.client.host if req.client else None
-    
+
     success = await auth_system.logout(
         refresh_token=request.refresh_token,
         ip_address=ip_address,
-        user_agent=user_agent
+        user_agent=user_agent,
     )
-    
+
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired refresh token"
+            detail="Invalid or expired refresh token",
         )
-    
+
     return {"message": "Logged out successfully"}
 
 
 @app.get("/auth/me")
 async def get_current_user(
     authorization: str = Header(..., description="Bearer <access_token>"),
-    auth_system: AuthSystem = Depends(get_auth_system)
+    auth_system: AuthSystem = Depends(get_auth_system),
 ):
     """
     Get current user info from access token.
-    
+
     Pass the access token in the Authorization header: `Bearer <token>`
     """
     # Parse Bearer token
@@ -521,30 +537,29 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authorization header format",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     token = authorization[7:]  # Remove "Bearer " prefix
-    
+
     claims = verify_access_token(token)
     if not claims:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Get full account info
     account = await auth_system.get_account_by_id(claims["user_id"])
     if not account:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Account not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
         )
-    
+
     # Get characters
     characters = await auth_system.get_characters_for_account(account.id)
-    
+
     return {
         "user_id": account.id,
         "username": account.username,
@@ -553,22 +568,30 @@ async def get_current_user(
         "is_active": account.is_active,
         "active_character_id": account.active_character_id,
         "characters": [
-            {"id": c.id, "name": c.name, "level": c.level, "character_class": c.character_class}
+            {
+                "id": c.id,
+                "name": c.name,
+                "level": c.level,
+                "character_class": c.character_class,
+            }
             for c in characters
-        ]
+        ],
     }
 
 
 # ---------- Character Management Endpoints (Phase 7) ----------
 
+
 class CreateCharacterRequest(BaseModel):
     """Create character request body."""
+
     name: str = Field(..., min_length=2, max_length=32)
     character_class: str = Field(default="adventurer", max_length=32)
 
 
 class CharacterResponse(BaseModel):
     """Character info response."""
+
     id: str
     name: str
     level: int
@@ -581,62 +604,59 @@ async def create_character(
     request: CreateCharacterRequest,
     authorization: str = Header(...),
     session: AsyncSession = Depends(get_session),
-    auth_system: AuthSystem = Depends(get_auth_system)
+    auth_system: AuthSystem = Depends(get_auth_system),
 ):
     """
     Create a new character for the authenticated account.
-    
+
     The character starts in the default spawn room.
     """
     # Parse Bearer token
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format"
+            detail="Invalid authorization header format",
         )
-    
+
     token = authorization[7:]
     claims = verify_access_token(token)
     if not claims:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         )
-    
+
     user_id = claims["user_id"]
-    
+
     # Check if name is already taken
-    result = await session.execute(
-        select(Player).where(Player.name == request.name)
-    )
+    result = await session.execute(select(Player).where(Player.name == request.name))
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Character name already taken"
+            detail="Character name already taken",
         )
-    
+
     # Check character limit (max 3 per account)
     existing = await auth_system.get_characters_for_account(user_id)
     if len(existing) >= 3:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Maximum number of characters reached (3)"
+            detail="Maximum number of characters reached (3)",
         )
-    
+
     # Create new character
     start_room_id = "room_1_1_1"  # Default spawn location
     character_id = str(uuid.uuid4())
-    
+
     character = Player(
         id=character_id,
         name=request.name,
         current_room_id=start_room_id,
         character_class=request.character_class,
         account_id=user_id,
-        data={}
+        data={},
     )
     session.add(character)
-    
+
     # Create inventory record
     inventory = PlayerInventory(
         player_id=character_id,
@@ -646,13 +666,14 @@ async def create_character(
         current_slots=0,
     )
     session.add(inventory)
-    
+
     await session.commit()
-    
+
     # Add to in-memory world if engine is running
     engine = getattr(app.state, "world_engine", None)
     if engine:
         from .engine.world import WorldPlayer
+
         world_player = WorldPlayer(
             id=character_id,
             name=request.name,
@@ -661,27 +682,26 @@ async def create_character(
             max_health=100,
             current_health=100,
             data={},
-            account_id=user_id
+            account_id=user_id,
         )
         engine.world.players[character_id] = world_player
-    
+
     # Set as active character if it's the first one
     if len(existing) == 0:
         await auth_system.set_active_character(user_id, character_id)
-    
+
     return CharacterResponse(
         id=character_id,
         name=request.name,
         level=1,
         character_class=request.character_class,
-        current_room_id=start_room_id
+        current_room_id=start_room_id,
     )
 
 
 @app.get("/characters")
 async def list_characters(
-    authorization: str = Header(...),
-    auth_system: AuthSystem = Depends(get_auth_system)
+    authorization: str = Header(...), auth_system: AuthSystem = Depends(get_auth_system)
 ):
     """
     List all characters for the authenticated account.
@@ -690,22 +710,21 @@ async def list_characters(
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format"
+            detail="Invalid authorization header format",
         )
-    
+
     token = authorization[7:]
     claims = verify_access_token(token)
     if not claims:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         )
-    
+
     user_id = claims["user_id"]
-    
+
     characters = await auth_system.get_characters_for_account(user_id)
     account = await auth_system.get_account_by_id(user_id)
-    
+
     return {
         "characters": [
             {
@@ -714,7 +733,7 @@ async def list_characters(
                 "level": c.level,
                 "character_class": c.character_class,
                 "current_room_id": c.current_room_id,
-                "is_active": account and account.active_character_id == c.id
+                "is_active": account and account.active_character_id == c.id,
             }
             for c in characters
         ]
@@ -725,7 +744,7 @@ async def list_characters(
 async def select_character(
     character_id: str,
     authorization: str = Header(...),
-    auth_system: AuthSystem = Depends(get_auth_system)
+    auth_system: AuthSystem = Depends(get_auth_system),
 ):
     """
     Set a character as the active character for the authenticated account.
@@ -734,27 +753,26 @@ async def select_character(
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format"
+            detail="Invalid authorization header format",
         )
-    
+
     token = authorization[7:]
     claims = verify_access_token(token)
     if not claims:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         )
-    
+
     user_id = claims["user_id"]
-    
+
     # Verify character belongs to this account and set as active
     success = await auth_system.set_active_character(user_id, character_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Character not found or doesn't belong to this account"
+            detail="Character not found or doesn't belong to this account",
         )
-    
+
     return {"message": "Character selected", "active_character_id": character_id}
 
 
@@ -763,30 +781,29 @@ async def delete_character(
     character_id: str,
     authorization: str = Header(...),
     session: AsyncSession = Depends(get_session),
-    auth_system: AuthSystem = Depends(get_auth_system)
+    auth_system: AuthSystem = Depends(get_auth_system),
 ):
     """
     Delete a character.
-    
+
     This is a permanent action and cannot be undone.
     """
     # Parse Bearer token
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format"
+            detail="Invalid authorization header format",
         )
-    
+
     token = authorization[7:]
     claims = verify_access_token(token)
     if not claims:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         )
-    
+
     user_id = claims["user_id"]
-    
+
     # Verify character belongs to this account
     result = await session.execute(
         select(Player)
@@ -794,21 +811,21 @@ async def delete_character(
         .where(Player.account_id == user_id)
     )
     character = result.scalar_one_or_none()
-    
+
     if not character:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Character not found or doesn't belong to this account"
+            detail="Character not found or doesn't belong to this account",
         )
-    
+
     # Remove from in-memory world if engine is running
     engine = getattr(app.state, "world_engine", None)
     if engine and character_id in engine.world.players:
         del engine.world.players[character_id]
-    
+
     # Delete from database
     await session.delete(character)
-    
+
     # If this was the active character, clear the active_character_id
     account = await auth_system.get_account_by_id(user_id)
     if account and account.active_character_id == character_id:
@@ -817,13 +834,14 @@ async def delete_character(
         remaining = [c for c in remaining if c.id != character_id]
         if remaining:
             await auth_system.set_active_character(user_id, remaining[0].id)
-    
+
     await session.commit()
-    
+
     return {"message": "Character deleted", "character_id": character_id}
 
 
 # ---------- Character Selection Mode Helper ----------
+
 
 async def _build_character_menu(
     auth_system,
@@ -831,16 +849,18 @@ async def _build_character_menu(
 ) -> tuple[str, list]:
     """Build the character selection menu text."""
     characters = await auth_system.get_characters_for_account(user_id)
-    
+
     lines = [
         "=== Character Selection ===",
         "",
     ]
-    
+
     if characters:
         lines.append("Your characters:")
         for i, char in enumerate(characters, 1):
-            lines.append(f"  {i}. {char.name} (Level {char.level} {char.character_class})")
+            lines.append(
+                f"  {i}. {char.name} (Level {char.level} {char.character_class})"
+            )
         lines.append("")
         lines.append("Commands:")
         lines.append("  <number>        - Select a character to play")
@@ -851,9 +871,9 @@ async def _build_character_menu(
         lines.append("")
         lines.append("Commands:")
         lines.append("  new             - Create a new character")
-    
+
     lines.append("")
-    
+
     return "\n".join(lines), characters
 
 
@@ -865,117 +885,135 @@ async def _handle_character_selection(
 ):
     """
     Handle character selection/creation mode.
-    
+
     Returns the selected Character object, or None if disconnected/error.
     """
     # State for character creation
     create_state = None  # None, "awaiting_name", "awaiting_class"
     pending_name = None
-    
+
     # Available classes
     available_classes = ["warrior", "mage", "rogue", "cleric"]
-    
+
     while True:
         # Send current menu
         menu_text, characters = await _build_character_menu(auth_system, user_id)
-        
+
         if create_state == "awaiting_name":
             menu_text = "=== Create New Character ===\n\nEnter a name for your character (or 'cancel' to go back):\n"
         elif create_state == "awaiting_class":
             class_list = ", ".join(available_classes)
             menu_text = f"=== Create New Character ===\n\nChoose a class for {pending_name}:\n  {class_list}\n\n(or 'cancel' to go back):\n"
-        
-        await websocket.send_json({
-            "type": "character_menu",
-            "text": menu_text,
-        })
-        
+
+        await websocket.send_json(
+            {
+                "type": "character_menu",
+                "text": menu_text,
+            }
+        )
+
         try:
             # Wait for input
             data = await websocket.receive_json()
-            
+
             if data.get("type") != "command":
                 continue
-            
+
             cmd = data.get("text", "").strip().lower()
-            
+
             # Handle creation states
             if create_state == "awaiting_name":
                 if cmd == "cancel":
                     create_state = None
                     pending_name = None
                     continue
-                
+
                 # Validate name
                 name = data.get("text", "").strip()  # Use original case
                 if len(name) < 2:
-                    await websocket.send_json({
-                        "type": "error",
-                        "text": "Name must be at least 2 characters.",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "text": "Name must be at least 2 characters.",
+                        }
+                    )
                     continue
                 if len(name) > 32:
-                    await websocket.send_json({
-                        "type": "error",
-                        "text": "Name must be 32 characters or less.",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "text": "Name must be 32 characters or less.",
+                        }
+                    )
                     continue
-                
+
                 pending_name = name
                 create_state = "awaiting_class"
                 continue
-            
+
             elif create_state == "awaiting_class":
                 if cmd == "cancel":
                     create_state = None
                     pending_name = None
                     continue
-                
+
                 if cmd not in available_classes:
-                    await websocket.send_json({
-                        "type": "error",
-                        "text": f"Invalid class. Choose from: {', '.join(available_classes)}",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "text": f"Invalid class. Choose from: {', '.join(available_classes)}",
+                        }
+                    )
                     continue
-                
+
                 # Create the character
-                from app.models import Player
                 from app.db import get_session
-                
+                from app.models import Player
+
                 async for session in get_session():
                     # Check if name is taken
                     from sqlalchemy import select
+
                     existing = await session.execute(
                         select(Player).where(Player.name == pending_name)
                     )
                     if existing.scalar():
-                        await websocket.send_json({
-                            "type": "error",
-                            "text": f"The name '{pending_name}' is already taken.",
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "error",
+                                "text": f"The name '{pending_name}' is already taken.",
+                            }
+                        )
                         create_state = "awaiting_name"
                         pending_name = None
                         break
-                    
+
                     # Generate unique player ID
                     import uuid
+
                     player_id = str(uuid.uuid4())
-                    
+
                     # Get class template for initialization
                     class_template = engine.class_system.get_class(cmd)
                     if not class_template:
-                        await websocket.send_json({
-                            "type": "error",
-                            "text": f"Class '{cmd}' is not available.",
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "error",
+                                "text": f"Class '{cmd}' is not available.",
+                            }
+                        )
                         continue
-                    
+
                     # Initialize character data with class info
                     char_data = {
                         "class_id": cmd,
-                        "learned_abilities": class_template.available_abilities[:3] if class_template.available_abilities else [],
+                        "learned_abilities": (
+                            class_template.available_abilities[:3]
+                            if class_template.available_abilities
+                            else []
+                        ),
                     }
-                    
+
                     # Create character
                     new_char = Player(
                         id=player_id,
@@ -993,100 +1031,120 @@ async def _handle_character_selection(
                     session.add(new_char)
                     await session.commit()
                     await session.refresh(new_char)
-                    
+
                     # Set as active
                     await auth_system.set_active_character(user_id, new_char.id)
-                    
-                    await websocket.send_json({
-                        "type": "message",
-                        "text": f"Character '{pending_name}' created! Entering the world...",
-                    })
-                    
+
+                    await websocket.send_json(
+                        {
+                            "type": "message",
+                            "text": f"Character '{pending_name}' created! Entering the world...",
+                        }
+                    )
+
                     create_state = None
                     pending_name = None
-                    
+
                     return new_char
-                
+
                 continue
-            
+
             # Normal menu state
             if cmd == "new":
                 create_state = "awaiting_name"
                 continue
-            
+
             elif cmd.startswith("delete "):
                 try:
                     num = int(cmd.split()[1])
                     if 1 <= num <= len(characters):
                         char_to_delete = characters[num - 1]
-                        
+
                         from app.db import get_session
+
                         async for session in get_session():
                             # Remove from world if loaded
                             if char_to_delete.id in engine.world.players:
                                 del engine.world.players[char_to_delete.id]
-                            
+
                             await session.delete(char_to_delete)
                             await session.commit()
-                        
-                        await websocket.send_json({
-                            "type": "message",
-                            "text": f"Character '{char_to_delete.name}' deleted.",
-                        })
+
+                        await websocket.send_json(
+                            {
+                                "type": "message",
+                                "text": f"Character '{char_to_delete.name}' deleted.",
+                            }
+                        )
                     else:
-                        await websocket.send_json({
-                            "type": "error",
-                            "text": f"Invalid character number. Enter 1-{len(characters)}.",
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "error",
+                                "text": f"Invalid character number. Enter 1-{len(characters)}.",
+                            }
+                        )
                 except (ValueError, IndexError):
-                    await websocket.send_json({
-                        "type": "error",
-                        "text": "Usage: delete <number>",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "text": "Usage: delete <number>",
+                        }
+                    )
                 continue
-            
+
             # Try to select by number
             try:
                 num = int(cmd)
                 if 1 <= num <= len(characters):
                     selected_char = characters[num - 1]
                     await auth_system.set_active_character(user_id, selected_char.id)
-                    
-                    await websocket.send_json({
-                        "type": "message",
-                        "text": f"Selected {selected_char.name}. Entering the world...",
-                    })
-                    
+
+                    await websocket.send_json(
+                        {
+                            "type": "message",
+                            "text": f"Selected {selected_char.name}. Entering the world...",
+                        }
+                    )
+
                     return selected_char
                 else:
-                    await websocket.send_json({
-                        "type": "error",
-                        "text": f"Invalid character number. Enter 1-{len(characters)}.",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "text": f"Invalid character number. Enter 1-{len(characters)}.",
+                        }
+                    )
             except ValueError:
                 if characters:
-                    await websocket.send_json({
-                        "type": "error",
-                        "text": "Unknown command. Enter a number to select a character, 'new' to create one, or 'delete <number>' to delete one.",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "text": "Unknown command. Enter a number to select a character, 'new' to create one, or 'delete <number>' to delete one.",
+                        }
+                    )
                 else:
-                    await websocket.send_json({
-                        "type": "error",
-                        "text": "Unknown command. Enter 'new' to create a character.",
-                    })
-        
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "text": "Unknown command. Enter 'new' to create a character.",
+                        }
+                    )
+
         except WebSocketDisconnect:
             logger.info("Client disconnected during character selection")
             return None
         except Exception as e:
             logger.error("Error during character selection: %s", e)
-            await websocket.send_json({
-                "type": "error",
-                "text": "An error occurred. Please try again.",
-            })
+            await websocket.send_json(
+                {
+                    "type": "error",
+                    "text": "An error occurred. Please try again.",
+                }
+            )
 
 
 # ---------- WebSocket Endpoints ----------
+
 
 @app.websocket("/ws/game/auth")
 async def game_ws_auth(
@@ -1108,13 +1166,13 @@ async def game_ws_auth(
     if not claims:
         await websocket.close(code=4001, reason="Invalid or expired token")
         return
-    
+
     user_id = claims["user_id"]
     user_role = claims["role"]
-    
+
     await websocket.accept()
     logger.info("Authenticated WebSocket connection attempt for user %s", user_id)
-    
+
     # Ensure engine exists
     try:
         engine = get_world_engine()
@@ -1126,18 +1184,18 @@ async def game_ws_auth(
         logger.error("World engine not initialized")
         await websocket.close(code=1011, reason="World engine not ready")
         return
-    
+
     # Get auth system and lookup user's active character
     auth_system = getattr(app.state, "auth_system", None)
     if auth_system is None:
         await websocket.close(code=1011, reason="Auth system not ready")
         return
-    
+
     # Outer loop: Character Selection -> Play -> Character Selection (on quit)
     while True:
         # Get active character - if none, enter character selection mode
         character = await auth_system.get_active_character(user_id)
-        
+
         if character is None:
             # Enter character selection mode
             character = await _handle_character_selection(
@@ -1146,26 +1204,31 @@ async def game_ws_auth(
             if character is None:
                 # User disconnected or error during character selection
                 return
-        
+
         player_id = character.id
-        
+
         # Ensure player exists in the in-memory world
         if player_id not in engine.world.players:
             # Character exists in DB but not in memory - load it now
             logger.info("Loading character %s into memory from database", player_id)
-            from .engine.world import WorldPlayer, EntityType, CharacterSheet, ResourcePool
-            
+            from .engine.world import (CharacterSheet, EntityType,
+                                       ResourcePool, WorldPlayer)
+
             # Load quest/flag data from DB
-            quest_progress_data = character.quest_progress if character.quest_progress else {}
-            completed_quests_data = character.completed_quests if character.completed_quests else []
+            quest_progress_data = (
+                character.quest_progress if character.quest_progress else {}
+            )
+            completed_quests_data = (
+                character.completed_quests if character.completed_quests else []
+            )
             player_flags_data = character.player_flags if character.player_flags else {}
-            
+
             # Initialize character sheet if they have a class
             character_sheet = None
             if character.character_class and character.data:
                 class_id = character.data.get("class_id", character.character_class)
                 learned_abilities = set(character.data.get("learned_abilities", []))
-                
+
                 # Get class template to initialize resource pools
                 class_template = engine.class_system.get_class(class_id)
                 resource_pools = {}
@@ -1176,9 +1239,9 @@ async def game_ws_auth(
                             current=resource_def.max_amount,
                             max=resource_def.max_amount,
                             regen_per_second=resource_def.regen_rate,
-                            last_regen_tick=0.0
+                            last_regen_tick=0.0,
                         )
-                
+
                 character_sheet = CharacterSheet(
                     class_id=class_id,
                     level=character.level,
@@ -1187,7 +1250,7 @@ async def game_ws_auth(
                     ability_loadout=[],
                     resource_pools=resource_pools,
                 )
-            
+
             world_player = WorldPlayer(
                 id=character.id,
                 entity_type=EntityType.PLAYER,
@@ -1205,39 +1268,51 @@ async def game_ws_auth(
                 max_energy=character.max_energy,
                 current_energy=character.current_energy,
                 experience=character.experience,
-                on_move_effect=character.data.get("on_move_effect") if character.data else None,
+                on_move_effect=(
+                    character.data.get("on_move_effect") if character.data else None
+                ),
                 quest_progress=quest_progress_data,
                 completed_quests=set(completed_quests_data),
                 player_flags=player_flags_data,
                 character_sheet=character_sheet,
             )
             engine.world.players[player_id] = world_player
-            
+
             # Make sure the room exists and add player to it
             if world_player.room_id in engine.world.rooms:
                 engine.world.rooms[world_player.room_id].entities.add(player_id)
-        
+
         # Store auth info in context for permission checks
         auth_info = {"user_id": user_id, "role": user_role}
-        
+
         # Register this player with the engine
         event_queue = await engine.register_player(player_id)
-        logger.info("Player %s (user %s, role %s) connected via authenticated WebSocket", 
-                    player_id, user_id, user_role)
-        
+        logger.info(
+            "Player %s (user %s, role %s) connected via authenticated WebSocket",
+            player_id,
+            user_id,
+            user_role,
+        )
+
         # Send welcome message with auth info
-        await websocket.send_json({
-            "type": "auth_success",
-            "user_id": user_id,
-            "player_id": player_id,
-            "role": user_role
-        })
+        await websocket.send_json(
+            {
+                "type": "auth_success",
+                "user_id": user_id,
+                "player_id": player_id,
+                "role": user_role,
+            }
+        )
 
         # Use a flag to track if player quit (vs disconnected)
         quit_flag = {"quit": False}
-        
-        send_task = asyncio.create_task(_ws_sender_with_quit(websocket, event_queue, quit_flag))
-        recv_task = asyncio.create_task(_ws_receiver_auth(websocket, engine, player_id, auth_info))
+
+        send_task = asyncio.create_task(
+            _ws_sender_with_quit(websocket, event_queue, quit_flag)
+        )
+        recv_task = asyncio.create_task(
+            _ws_receiver_auth(websocket, engine, player_id, auth_info)
+        )
 
         try:
             done, pending = await asyncio.wait(
@@ -1254,10 +1329,12 @@ async def game_ws_auth(
             await engine.player_disconnect(player_id)
             engine.unregister_player(player_id)
             logger.info("Player %s disconnected", player_id)
-        
+
         # If player used 'quit' command, loop back to character selection
         if quit_flag["quit"]:
-            logger.info("Player %s used quit, returning to character selection", player_id)
+            logger.info(
+                "Player %s used quit, returning to character selection", player_id
+            )
             # Clear active character so they go through selection again
             await auth_system.clear_active_character(user_id)
             continue
@@ -1278,7 +1355,7 @@ async def _ws_sender_with_quit(
     try:
         while True:
             event = await queue.get()
-            
+
             # Check if this is a quit event
             if event.get("type") == "quit":
                 quit_flag["quit"] = True
@@ -1286,7 +1363,7 @@ async def _ws_sender_with_quit(
                 await websocket.send_json(event)
                 # Then stop the sender (which will trigger return to char select)
                 return
-            
+
             await websocket.send_json(event)
     except Exception as e:
         logger.warning("Error in _ws_sender_with_quit: %s", e)
@@ -1325,11 +1402,14 @@ async def _ws_receiver_auth(
 @app.websocket("/ws/game")
 async def game_ws(
     websocket: WebSocket,
-    player_id: str = Query(..., description="Player ID (from /players) - DEPRECATED: Use /ws/game/auth instead"),
+    player_id: str = Query(
+        ...,
+        description="Player ID (from /players) - DEPRECATED: Use /ws/game/auth instead",
+    ),
 ) -> None:
     """
     Legacy WebSocket endpoint (DEPRECATED).
-    
+
     Use /ws/game/auth with a token instead for authenticated connections.
 
     - client connects: /ws/game?player_id=...
@@ -1345,7 +1425,9 @@ async def game_ws(
         engine = get_world_engine()
         if engine is None:
             logger.error("World engine not initialized")
-            await websocket.close(code=1011, reason="Engine is None. World engine not ready")
+            await websocket.close(
+                code=1011, reason="Engine is None. World engine not ready"
+            )
             return
     except RuntimeError:
         logger.error("World engine not initialized")

@@ -209,24 +209,24 @@ async def my_utility_behavior(
 ) -> UtilityResult:
     """
     Your utility ability implementation.
-    
+
     Args:
         caster: WorldPlayer or WorldEntity casting
         target: Target entity (may be caster for self-targeted)
         ability_template: AbilityTemplate with metadata
         combat_system: CombatSystem for any combat interactions
         **context: Additional context (target_object, destination, etc.)
-    
+
     Returns:
         UtilityResult describing outcome
     """
     try:
         # Extract metadata
         duration = ability_template.metadata.get("duration", 60.0)
-        
+
         # Perform ability logic
         # Update state on caster or context
-        
+
         return UtilityResult(
             success=True,
             message=f"{caster.name} used ability!",

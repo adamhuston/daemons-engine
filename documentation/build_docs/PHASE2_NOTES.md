@@ -296,4 +296,3 @@ All three subsystems implemented:
 - **2c**: World time system (independent area times with scaling)
 
 **Ready for Phase 3 – Items & Inventory**
-

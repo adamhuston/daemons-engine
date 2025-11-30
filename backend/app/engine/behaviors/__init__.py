@@ -14,7 +14,7 @@ To create a new behavior:
 
 Example:
     from .base import behavior, BehaviorScript, BehaviorContext, BehaviorResult
-    
+
     @behavior(
         name="my_custom_behavior",
         description="Does something cool",
@@ -32,32 +32,24 @@ from pathlib import Path
 from typing import Any
 
 # Import base classes first (they set up the registry)
-from .base import (
-    BehaviorScript,
-    BehaviorContext, 
-    BehaviorResult,
-    behavior,
-    get_behavior,
-    get_all_behaviors,
-    get_behavior_instance,
-    get_behavior_defaults,
-    _BEHAVIOR_REGISTRY,
-)
+from .base import (_BEHAVIOR_REGISTRY, BehaviorContext, BehaviorResult,
+                   BehaviorScript, get_behavior_defaults,
+                   get_behavior_instance)
 
 
 def _load_behavior_scripts() -> None:
     """
     Dynamically load all behavior script modules from this package.
-    
+
     Each module should use the @behavior decorator to register its behavior classes.
     """
     package_dir = Path(__file__).parent
-    
+
     for module_info in pkgutil.iter_modules([str(package_dir)]):
         # Skip private modules and base
         if module_info.name.startswith("_") or module_info.name == "base":
             continue
-        
+
         try:
             importlib.import_module(f".{module_info.name}", package=__name__)
         except Exception as e:
@@ -67,7 +59,7 @@ def _load_behavior_scripts() -> None:
 def resolve_behaviors(behavior_names: list[str]) -> dict[str, Any]:
     """
     Resolve a list of behavior names into a merged configuration dict.
-    
+
     This merges the defaults from all specified behaviors, with later
     behaviors overriding earlier ones for conflicting keys.
     """
@@ -77,7 +69,7 @@ def resolve_behaviors(behavior_names: list[str]) -> dict[str, Any]:
 def get_behavior_instances(behavior_names: list[str]) -> list[BehaviorScript]:
     """
     Get instances of all specified behaviors, sorted by priority.
-    
+
     Lower priority values run first.
     """
     instances = []
@@ -87,7 +79,7 @@ def get_behavior_instances(behavior_names: list[str]) -> list[BehaviorScript]:
             instances.append(instance)
         else:
             print(f"[Behavior] Warning: Unknown behavior '{name}'")
-    
+
     # Sort by priority (lower = runs first)
     instances.sort(key=lambda b: b.priority)
     return instances
@@ -129,3 +121,16 @@ DEFAULT_BEHAVIOR: dict[str, Any] = {
 # Load all behavior scripts on import
 _load_behavior_scripts()
 
+# Export public API
+__all__ = [
+    "BehaviorContext",
+    "BehaviorResult",
+    "BehaviorScript",
+    "get_behavior_instances",
+    "get_behavior_instance",
+    "get_behavior_defaults",
+    "resolve_behaviors",
+    "get_all_tags",
+    "BEHAVIOR_SCRIPTS",
+    "DEFAULT_BEHAVIOR",
+]
