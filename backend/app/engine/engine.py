@@ -643,11 +643,11 @@ class WorldEngine:
             return [self._msg_to_player(player_id, "Use what?")]
         return self._use(player_id, args)
 
-    def _attack_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+    async def _attack_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """Adapter for attack command."""
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Attack whom?")]
-        return self._attack(player_id, args)
+        return await self._attack(player_id, args)
 
     def _stop_combat_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """Adapter for stop combat command."""
@@ -667,11 +667,11 @@ class WorldEngine:
 
     # Phase 9: Ability command handlers
     
-    def _cast_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
+    async def _cast_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """Adapter for cast ability command."""
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Cast which ability?")]
-        return self._cast_ability(player_id, args)
+        return await self._cast_ability(player_id, args)
     
     def _abilities_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """Adapter for abilities/skills command."""
@@ -2961,13 +2961,13 @@ class WorldEngine:
         while True:
             player_id, command = await self._command_queue.get()
             print(f"WorldEngine: got command from {player_id}: {command!r}")
-            events = self.handle_command(player_id, command)
+            events = await self.handle_command(player_id, command)
             print(f"WorldEngine: generated: {events!r}")
             await self._dispatch_events(events)
 
     # ---------- Command handling ----------
 
-    def handle_command(self, player_id: PlayerId, command: str) -> List[Event]:
+    async def handle_command(self, player_id: PlayerId, command: str) -> List[Event]:
         """
         Parse a raw command string and return logical events.
         
@@ -2996,7 +2996,7 @@ class WorldEngine:
             raw = re.sub(r'\bself\b', player.name, raw, flags=re.IGNORECASE)
 
         # Dispatch to command router
-        return self.command_router.dispatch(player_id, raw)
+        return await self.command_router.dispatch(player_id, raw)
 
     # ---------- Helper: event constructors ----------
 
@@ -4180,9 +4180,9 @@ class WorldEngine:
     # Real-Time Combat System (delegates to CombatSystem)
     # =========================================================================
     
-    def _attack(self, player_id: PlayerId, target_name: str) -> List[Event]:
+    async def _attack(self, player_id: PlayerId, target_name: str) -> List[Event]:
         """Initiate an attack. Delegates to CombatSystem."""
-        return self.combat_system.start_attack(player_id, target_name)
+        return await self.combat_system.start_attack(player_id, target_name)
     
     def _roll_and_drop_loot(self, drop_table: list, room_id: RoomId, npc_name: str) -> List[Event]:
         """Roll and drop loot. Delegates to CombatSystem."""
@@ -5218,7 +5218,7 @@ class WorldEngine:
 
     # ========== Phase 9: Ability Commands ==========
     
-    def _cast_ability(self, player_id: PlayerId, args: str) -> List[Event]:
+    async def _cast_ability(self, player_id: PlayerId, args: str) -> List[Event]:
         """
         Cast an ability.
         
@@ -5247,13 +5247,19 @@ class WorldEngine:
         # Resolve target if needed
         target_entity = None
         if target_name:
-            target_entity = self._find_target(player_id, target_name)
+            # Find target in the player's room
+            target_entity, target_type = self._find_targetable_in_room(
+                player.room_id,
+                target_name,
+                include_players=True,
+                include_npcs=True,
+                include_items=False  # Abilities typically target entities, not items
+            )
             if not target_entity:
                 return [self._msg_to_player(player_id, f"'{target_name}' not found.")]
         
-        # Execute ability via AbilityExecutor
-        # Note: This is synchronous; Phase 9h will add async event support
-        result = self._execute_ability_sync(player_id, ability_id, target_entity)
+        # Execute ability via AbilityExecutor (now properly async)
+        result = await self._execute_ability(player_id, ability_id, target_entity)
         
         if result.success:
             events.append(self._msg_to_player(player_id, result.message))
@@ -5282,17 +5288,14 @@ class WorldEngine:
         
         return events
     
-    def _execute_ability_sync(
+    async def _execute_ability(
         self,
         player_id: PlayerId,
         ability_id: str,
         target_entity: Optional[WorldEntity] = None
     ) -> Any:
         """
-        Synchronous wrapper for ability execution.
-        
-        This is a temporary wrapper for Phase 9f. Phase 9h will make this async
-        and emit proper events to all connected players.
+        Execute an ability asynchronously.
         
         Args:
             player_id: The caster
@@ -5313,32 +5316,14 @@ class WorldEngine:
                 error="Player not found"
             )
         
-        # For now, we'll use a blocking call to the ability executor
-        # This will be properly async in Phase 9h
+        # Execute ability via AbilityExecutor (properly async now)
         try:
-            import asyncio
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If we're already in an async context, we can't use run_until_complete
-                # This is a limitation of the sync wrapper - Phase 9h will fix this
-                from app.engine.systems.abilities import AbilityExecutionResult
-                return AbilityExecutionResult(
-                    success=False,
-                    ability_id=ability_id,
-                    caster_id=player_id,
-                    message="",
-                    error="Ability system not ready for async execution"
-                )
-            else:
-                # We're in sync context, can run async function
-                result = loop.run_until_complete(
-                    self.ability_executor.execute_ability(
-                        player,
-                        ability_id,
-                        target_entity=target_entity
-                    )
-                )
-                return result
+            result = await self.ability_executor.execute_ability(
+                player,
+                ability_id,
+                target_entity=target_entity
+            )
+            return result
         except Exception as e:
             from app.engine.systems.abilities import AbilityExecutionResult
             import logging

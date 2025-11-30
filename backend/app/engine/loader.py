@@ -404,6 +404,9 @@ def load_triggers_from_yaml(world: World, world_data_dir: str | None = None) -> 
     if rooms_dir.exists():
         yaml_files = list(rooms_dir.glob("**/*.yaml"))
         for yaml_file in yaml_files:
+            # Skip schema/documentation files (those starting with _)
+            if yaml_file.name.startswith('_'):
+                continue
             with open(yaml_file, 'r', encoding='utf-8') as f:
                 room_data = yaml.safe_load(f)
             
@@ -432,6 +435,9 @@ def load_triggers_from_yaml(world: World, world_data_dir: str | None = None) -> 
     if areas_dir.exists():
         yaml_files = list(areas_dir.glob("**/*.yaml"))
         for yaml_file in yaml_files:
+            # Skip schema/documentation files (those starting with _)
+            if yaml_file.name.startswith('_'):
+                continue
             with open(yaml_file, 'r', encoding='utf-8') as f:
                 area_data = yaml.safe_load(f)
             
@@ -586,8 +592,8 @@ def load_quests_into_system(quest_system, world_data_dir: str | None = None) -> 
     
     yaml_files = list(quests_dir.glob("**/*.yaml"))
     for yaml_file in yaml_files:
-        # Skip README files
-        if yaml_file.stem.lower() == 'readme':
+        # Skip README and schema/documentation files (those starting with _)
+        if yaml_file.stem.lower() == 'readme' or yaml_file.name.startswith('_'):
             continue
             
         try:
@@ -700,8 +706,8 @@ def load_dialogues_into_system(quest_system, world_data_dir: str | None = None) 
     
     yaml_files = list(dialogues_dir.glob("**/*.yaml"))
     for yaml_file in yaml_files:
-        # Skip README files
-        if yaml_file.stem.lower() == 'readme':
+        # Skip README and schema/documentation files (those starting with _)
+        if yaml_file.stem.lower() == 'readme' or yaml_file.name.startswith('_'):
             continue
             
         try:
@@ -839,8 +845,8 @@ def load_quest_chains_into_system(quest_system, world_data_dir: str | None = Non
     
     yaml_files = list(chains_dir.glob("**/*.yaml"))
     for yaml_file in yaml_files:
-        # Skip README files
-        if yaml_file.stem.lower() == 'readme':
+        # Skip README and schema/documentation files (those starting with _)
+        if yaml_file.stem.lower() == 'readme' or yaml_file.name.startswith('_'):
             continue
             
         try:

@@ -80,8 +80,11 @@ class AbilityTemplate:
     # Cooldown mechanics
     cooldown: float  # Seconds between uses (personal cooldown)
     
-    # Effect execution
-    behavior_id: str  # "slash_behavior", "fireball_behavior"
+    # Effect execution - supports behavior chaining!
+    # Legacy: behavior_id for single behavior (backward compatible)
+    # New: behaviors list for chaining multiple behaviors
+    behavior_id: Optional[str] = None  # Legacy single behavior (converted to behaviors list)
+    behaviors: List[str] = field(default_factory=list)  # Behavior chain: ["melee_attack", "stun_effect"]
     
     # Targeting (base defaults)
     target_type: str = "self"  # "self", "enemy", "ally", "room"
@@ -242,7 +245,29 @@ async def load_abilities_from_yaml(path: Path) -> Dict[str, AbilityTemplate]:
             
             for ability_data in ability_list:
                 try:
+                    # Handle backward compatibility: convert behavior_id to behaviors list
+                    if "behavior_id" in ability_data and "behaviors" not in ability_data:
+                        # Legacy format: single behavior_id
+                        behavior_id = ability_data.pop("behavior_id")
+                        ability_data["behaviors"] = [behavior_id]
+                        logger.debug(
+                            f"Converting legacy behavior_id '{behavior_id}' to behaviors list "
+                            f"for {ability_data.get('ability_id', 'unknown')}"
+                        )
+                    elif "behaviors" in ability_data:
+                        # New format: behaviors list already present
+                        # Remove behavior_id if present to avoid confusion
+                        ability_data.pop("behavior_id", None)
+                    
                     ability = AbilityTemplate(**ability_data)
+                    
+                    # Validate that behaviors list is not empty
+                    if not ability.behaviors:
+                        logger.error(
+                            f"Ability {ability.ability_id} has no behaviors defined. "
+                            f"Must have either behavior_id or behaviors field."
+                        )
+                        continue
                     
                     # Check for duplicate IDs
                     if ability.ability_id in abilities:
@@ -252,7 +277,8 @@ async def load_abilities_from_yaml(path: Path) -> Dict[str, AbilityTemplate]:
                         )
                     
                     abilities[ability.ability_id] = ability
-                    logger.info(f"Loaded ability: {ability.ability_id} ({ability.name})")
+                    behavior_info = " -> ".join(ability.behaviors) if len(ability.behaviors) > 1 else ability.behaviors[0]
+                    logger.info(f"Loaded ability: {ability.ability_id} ({ability.name}) - behaviors: {behavior_info}")
                     
                 except (KeyError, TypeError) as e:
                     logger.error(
@@ -415,7 +441,7 @@ class AbilityExecutor:
                         )
                         # Create resource_update event
                         resources_payload = {}
-                        for rid in caster.character_sheet.resources.keys() if caster.character_sheet else []:
+                        for rid in caster.character_sheet.resource_pools.keys() if caster.character_sheet else []:
                             rpool = caster.get_resource_pool(rid)
                             if rpool:
                                 resources_payload[rid] = {
@@ -432,39 +458,105 @@ class AbilityExecutor:
                 if resource_events:
                     await self.context.event_dispatcher.dispatch(resource_events)
             
-            # 4. Get behavior function from ClassSystem
-            behavior_fn = self.context.class_system.get_behavior(ability.behavior_id)
-            if not behavior_fn:
-                error_msg = f"No behavior found: {ability.behavior_id}"
-                error_event = self.context.event_dispatcher.ability_error(
-                    caster.id, ability_id, ability.name, error_msg
-                )
-                await self.context.event_dispatcher.dispatch([error_event])
-                
-                return AbilityExecutionResult(
-                    success=False,
-                    ability_id=ability_id,
-                    caster_id=caster.id,
-                    message="",
-                    error=error_msg
-                )
+            # 4. Execute behavior chain
+            # Support both single behavior and multi-behavior chains
+            behavior_results = []
+            combined_targets_hit = set()
+            combined_damage = 0
+            combined_effects = []
+            combined_messages = []
             
-            # 5. Execute behavior
-            if targets:
-                # Pass multiple targets for AoE, single target otherwise
-                if len(targets) > 1 or ability.target_type == "room":
-                    behavior_result = await behavior_fn(
-                        caster, targets, ability, self.context.combat_system
+            for behavior_id in ability.behaviors:
+                behavior_fn = self.context.class_system.get_behavior(behavior_id)
+                if not behavior_fn:
+                    error_msg = f"No behavior found in chain: {behavior_id}"
+                    logger.error(f"Behavior chain error for {ability_id}: {error_msg}")
+                    error_event = self.context.event_dispatcher.ability_error(
+                        caster.id, ability_id, ability.name, error_msg
                     )
+                    await self.context.event_dispatcher.dispatch([error_event])
+                    
+                    return AbilityExecutionResult(
+                        success=False,
+                        ability_id=ability_id,
+                        caster_id=caster.id,
+                        message="",
+                        error=error_msg
+                    )
+                
+                # Execute this behavior in the chain
+                if targets:
+                    # Pass multiple targets for AoE, single target otherwise
+                    if len(targets) > 1 or ability.target_type == "room":
+                        behavior_result = await behavior_fn(
+                            caster, targets, ability, self.context.combat_system
+                        )
+                    else:
+                        behavior_result = await behavior_fn(
+                            caster, targets[0], ability, self.context.combat_system
+                        )
                 else:
+                    # No targets (self or area effect)
                     behavior_result = await behavior_fn(
-                        caster, targets[0], ability, self.context.combat_system
+                        caster, caster, ability, self.context.combat_system
                     )
-            else:
-                # No targets (self or area effect)
-                behavior_result = await behavior_fn(
-                    caster, caster, ability, self.context.combat_system
-                )
+                
+                # Collect results from this behavior
+                if not behavior_result.success:
+                    # If any behavior in the chain fails, abort
+                    logger.warning(
+                        f"Behavior {behavior_id} failed in chain for {ability_id}: {behavior_result.error}"
+                    )
+                    error_event = self.context.event_dispatcher.ability_error(
+                        caster.id, ability_id, ability.name, behavior_result.error or "Behavior failed"
+                    )
+                    await self.context.event_dispatcher.dispatch([error_event])
+                    
+                    return AbilityExecutionResult(
+                        success=False,
+                        ability_id=ability_id,
+                        caster_id=caster.id,
+                        message="",
+                        error=behavior_result.error
+                    )
+                
+                behavior_results.append(behavior_result)
+                
+                # Aggregate results from all behaviors in chain
+                if behavior_result.targets_hit:
+                    combined_targets_hit.update(behavior_result.targets_hit)
+                if behavior_result.damage_dealt:
+                    combined_damage += behavior_result.damage_dealt
+                if behavior_result.effects_applied:
+                    combined_effects.extend(behavior_result.effects_applied)
+                if behavior_result.message:
+                    combined_messages.append(behavior_result.message)
+            
+            # Combine all behavior results into final result
+            behavior_result = behavior_results[0]  # Use first result as base
+            behavior_result.targets_hit = list(combined_targets_hit)
+            behavior_result.damage_dealt = combined_damage
+            behavior_result.effects_applied = combined_effects
+            behavior_result.message = " ".join(combined_messages) if combined_messages else behavior_result.message
+            
+            # 5. Check for target deaths after behavior chain execution
+            death_events = []
+            if targets and combined_damage > 0:
+                for target in targets if isinstance(targets, list) else [targets]:
+                    if not target.is_alive():
+                        logger.info(f"Target {target.name} killed by {ability_id} from {caster.name}")
+                        target_death_events = await self.context.combat_system.handle_death(
+                            target.id, caster.id
+                        )
+                        death_events.extend(target_death_events)
+                        
+                        # Clear caster's combat state if target was their combat target
+                        if hasattr(caster, 'combat') and caster.combat.target_id == target.id:
+                            caster.combat.clear_combat()
+            
+            # Dispatch death events immediately
+            if death_events:
+                await self.context.event_dispatcher.dispatch(death_events)
             
             # 6. Apply cooldowns
             self._apply_cooldowns(caster, ability)

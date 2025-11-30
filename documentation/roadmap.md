@@ -1035,21 +1035,268 @@ Before adding big systems, make the core loop solid.
 - ✅ 26/26 tests passing (100% pass rate)
 - ✅ Tests cover: light calculation, time integration, light sources, visibility filtering, item properties, environmental content, trigger integration
 
-### Phase 12 - Abilities Audit
+---
+
+## Phase 12 - CMS API Integration ⬜
+
+**Goals**: Provide complete REST API endpoints for the Daemonswright CMS to create, read, update, and manage game content without direct file system access.
+
+**Status**: Not Started | **Priority**: High (blocks CMS development)
+
+### Phase 12.1 - Schema Registry API ⬜
+
+**Purpose**: Enable CMS to dynamically fetch schema definitions for all content types
+
+- [ ] **Core Endpoint**:
+    - [ ] `GET /api/admin/schemas` - Return all `_schema.yaml` files with metadata
+    - [ ] Response includes: content, last_modified, checksum (SHA256)
+    - [ ] Optional filtering by content_type (rooms, items, npcs, etc.)
+    - [ ] Version header with schema version number
+
+- [ ] **Schema Metadata**:
+    - [ ] `GET /api/admin/schemas/version` - Current schema version info
+    - [ ] Response includes: version, engine_version, last_modified
+    - [ ] Used for cache invalidation in CMS
+
+- [ ] **Integration**:
+    - [ ] SchemaRegistry class in `backend/app/engine/systems/`
+    - [ ] Caches parsed schemas on server startup
+    - [ ] Hot-reload support when schema files change
+
+**Blocking**: Phase 1 of CMS development (TypeScript type generation)
+
+### Phase 12.2 - YAML File Management API ⬜
+
+**Purpose**: Enable CMS to upload, download, and list YAML content files
+
+- [ ] **File Operations**:
+    - [ ] `GET /api/admin/content/files` - List all YAML files in world_data/
+    - [ ] Supports filtering by content_type
+    - [ ] Optional git status inclusion (modified, untracked, etc.)
+    - [ ] Returns file metadata: path, size, last_modified
+
+- [ ] **Download Content**:
+    - [ ] `GET /api/admin/content/download?file_path=<path>` - Download raw YAML
+    - [ ] Returns content, checksum, last_modified
+    - [ ] Supports all content types (rooms, items, npcs, etc.)
+
+- [ ] **Upload/Update Content**:
+    - [ ] `POST /api/admin/content/upload` - Create or update YAML file
+    - [ ] Request: content_type, file_path, content (raw YAML string)
+    - [ ] Optional `validate_only=true` for dry-run validation
+    - [ ] Response: validation_errors, file_written, auto_reload_triggered
+    - [ ] Atomic write operations (temp file + rename)
+
+- [ ] **File Tree Structure**:
+    - [ ] Maintain world_data/ directory hierarchy
+    - [ ] Prevent path traversal attacks (validate file_path)
+    - [ ] Respect .gitignore patterns
+
+**Blocking**: Phase 2 of CMS development (File explorer and editor)
+
+### Phase 12.3 - Enhanced Validation API ⬜
+
+**Purpose**: Provide real-time validation feedback during content editing
+
+- [ ] **Enhanced `/api/admin/content/validate`**:
+    - [ ] Accept raw YAML string (not just file_path)
+    - [ ] Validate syntax (YAML parser)
+    - [ ] Validate schema conformance (required fields, types)
+    - [ ] Validate references (foreign keys to rooms, items, NPCs)
+    - [ ] Return detailed error locations (line/column numbers)
+
+- [ ] **Reference Validation**:
+    - [ ] `POST /api/admin/content/validate-references` - Check broken links
+    - [ ] Detects: invalid room exits, missing item templates, non-existent NPCs
+    - [ ] Returns: field path, referenced_id, error message
+    - [ ] Cross-content validation (e.g., quest references NPC that exists)
+
+- [ ] **Validation Response Format**:
+    ```json
+    {
+      "valid": false,
+      "errors": [
+        {
+          "type": "syntax_error",
+          "line": 15,
+          "column": 3,
+          "message": "Invalid YAML: unexpected indentation"
+        },
+        {
+          "type": "reference_error",
+          "field": "exits.north",
+          "value": "room_99_99_99",
+          "message": "Room does not exist"
+        }
+      ],
+      "warnings": [
+        {
+          "type": "best_practice",
+          "field": "room_type",
+          "message": "Consider using room_type_emoji for visual distinction"
+        }
+      ]
+    }
+    ```
+
+- [ ] **Integration**:
+    - [ ] ValidationService class with pluggable validators
+    - [ ] Reference cache for O(1) lookups (refreshed on content reload)
+    - [ ] Async validation for large files
+
+**Blocking**: Phase 2A of CMS (real-time Monaco editor validation)
+
+### Phase 12.4 - Content Querying API ⬜
+
+**Purpose**: Enable CMS to query and search existing content for references and dependencies
+
+- [ ] **Content Search**:
+    - [ ] `GET /api/admin/content/search?q=<query>&type=<type>` - Full-text search
+    - [ ] Search across: names, descriptions, IDs, keywords
+    - [ ] Returns matching content with context snippets
+    - [ ] Supports filtering by content_type
+
+- [ ] **Dependency Graph**:
+    - [ ] `GET /api/admin/content/dependencies?id=<id>&type=<type>` - Get dependencies
+    - [ ] Returns: what references this entity, what this entity references
+    - [ ] Example: Room depends on Area, spawns NPCs, contains Items
+    - [ ] Used for "safe delete" checks and impact analysis
+
+- [ ] **Content Statistics**:
+    - [ ] `GET /api/admin/content/stats` - Content counts and metrics
+    - [ ] Returns: total rooms, items, NPCs, quests by type
+    - [ ] Broken reference counts
+    - [ ] Orphaned content (no references to it)
+
+**Blocking**: Phase 3A of CMS (dependency visualization, safe deletion)
+
+### Phase 12.5 - Bulk Operations API ⬜
+
+**Purpose**: Enable efficient bulk import/export for large content sets
+
+- [ ] **Bulk Import**:
+    - [ ] `POST /api/admin/content/bulk-import` - Import multiple entities
+    - [ ] Accepts array of content objects (converted from CSV/JSON)
+    - [ ] Validates all before writing any
+    - [ ] Returns: success_count, error_count, detailed_errors
+    - [ ] Transaction-like behavior (all or nothing option)
+
+- [ ] **Bulk Export**:
+    - [ ] `GET /api/admin/content/bulk-export?type=<type>&filter=<filter>` - Export content
+    - [ ] Supports CSV, JSON, YAML formats
+    - [ ] Optional filtering (e.g., all items in area X)
+    - [ ] Streaming response for large datasets
+
+- [ ] **Batch Validation**:
+    - [ ] `POST /api/admin/content/batch-validate` - Validate multiple files at once
+    - [ ] Returns validation results for each file
+    - [ ] Used during bulk import preview
+
+**Blocking**: Phase 4B of CMS (bulk import/export features)
+
+### Phase 12.6 - Git Integration (Optional) ⬜
+
+**Purpose**: Provide server-side git operations for version control
+
+- [ ] **Git Status**:
+    - [ ] `GET /api/admin/git/status` - Current git status
+    - [ ] Returns: branch, uncommitted changes, untracked files
+    - [ ] Used for UI indicators in CMS
+
+- [ ] **Commit Operations**:
+    - [ ] `POST /api/admin/git/commit` - Commit specified files
+    - [ ] Request: message, files (array of paths)
+    - [ ] Returns: commit hash, timestamp
+
+- [ ] **Push/Pull** (Future):
+    - [ ] `POST /api/admin/git/push` - Push to remote
+    - [ ] `POST /api/admin/git/pull` - Pull from remote
+    - [ ] Conflict detection and resolution UI
+
+**Note**: This is optional - CMS can manage local git clone instead. Server-side git is cleaner but adds complexity.
+
+**Priority**: Low (CMS can handle git client-side)
+
+### Phase 12.7 - Real-Time Preview API ⬜
+
+**Purpose**: Enable CMS to preview content changes without committing to database
+
+- [ ] **Preview Mode**:
+    - [ ] `POST /api/admin/content/preview` - Load content into temporary sandbox
+    - [ ] Creates isolated WorldEngine instance
+    - [ ] Returns: preview_session_id, expires_at
+
+- [ ] **Preview Queries**:
+    - [ ] `GET /api/admin/preview/{session_id}/room/{room_id}` - Preview room state
+    - [ ] `GET /api/admin/preview/{session_id}/validate` - Validate preview state
+    - [ ] Preview expires after 15 minutes or manual cleanup
+
+- [ ] **Preview WebSocket** (Future):
+    - [ ] Connect to preview session with test player
+    - [ ] Walk through content changes in real-time
+    - [ ] Full game engine in sandbox mode
+
+**Priority**: Medium (nice-to-have for Phase 5 CMS preview features)
+
+### Implementation Phases
+
+**Phase 12.1-12.3 (Critical Path)** - Blocks CMS Phase 1-2:
+1. Schema Registry API
+2. YAML File Management API  
+3. Enhanced Validation API
+
+**Phase 12.4-12.5 (Important)** - Blocks CMS Phase 3-4:
+4. Content Querying API
+5. Bulk Operations API
+
+**Phase 12.6-12.7 (Optional)** - Nice-to-have features:
+6. Git Integration (can be client-side)
+7. Real-Time Preview (advanced feature)
+
+### Technical Considerations
+
+**Security**:
+- All endpoints require `GAME_MASTER` or `ADMIN` role
+- Path traversal prevention in file operations
+- Content size limits (prevent DoS via huge YAML files)
+- Rate limiting on validation endpoints
+
+**Performance**:
+- Schema caching with invalidation
+- Reference cache for O(1) validation lookups
+- Streaming responses for bulk operations
+- Async file I/O for all operations
+
+**Error Handling**:
+- Detailed error messages with line/column info
+- Validation errors vs warnings
+- Graceful degradation if git operations fail
+- Transaction rollback on bulk import failures
+
+### Documentation Updates
+
+- [ ] Update protocol.md with new endpoints
+- [ ] API documentation with request/response examples
+- [ ] CMS integration guide
+- [ ] Schema versioning documentation
+
+---
+
+### Phase 13 - Abilities Audit ⬜
 Ensure test engine is working
 Make sure every ability produced does what it claims to do
 
-### Phase Y - Player quality of life
+### Phase Y - Player quality of life ⬜
 In-game documentation: listing all commands, player role, etc
 Stub client tweaks
 
-### Phase 13 - Cybersecurity Audit
+### Phase 14 - Cybersecurity Audit ⬜
 Ensure the engine server and database are protected from malicious actors, especially with regards to text sent to the server from the client
 
-### Phase 14 - Knobs and Levers: comprehensive In-game commands and API Routes documentation
+### Phase 15 - Knobs and Levers: comprehensive In-game commands and API Routes documentation
 User-focused documentation for in-game commands and API routes for development
 
-### Phase 15 - Mechanic's Log: comprehensive guide for modders
+### Phase 16 - Mechanic's Manual: comprehensive guide for modders
 Modder-focused guide to easily extending the engine codebase
 
 ## Phase Z - Backlogged Niceties & polish

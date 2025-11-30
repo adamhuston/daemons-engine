@@ -170,7 +170,7 @@ class CommandRouter:
         if primary_name not in self.categories[category]:
             self.categories[category].append(primary_name)
     
-    def dispatch(self, player_id: str, raw_command: str) -> List['Event']:
+    async def dispatch(self, player_id: str, raw_command: str) -> List['Event']:
         """
         Parse and dispatch a command to its handler.
         
@@ -209,9 +209,13 @@ class CommandRouter:
         
         meta = self.commands[cmd_name]
         
-        # Call handler with arguments
+        # Call handler with arguments (await if it's a coroutine)
         try:
-            return meta.handler(self.engine, player_id, args)
+            result = meta.handler(self.engine, player_id, args)
+            # Check if the handler is async (returns a coroutine)
+            if hasattr(result, '__await__'):
+                return await result
+            return result
         except Exception as e:
             # Log error and return generic message
             print(f"[CommandError] {cmd_name}: {e}")

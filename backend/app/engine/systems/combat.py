@@ -65,7 +65,7 @@ class CombatSystem:
     
     # ---------- Combat Initiation ----------
     
-    def start_attack(self, player_id: "PlayerId", target_name: str) -> List[Event]:
+    async def start_attack(self, player_id: "PlayerId", target_name: str) -> List[Event]:
         """
         Initiate an attack against a target.
         Starts the swing timer based on weapon speed.
@@ -146,9 +146,12 @@ class CombatSystem:
             exclude={player_id, target.id}
         ))
 
-        # Add threat for NPCs
+        # Add threat for NPCs and trigger combat start behavior
         if target.id in world.npcs:
             target.combat.add_threat(player_id, 100.0)
+            # Trigger NPC retaliation behavior if engine callback is available
+            if hasattr(self.ctx, 'engine') and hasattr(self.ctx.engine, '_trigger_npc_combat_start'):
+                await self.ctx.engine._trigger_npc_combat_start(target.id, player_id)
 
         return events
 

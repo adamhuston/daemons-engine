@@ -12,14 +12,19 @@ Each behavior is an async callable that resolves outcomes and effects.
 
 from .core import (
     melee_attack_behavior,
+    arcane_bolt_behavior,
     power_attack_behavior,
     rally_passive_behavior,
     aoe_attack_behavior,
     stun_effect_behavior,
     mana_regen_behavior,
     fireball_behavior,
+    frostbolt_behavior,
+    mana_shield_behavior,
     polymorph_behavior,
     backstab_behavior,
+    quick_strike_behavior,
+    poison_strike_behavior,
     evasion_passive_behavior,
     damage_boost_behavior,
 )
@@ -46,14 +51,19 @@ from .utility import (
 __all__ = [
     # Core behaviors
     "melee_attack_behavior",
+    "arcane_bolt_behavior",
     "power_attack_behavior",
     "rally_passive_behavior",
     "aoe_attack_behavior",
     "stun_effect_behavior",
     "mana_regen_behavior",
     "fireball_behavior",
+    "frostbolt_behavior",
+    "mana_shield_behavior",
     "polymorph_behavior",
     "backstab_behavior",
+    "quick_strike_behavior",
+    "poison_strike_behavior",
     "evasion_passive_behavior",
     "damage_boost_behavior",
     # Custom behaviors

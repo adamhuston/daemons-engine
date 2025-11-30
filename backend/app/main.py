@@ -81,6 +81,42 @@ async def lifespan(app: FastAPI):
     await engine_instance.class_system.load_content(class_dir)
     logger.info("Loaded character classes and abilities from world_data")
     
+    # 4a1) Initialize character sheets for all players now that classes are loaded
+    from .engine.world import CharacterSheet, ResourcePool
+    for player in engine_instance.world.players.values():
+        if player.character_class and not player.character_sheet:
+            # Get class template
+            class_template = engine_instance.class_system.get_class(player.character_class)
+            if class_template:
+                # Initialize resource pools
+                resource_pools = {}
+                for resource_id, resource_def in class_template.resources.items():
+                    resource_pools[resource_id] = ResourcePool(
+                        resource_id=resource_id,
+                        current=resource_def.max_amount,
+                        max=resource_def.max_amount,
+                        regen_per_second=resource_def.regen_rate,
+                        last_regen_tick=0.0
+                    )
+                
+                # Get learned abilities from DB or default to first 3 available
+                learned_abilities = set()
+                if hasattr(player, 'player_flags') and player.player_flags:
+                    learned_abilities = set(player.player_flags.get('learned_abilities', []))
+                if not learned_abilities and class_template.available_abilities:
+                    learned_abilities = set(class_template.available_abilities[:3])
+                
+                # Create character sheet
+                player.character_sheet = CharacterSheet(
+                    class_id=player.character_class,
+                    level=player.level,
+                    experience=player.experience,
+                    learned_abilities=learned_abilities,
+                    ability_loadout=[],
+                    resource_pools=resource_pools,
+                )
+                logger.info(f"Initialized character sheet for {player.name} ({player.character_class})")
+    
     # 4a2) Load clans from database into ClanSystem (Phase 10.2)
     await engine_instance.clan_system.load_clans_from_db()
     logger.info("Loaded clans from database into ClanSystem")
@@ -903,14 +939,14 @@ async def _handle_character_selection(
                     continue
                 
                 # Create the character
-                from app.models import Character
-                from app.db import get_async_session
+                from app.models import Player
+                from app.db import get_session
                 
-                async for session in get_async_session():
+                async for session in get_session():
                     # Check if name is taken
                     from sqlalchemy import select
                     existing = await session.execute(
-                        select(Character).where(Character.name == pending_name)
+                        select(Player).where(Player.name == pending_name)
                     )
                     if existing.scalar():
                         await websocket.send_json({
@@ -921,13 +957,38 @@ async def _handle_character_selection(
                         pending_name = None
                         break
                     
+                    # Generate unique player ID
+                    import uuid
+                    player_id = str(uuid.uuid4())
+                    
+                    # Get class template for initialization
+                    class_template = engine.class_system.get_class(cmd)
+                    if not class_template:
+                        await websocket.send_json({
+                            "type": "error",
+                            "text": f"Class '{cmd}' is not available.",
+                        })
+                        continue
+                    
+                    # Initialize character data with class info
+                    char_data = {
+                        "class_id": cmd,
+                        "learned_abilities": class_template.available_abilities[:3] if class_template.available_abilities else [],
+                    }
+                    
                     # Create character
-                    new_char = Character(
+                    new_char = Player(
+                        id=player_id,
                         account_id=user_id,
                         name=pending_name,
                         character_class=cmd,
                         level=1,
                         current_room_id="room_0_0_0",
+                        strength=class_template.base_stats.get("strength", 10),
+                        dexterity=class_template.base_stats.get("dexterity", 10),
+                        intelligence=class_template.base_stats.get("intelligence", 10),
+                        vitality=class_template.base_stats.get("vitality", 10),
+                        data=char_data,
                     )
                     session.add(new_char)
                     await session.commit()
@@ -959,8 +1020,8 @@ async def _handle_character_selection(
                     if 1 <= num <= len(characters):
                         char_to_delete = characters[num - 1]
                         
-                        from app.db import get_async_session
-                        async for session in get_async_session():
+                        from app.db import get_session
+                        async for session in get_session():
                             # Remove from world if loaded
                             if char_to_delete.id in engine.world.players:
                                 del engine.world.players[char_to_delete.id]
@@ -1092,9 +1153,44 @@ async def game_ws_auth(
         if player_id not in engine.world.players:
             # Character exists in DB but not in memory - load it now
             logger.info("Loading character %s into memory from database", player_id)
-            from .engine.world import WorldPlayer
+            from .engine.world import WorldPlayer, EntityType, CharacterSheet, ResourcePool
+            
+            # Load quest/flag data from DB
+            quest_progress_data = character.quest_progress if character.quest_progress else {}
+            completed_quests_data = character.completed_quests if character.completed_quests else []
+            player_flags_data = character.player_flags if character.player_flags else {}
+            
+            # Initialize character sheet if they have a class
+            character_sheet = None
+            if character.character_class and character.data:
+                class_id = character.data.get("class_id", character.character_class)
+                learned_abilities = set(character.data.get("learned_abilities", []))
+                
+                # Get class template to initialize resource pools
+                class_template = engine.class_system.get_class(class_id)
+                resource_pools = {}
+                if class_template and class_template.resources:
+                    for resource_id, resource_def in class_template.resources.items():
+                        resource_pools[resource_id] = ResourcePool(
+                            resource_id=resource_id,
+                            current=resource_def.max_amount,
+                            max=resource_def.max_amount,
+                            regen_per_second=resource_def.regen_rate,
+                            last_regen_tick=0.0
+                        )
+                
+                character_sheet = CharacterSheet(
+                    class_id=class_id,
+                    level=character.level,
+                    experience=character.experience,
+                    learned_abilities=learned_abilities,
+                    ability_loadout=[],
+                    resource_pools=resource_pools,
+                )
+            
             world_player = WorldPlayer(
                 id=character.id,
+                entity_type=EntityType.PLAYER,
                 name=character.name,
                 room_id=character.current_room_id,
                 character_class=character.character_class,
@@ -1105,14 +1201,21 @@ async def game_ws_auth(
                 dexterity=character.dexterity,
                 intelligence=character.intelligence,
                 vitality=character.vitality,
-                data=character.data or {},
-                account_id=character.account_id
+                armor_class=character.armor_class,
+                max_energy=character.max_energy,
+                current_energy=character.current_energy,
+                experience=character.experience,
+                on_move_effect=character.data.get("on_move_effect") if character.data else None,
+                quest_progress=quest_progress_data,
+                completed_quests=set(completed_quests_data),
+                player_flags=player_flags_data,
+                character_sheet=character_sheet,
             )
             engine.world.players[player_id] = world_player
             
             # Make sure the room exists and add player to it
             if world_player.room_id in engine.world.rooms:
-                engine.world.rooms[world_player.room_id].players.add(player_id)
+                engine.world.rooms[world_player.room_id].entities.add(player_id)
         
         # Store auth info in context for permission checks
         auth_info = {"user_id": user_id, "role": user_role}
