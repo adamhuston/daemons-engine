@@ -4,9 +4,7 @@ Player factory and builder fixtures.
 Provides convenient builders for creating test players with various configurations.
 """
 
-from typing import Optional
-
-from app.engine.world import WorldPlayer
+from daemons.engine.world import WorldPlayer
 
 
 class PlayerBuilder:
@@ -63,14 +61,14 @@ class PlayerBuilder:
         self.data["xp"] = (level - 1) * 1000
         return self
 
-    def with_hp(self, hp: int, max_hp: Optional[int] = None) -> "PlayerBuilder":
+    def with_hp(self, hp: int, max_hp: int | None = None) -> "PlayerBuilder":
         """Set player HP."""
         self.data["hp"] = hp
         if max_hp is not None:
             self.data["max_hp"] = max_hp
         return self
 
-    def with_mp(self, mp: int, max_mp: Optional[int] = None) -> "PlayerBuilder":
+    def with_mp(self, mp: int, max_mp: int | None = None) -> "PlayerBuilder":
         """Set player MP."""
         self.data["mp"] = mp
         if max_mp is not None:

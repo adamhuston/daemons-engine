@@ -31,11 +31,12 @@ repos:
   #     - id: black
   #       language_version: python3.13
 
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        name: isort (python)
+  # isort removed - ruff handles import sorting via the "I" rule
+  # - repo: https://github.com/pycqa/isort
+  #   rev: 5.13.2
+  #   hooks:
+  #     - id: isort
+  #       name: isort (python)
 
   # pytest-check removed - run tests manually or in CI/CD
   # Tests require venv but pre-commit runs in isolated environment

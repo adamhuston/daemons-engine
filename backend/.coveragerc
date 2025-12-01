@@ -1,5 +1,5 @@
 [run]
-source = app
+source = daemons
 omit =
     */tests/*
     */test_*.py
@@ -8,8 +8,8 @@ omit =
     */.venv/*
     */migrations/*
     */alembic/versions/*
-    app/main.py
-    app/__init__.py
+    daemons/main.py
+    daemons/__init__.py
     */conftest.py
 
 [report]

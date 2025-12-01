@@ -1,11 +1,12 @@
 """System test specific fixtures."""
 
 import pytest
-from app.engine.systems.bulk_service import BulkService
-from app.engine.systems.file_manager import FileManager
-from app.engine.systems.query_service import QueryService
-from app.engine.systems.schema_registry import SchemaRegistry
-from app.engine.systems.validation_service import ValidationService
+
+from daemons.engine.systems.bulk_service import BulkService
+from daemons.engine.systems.file_manager import FileManager
+from daemons.engine.systems.query_service import QueryService
+from daemons.engine.systems.schema_registry import SchemaRegistry
+from daemons.engine.systems.validation_service import ValidationService
 
 
 @pytest.fixture

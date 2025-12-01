@@ -100,7 +100,7 @@ class TestFileManager:
 
     async def test_read_nonexistent_file(self, file_manager):
         """Test reading a file that doesn't exist."""
-        with pytest.raises(Exception):
+        with pytest.raises(FileNotFoundError):
             await file_manager.read_file("nonexistent/file.yaml")
 
     async def test_validate_yaml_syntax(self, file_manager):
@@ -187,7 +187,7 @@ test_list:
 @pytest.mark.phase12
 def test_file_manager_initialization(temp_world_data):
     """Test that FileManager can be initialized with a valid path."""
-    from app.engine.systems.file_manager import FileManager
+    from daemons.engine.systems.file_manager import FileManager
 
     manager = FileManager(str(temp_world_data))
     assert manager.world_data_path == Path(temp_world_data), "Should set correct path"

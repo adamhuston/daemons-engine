@@ -5,11 +5,16 @@ These builders provide fluent APIs for creating test data structures
 with sensible defaults and easy customization.
 """
 
-from typing import Any, Optional
+from typing import Any
 
-from app.engine.systems.abilities import AbilityTemplate
-from app.engine.world import (CharacterSheet, EntityType, ResourcePool,
-                              WorldNpc, WorldPlayer)
+from daemons.engine.systems.abilities import AbilityTemplate
+from daemons.engine.world import (
+    CharacterSheet,
+    EntityType,
+    ResourcePool,
+    WorldNpc,
+    WorldPlayer,
+)
 
 
 class AbilityTemplateBuilder:
@@ -244,7 +249,7 @@ class WorldPlayerBuilder:
         self._dexterity = 10
         self._intelligence = 10
         self._vitality = 10
-        self._character_sheet: Optional[CharacterSheet] = None
+        self._character_sheet: CharacterSheet | None = None
 
     def with_id(self, player_id: str) -> "WorldPlayerBuilder":
         self._id = player_id
@@ -321,7 +326,7 @@ class WorldNpcBuilder:
         self._dexterity = 10
         self._intelligence = 10
         self._vitality = 10
-        self._character_sheet: Optional[CharacterSheet] = None
+        self._character_sheet: CharacterSheet | None = None
 
     def with_id(self, entity_id: str) -> "WorldNpcBuilder":
         self._id = entity_id

@@ -12,10 +12,12 @@ Comprehensive test suite covering:
 import time
 
 import pytest
-from app.engine.systems.context import GameContext
+
+from daemons.engine.systems.context import GameContext
+
 # Import the systems and models
-from app.engine.systems.group_system import GroupSystem
-from app.engine.world import EntityType, World, WorldPlayer, WorldRoom
+from daemons.engine.systems.group_system import GroupSystem
+from daemons.engine.world import EntityType, World, WorldPlayer, WorldRoom
 
 # ============ FIXTURES ============
 

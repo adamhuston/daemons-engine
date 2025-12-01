@@ -1,18 +1,26 @@
 """Ability test specific fixtures."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from app.engine.systems.abilities import AbilityExecutor
-from app.engine.systems.classes import ClassSystem
-from app.engine.systems.combat import CombatSystem
-from app.engine.systems.effects import EffectSystem
-from app.engine.systems.events import EventDispatcher
-from app.engine.systems.time_manager import TimeEventManager
-from app.engine.world import (CharacterSheet, EntityType, ResourcePool,
-                              WorldArea, WorldNpc, WorldPlayer, WorldRoom)
+
+from daemons.engine.systems.abilities import AbilityExecutor
+from daemons.engine.systems.classes import ClassSystem
+from daemons.engine.systems.combat import CombatSystem
+from daemons.engine.systems.effects import EffectSystem
+from daemons.engine.systems.events import EventDispatcher
+from daemons.engine.systems.time_manager import TimeEventManager
+from daemons.engine.world import (
+    CharacterSheet,
+    EntityType,
+    ResourcePool,
+    WorldArea,
+    WorldNpc,
+    WorldPlayer,
+    WorldRoom,
+)
 from tests.fixtures.players import PlayerBuilder
 
 # ============================================================================
@@ -356,13 +364,13 @@ class BehaviorTestContext:
     """Helper for creating BehaviorContext for behavior function testing"""
 
     caster: WorldPlayer
-    target: Optional[Any]
-    ability_template: Dict[str, Any]
+    target: Any | None
+    ability_template: dict[str, Any]
     combat_system: CombatSystem
     effect_system: EffectSystem
     time_manager: TimeEventManager
-    room: Optional[WorldRoom] = None
-    area: Optional[WorldArea] = None
+    room: WorldRoom | None = None
+    area: WorldArea | None = None
 
     def to_dict(self):
         """Convert to kwargs dict for behavior function calls"""

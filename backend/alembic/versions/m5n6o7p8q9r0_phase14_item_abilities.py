@@ -13,16 +13,16 @@ This migration extends ItemTemplate to support:
 All fields are optional/nullable to maintain backward compatibility.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "m5n6o7p8q9r0"
-down_revision: Union[str, None] = "l4m5n6o7p8q9"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "l4m5n6o7p8q9"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

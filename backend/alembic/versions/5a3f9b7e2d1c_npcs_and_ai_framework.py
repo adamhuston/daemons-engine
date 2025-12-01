@@ -7,8 +7,8 @@ Create Date: 2025-11-28 12:00:00.000000
 """
 
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 import yaml
@@ -17,9 +17,9 @@ from sqlalchemy import MetaData, Table
 
 # revision identifiers, used by Alembic.
 revision: str = "5a3f9b7e2d1c"
-down_revision: Union[str, Sequence[str], None] = "186cf284ed62"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = "186cf284ed62"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -150,7 +150,7 @@ def load_npcs_from_yaml() -> None:
 
     for yaml_path in yaml_files:
         try:
-            with open(yaml_path, "r", encoding="utf-8") as f:
+            with open(yaml_path, encoding="utf-8") as f:
                 npc_data = yaml.safe_load(f)
 
             if not npc_data:
@@ -231,7 +231,7 @@ def load_npc_spawns_from_yaml() -> None:
 
     for yaml_path in yaml_files:
         try:
-            with open(yaml_path, "r", encoding="utf-8") as f:
+            with open(yaml_path, encoding="utf-8") as f:
                 spawn_data = yaml.safe_load(f)
 
             if not spawn_data or "spawns" not in spawn_data:

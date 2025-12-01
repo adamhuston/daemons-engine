@@ -1,8 +1,9 @@
 """API test specific fixtures."""
 
 import pytest
-from app.main import app
 from fastapi.testclient import TestClient
+
+from daemons.main import app
 
 
 @pytest.fixture

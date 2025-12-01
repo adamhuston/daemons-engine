@@ -11,21 +11,20 @@ Provides common test infrastructure for all test suites including:
 
 import asyncio
 import sys
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import AsyncGenerator
 
 import pytest
-from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
-                                    create_async_engine)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 # Add backend to path
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-import app.models  # noqa: F401, E402
-from app.engine.world import World, WorldPlayer, WorldRoom  # noqa: E402
-from app.models import Base  # noqa: E402
+import daemons.models  # noqa: F401, E402
+from daemons.engine.world import World, WorldPlayer, WorldRoom  # noqa: E402
+from daemons.models import Base  # noqa: E402
 
 # ============================================================================
 # Session Configuration

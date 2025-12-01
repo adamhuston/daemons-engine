@@ -5,7 +5,8 @@ Tests combat math, stat scaling, and progression systems.
 """
 
 import pytest
-from app.engine.world import LEVEL_UP_STAT_GAINS, XP_THRESHOLDS
+
+from daemons.engine.world import LEVEL_UP_STAT_GAINS, XP_THRESHOLDS
 
 # ============================================================================
 # Level Calculation Tests

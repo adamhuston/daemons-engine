@@ -5,8 +5,16 @@ Tests WorldPlayer, WorldNpc, WorldRoom, World, and related structures.
 """
 
 import pytest
-from app.engine.world import (EntityType, TargetableType, World, WorldArea,
-                              WorldNpc, WorldPlayer, WorldRoom)
+
+from daemons.engine.world import (
+    EntityType,
+    TargetableType,
+    World,
+    WorldArea,
+    WorldNpc,
+    WorldPlayer,
+    WorldRoom,
+)
 
 # ============================================================================
 # WorldPlayer Tests
@@ -215,7 +223,7 @@ def test_world_npc_behaviors():
 @pytest.mark.unit
 def test_world_area_creation():
     """Test creating a WorldArea."""
-    from app.engine.world import WorldTime
+    from daemons.engine.world import WorldTime
 
     area = WorldArea(
         id="area_forest",
@@ -233,7 +241,7 @@ def test_world_area_creation():
 @pytest.mark.unit
 def test_world_area_time_system():
     """Test area time system properties."""
-    from app.engine.world import WorldTime
+    from daemons.engine.world import WorldTime
 
     area_time = WorldTime(day=1, hour=12, minute=0)
     area = WorldArea(

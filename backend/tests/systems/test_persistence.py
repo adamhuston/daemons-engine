@@ -5,8 +5,9 @@ Tests state tracking, dirty flag management, and save/load operations.
 """
 
 import pytest
-from app.engine.systems.context import GameContext
-from app.engine.world import World
+
+from daemons.engine.systems.context import GameContext
+from daemons.engine.world import World
 
 
 @pytest.fixture

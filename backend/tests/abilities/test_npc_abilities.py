@@ -12,10 +12,14 @@ Tests cover:
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from app.engine.systems.abilities import AbilityExecutor
-from app.engine.systems.events import EventDispatcher
-from tests.abilities.builders import (AbilityTemplateBuilder,
-                                      CharacterSheetBuilder, WorldNpcBuilder)
+
+from daemons.engine.systems.abilities import AbilityExecutor
+from daemons.engine.systems.events import EventDispatcher
+from tests.abilities.builders import (
+    AbilityTemplateBuilder,
+    CharacterSheetBuilder,
+    WorldNpcBuilder,
+)
 from tests.fixtures.ability_samples import SAMPLE_FIREBALL
 
 # ============================================================================

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 # Add parent directory to path to import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.models import Base  # noqa: E402
+from daemons.models import Base  # noqa: E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

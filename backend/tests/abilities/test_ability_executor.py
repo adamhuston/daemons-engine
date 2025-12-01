@@ -11,15 +11,21 @@ import time
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from app.engine.systems.abilities import AbilityExecutor
-from app.engine.systems.classes import ClassSystem
-from app.engine.world import EntityType, ResourcePool
-from tests.abilities.builders import (AbilityTemplateBuilder,
-                                      CharacterSheetBuilder,
-                                      WorldPlayerBuilder)
-from tests.fixtures.ability_samples import (SAMPLE_FIREBALL,
-                                            SAMPLE_MELEE_ATTACK,
-                                            SAMPLE_POWER_ATTACK, SAMPLE_RALLY)
+
+from daemons.engine.systems.abilities import AbilityExecutor
+from daemons.engine.systems.classes import ClassSystem
+from daemons.engine.world import EntityType, ResourcePool
+from tests.abilities.builders import (
+    AbilityTemplateBuilder,
+    CharacterSheetBuilder,
+    WorldPlayerBuilder,
+)
+from tests.fixtures.ability_samples import (
+    SAMPLE_FIREBALL,
+    SAMPLE_MELEE_ATTACK,
+    SAMPLE_POWER_ATTACK,
+    SAMPLE_RALLY,
+)
 
 # ============================================================================
 # Validation Tests (10 tests)

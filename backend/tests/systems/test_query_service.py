@@ -347,7 +347,7 @@ available_abilities:
 @pytest.mark.phase12
 def test_query_service_initialization(file_manager, temp_world_data):
     """Test QueryService initialization."""
-    from app.engine.systems.query_service import QueryService
+    from daemons.engine.systems.query_service import QueryService
 
     service = QueryService(
         file_manager=file_manager, world_data_path=str(temp_world_data)

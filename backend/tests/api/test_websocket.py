@@ -14,7 +14,7 @@ import pytest
 async def test_websocket_connect():
     """Test basic WebSocket connection."""
     # This is a placeholder - actual implementation depends on WebSocket setup
-    # from app.main import app
+    # from daemons.main import app
     #
     # with TestClient(app) as client:
     #     with client.websocket_connect("/ws") as websocket:

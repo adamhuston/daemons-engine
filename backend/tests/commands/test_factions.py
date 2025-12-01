@@ -13,15 +13,23 @@ import time
 from unittest.mock import AsyncMock
 
 import pytest
-from app.engine.systems.context import GameContext
+
+from daemons.engine.systems.context import GameContext
+
 # Import the systems and models
-from app.engine.systems.faction_system import (STANDING_HATED,
-                                               STANDING_REVERED, TIER_DISLIKED,
-                                               TIER_HATED, TIER_LIKED,
-                                               TIER_NEUTRAL, TIER_REVERED,
-                                               FactionInfo, FactionStanding,
-                                               FactionSystem)
-from app.engine.world import World, WorldPlayer, WorldRoom
+from daemons.engine.systems.faction_system import (
+    STANDING_HATED,
+    STANDING_REVERED,
+    TIER_DISLIKED,
+    TIER_HATED,
+    TIER_LIKED,
+    TIER_NEUTRAL,
+    TIER_REVERED,
+    FactionInfo,
+    FactionStanding,
+    FactionSystem,
+)
+from daemons.engine.world import World, WorldPlayer, WorldRoom
 
 # ============ FIXTURES ============
 

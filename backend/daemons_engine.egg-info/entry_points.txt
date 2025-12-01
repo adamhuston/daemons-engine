@@ -1,0 +1,2 @@
+[console_scripts]
+daemons = daemons.cli:main

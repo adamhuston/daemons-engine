@@ -119,7 +119,7 @@ class TestSchemaRegistry:
 @pytest.mark.phase12
 def test_schema_registry_initialization(temp_world_data):
     """Test that SchemaRegistry can be initialized with a valid path."""
-    from app.engine.systems.schema_registry import SchemaRegistry
+    from daemons.engine.systems.schema_registry import SchemaRegistry
 
     registry = SchemaRegistry(str(temp_world_data))
     assert registry.world_data_path == Path(temp_world_data), "Should set correct path"

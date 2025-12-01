@@ -9,11 +9,12 @@ Comprehensive test suite covering:
 """
 
 import pytest
-from app.commands.social.follow import FollowCommand
-from app.commands.social.tell import TellCommand
-from app.commands.social.yell import YellCommand
-from app.engine.systems.context import GameContext
-from app.engine.world import EntityType, World, WorldPlayer, WorldRoom
+
+from daemons.commands.social.follow import FollowCommand
+from daemons.commands.social.tell import TellCommand
+from daemons.commands.social.yell import YellCommand
+from daemons.engine.systems.context import GameContext
+from daemons.engine.world import EntityType, World, WorldPlayer, WorldRoom
 
 # ============ FIXTURES ============
 

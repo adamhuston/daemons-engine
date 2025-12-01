@@ -9,7 +9,8 @@ Tests:
 """
 
 import pytest
-from app.engine.systems.validation_service import ReferenceCache
+
+from daemons.engine.systems.validation_service import ReferenceCache
 
 
 @pytest.mark.systems
@@ -281,7 +282,7 @@ def test_validation_service_initialization(
     temp_world_data, file_manager, schema_registry
 ):
     """Test ValidationService initialization."""
-    from app.engine.systems.validation_service import ValidationService
+    from daemons.engine.systems.validation_service import ValidationService
 
     service = ValidationService(
         world_data_path=str(temp_world_data),

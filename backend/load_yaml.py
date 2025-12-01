@@ -5,10 +5,17 @@ import uuid
 from pathlib import Path
 
 import yaml
-from app.db import AsyncSessionLocal
-from app.models import (Area, ItemInstance, ItemTemplate, NpcInstance,
-                        NpcTemplate, Room)
 from sqlalchemy import select
+
+from daemons.db import AsyncSessionLocal
+from daemons.models import (
+    Area,
+    ItemInstance,
+    ItemTemplate,
+    NpcInstance,
+    NpcTemplate,
+    Room,
+)
 
 
 async def load_data():
@@ -21,7 +28,7 @@ async def load_data():
             yaml_files = list(areas_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
-                with open(yaml_file, "r", encoding="utf-8") as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     area_data = yaml.safe_load(f)
 
                 existing = await session.execute(
@@ -61,7 +68,7 @@ async def load_data():
             yaml_files = list(rooms_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
-                with open(yaml_file, "r", encoding="utf-8") as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     room_data = yaml.safe_load(f)
 
                 existing = await session.execute(
@@ -98,7 +105,7 @@ async def load_data():
             yaml_files = list(items_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
-                with open(yaml_file, "r", encoding="utf-8") as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     item_data = yaml.safe_load(f)
 
                 existing = await session.execute(
@@ -148,7 +155,7 @@ async def load_data():
             yaml_files = list(item_instances_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
-                with open(yaml_file, "r", encoding="utf-8") as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
 
                 # Determine room_id from file path (e.g., ethereal/room_1_1_1.yaml)
@@ -182,7 +189,7 @@ async def load_data():
             yaml_files = list(npcs_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
-                with open(yaml_file, "r", encoding="utf-8") as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     npc_data = yaml.safe_load(f)
 
                 existing_result = await session.execute(
@@ -245,7 +252,7 @@ async def load_data():
             yaml_files = list(npc_spawns_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
-                with open(yaml_file, "r", encoding="utf-8") as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
 
                 spawns = data.get("spawns", [])

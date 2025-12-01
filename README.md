@@ -115,6 +115,7 @@ Reference Flet client included.
 
 ## Documentation
 
+- [QUICKSTART.md](./QUICKSTART.md) – **Full setup guide** (venv, deps, server, client, linting, tests)
 - [ARCHITECTURE.md](./documentation/ARCHITECTURE.md) – Backend and engine design
 - [CONTRIBUTING.md](./CONTRIBUTING.md) – Development workflow
 - [protocol.md](./documentation/protocol.md) – WebSocket message format

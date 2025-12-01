@@ -4,7 +4,7 @@ import re
 
 test_file = r"backend\tests\commands\test_clans.py"
 
-with open(test_file, "r", encoding="utf-8") as f:
+with open(test_file, encoding="utf-8") as f:
     lines = f.readlines()
 
 # Fix indentation for lines following clan creation

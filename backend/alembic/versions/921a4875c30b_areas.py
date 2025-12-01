@@ -6,8 +6,8 @@ Create Date: 2025-11-28 00:16:50.564656
 
 """
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 import yaml
@@ -16,9 +16,9 @@ from sqlalchemy import MetaData, Table
 
 # revision identifiers, used by Alembic.
 revision: str = "921a4875c30b"
-down_revision: Union[str, Sequence[str], None] = "bc07882b503f"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = "bc07882b503f"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -110,7 +110,7 @@ def load_areas_from_yaml():
     for yaml_file in yaml_files:
         print(f"Loading area from {yaml_file.name}")
 
-        with open(yaml_file, "r", encoding="utf-8") as f:
+        with open(yaml_file, encoding="utf-8") as f:
             area_data = yaml.safe_load(f)
 
         # Prepare data for insertion
@@ -169,7 +169,7 @@ def load_rooms_from_yaml():
     for yaml_file in yaml_files:
         print(f"Loading room from {yaml_file.name}")
 
-        with open(yaml_file, "r", encoding="utf-8") as f:
+        with open(yaml_file, encoding="utf-8") as f:
             room_data = yaml.safe_load(f)
 
         # Prepare data for insertion
