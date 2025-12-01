@@ -305,6 +305,9 @@ def main(page: ft.Page):
                 elif ev_type == "respawn_countdown":
                     # Silently ignore - respawn info comes via message events
                     pass
+                elif ev_type in ("cooldown_update", "ability_cast_complete", "resource_update"):
+                    # Silently ignore - these are internal events handled elsewhere
+                    pass
                 else:
                     append_line(f"[event] {ev}", ft.Colors.GREY_700)
         except Exception as e:
@@ -457,7 +460,7 @@ def main(page: ft.Page):
                 elif ev_type == "respawn_countdown":
                     # Respawn countdown is handled via message events, ignore the data event
                     pass
-                elif ev_type in ("npc_state", "room_state"):
+                elif ev_type in ("npc_state", "room_state", "cooldown_update", "ability_cast_complete", "resource_update"):
                     # Internal state updates - silently ignore
                     pass
                 else:
