@@ -11,7 +11,6 @@ import time
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-
 from app.engine.systems.abilities import AbilityExecutor
 from app.engine.systems.classes import ClassSystem
 from app.engine.world import EntityType, ResourcePool

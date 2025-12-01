@@ -744,7 +744,29 @@ class CombatSystem:
                     )
                 return
 
-            # Start next swing
+            # Phase 14.3: For NPCs with abilities, trigger on_combat_action hook
+            # This gives behaviors a chance to use abilities instead of basic attacks
+            if attacker_id in world.npcs and self.ctx.engine:
+                npc = world.npcs[attacker_id]
+                if npc.has_character_sheet():
+                    # Trigger ability behavior hook
+                    result = await self.ctx.engine._run_behavior_hook(
+                        attacker_id, "on_combat_action", target_id
+                    )
+                    # If behavior cast an ability, skip this basic attack cycle
+                    # The ability execution handles its own timing
+                    if result and result.handled and result.cast_ability:
+                        # Reschedule next swing after ability cooldown
+                        # For now, use same recovery time as basic attack
+                        self.ctx.time_manager.schedule(
+                            self.config.recovery_time
+                            * 1.5,  # Slightly longer for abilities
+                            next_swing_callback,
+                            event_id=f"combat_recovery_{attacker_id}_{time.time()}",
+                        )
+                        return
+
+            # Start next swing (basic attack)
             attacker.start_attack(target_id, world.item_templates)
             self._schedule_swing_completion(attacker_id, target_id, weapon)
 
@@ -1014,8 +1036,8 @@ class CombatSystem:
         # Parse numbered targeting
         target_index = 1
         actual_search = target_name
-        if '.' in target_name:
-            parts = target_name.split('.', 1)
+        if "." in target_name:
+            parts = target_name.split(".", 1)
             if len(parts) == 2 and parts[0].isdigit():
                 target_num = int(parts[0])
                 if target_num >= 1:

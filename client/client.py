@@ -6,7 +6,6 @@ import httpx
 import websockets
 
 BASE_URL = "http://127.0.0.1:8000"
-WS_URL = "ws://127.0.0.1:8000/ws/game"
 WS_AUTH_URL = "ws://127.0.0.1:8000/ws/game/auth"
 
 
@@ -23,51 +22,35 @@ def main(page: ft.Page):
 
     # Set default font for the page (optional)
     page.theme = ft.Theme(font_family="Consolas")
+    page.bgcolor = ft.Colors.GREY_900
+    page.scroll = None  # Disable scroll animations
 
     # UI controls - Column for colored log lines
-    log_column = ft.Column([], scroll=ft.ScrollMode.AUTO, auto_scroll=True, spacing=0)
+    log_column = ft.Column([], scroll=ft.ScrollMode.AUTO, spacing=0, expand=True)
     output_view = ft.Container(
         content=log_column,
         expand=True,
-        bgcolor=ft.Colors.BLACK,
+        bgcolor=ft.Colors.GREY_900,
         padding=10,
+        alignment=ft.alignment.bottom_left,
     )
 
-    # Auth mode toggle
-    auth_mode = ft.Dropdown(
-        label="Connection Mode",
-        width=200,
-        options=[
-            ft.dropdown.Option("authenticated", "Authenticated (New)"),
-            ft.dropdown.Option("legacy", "Legacy (player_id)"),
-        ],
-        value="authenticated",
-    )
-
-    # Legacy mode fields
-    player_id_field = ft.TextField(
-        label="Player ID (from /players)",
-        width=400,
-        visible=False,
-    )
-
-    # Auth mode fields
+    # Auth fields
     username_field = ft.TextField(
         label="Username",
         width=200,
+        color=ft.Colors.WHITE,
     )
     password_field = ft.TextField(
         label="Password",
         width=200,
         password=True,
         can_reveal_password=True,
+        color=ft.Colors.WHITE,
     )
 
     login_button = ft.ElevatedButton("Login", icon=ft.Icons.LOGIN)
     register_button = ft.ElevatedButton("Register", icon=ft.Icons.PERSON_ADD)
-    connect_button = ft.ElevatedButton(
-        "Connect", icon=ft.Icons.PLAY_ARROW, disabled=True
-    )
 
     # HP status display
     hp_status = ft.Text(
@@ -81,7 +64,7 @@ def main(page: ft.Page):
     # User info display
     user_info = ft.Text(
         value="Not logged in",
-        color=ft.Colors.GREY,
+        color=ft.Colors.WHITE,
         size=12,
     )
 
@@ -89,21 +72,21 @@ def main(page: ft.Page):
         label="Command",
         hint_text='Type commands like "look", "north", or \'say hello\'',
         expand=True,
+        color=ft.Colors.WHITE,
     )
     send_button = ft.ElevatedButton("Send", icon=ft.Icons.SEND)
 
-    status_text = ft.Text(value="Not connected", color=ft.Colors.GREY)
+    status_text = ft.Text(value="Not connected", color=ft.Colors.WHITE)
 
     input_row = ft.Row([command_field, send_button])
     auth_row = ft.Row([username_field, password_field, login_button, register_button])
-    legacy_row = ft.Row([player_id_field, connect_button])
-    mode_row = ft.Row([auth_mode, connect_button])
     status_row = ft.Row(
         [status_text, user_info, hp_status],
         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
     )
+    output_row = ft.Row([output_view], expand=True)
 
-    page.add(mode_row, auth_row, legacy_row, status_row, output_view, input_row)
+    page.add(auth_row, status_row, output_row, input_row)
 
     state: dict[str, object | None] = {
         "ws": None,
@@ -117,22 +100,6 @@ def main(page: ft.Page):
         "role": None,
         "in_game": False,  # True once we're past character selection and in the game world
     }
-
-    def update_mode_visibility(e=None):
-        """Update UI based on connection mode."""
-        is_auth = auth_mode.value == "authenticated"
-        auth_row.visible = is_auth
-        legacy_row.visible = not is_auth
-
-        # Enable connect button based on mode
-        if is_auth:
-            connect_button.disabled = state["access_token"] is None
-        else:
-            connect_button.disabled = False
-        page.update()
-
-    auth_mode.on_change = update_mode_visibility
-    update_mode_visibility()  # Initial setup
 
     async def do_login(username: str, password: str) -> bool:
         """Attempt to login and get access token."""
@@ -157,7 +124,6 @@ def main(page: ft.Page):
                         f"Logged in as: {data['username']} ({data['role']})"
                     )
                     user_info.color = ft.Colors.GREEN
-                    connect_button.disabled = False
                     append_line(
                         f"[auth] Login successful! Role: {data['role']}",
                         ft.Colors.GREEN,
@@ -194,7 +160,7 @@ def main(page: ft.Page):
                         f"[auth] Account created! User ID: {data['user_id']}",
                         ft.Colors.GREEN,
                     )
-                    append_line("[auth] Now logging in...", ft.Colors.GREY)
+                    append_line("[auth] Now logging in...", ft.Colors.WHITE)
                     # Auto-login after registration
                     return await do_login(username, password)
                 else:
@@ -305,11 +271,15 @@ def main(page: ft.Page):
                 elif ev_type == "respawn_countdown":
                     # Silently ignore - respawn info comes via message events
                     pass
-                elif ev_type in ("cooldown_update", "ability_cast_complete", "resource_update"):
+                elif ev_type in (
+                    "cooldown_update",
+                    "ability_cast_complete",
+                    "resource_update",
+                ):
                     # Silently ignore - these are internal events handled elsewhere
                     pass
                 else:
-                    append_line(f"[event] {ev}", ft.Colors.GREY_700)
+                    append_line(f"[event] {ev}", ft.Colors.GREY_300)
         except Exception as e:
             append_line(f"[error] WebSocket closed: {e!r}")
         finally:
@@ -389,91 +359,8 @@ def main(page: ft.Page):
                     font_family="Consolas",  # Option to use a custom font
                 )
             )
+        log_column.scroll_to(offset=-1, duration=50)  # Instant scroll to bottom
         page.update()
-
-    async def connect_ws(player_id: str) -> None:
-        if state["connected"]:
-            append_line("[system] Already connected.")
-            return
-
-        url = f"{WS_URL}?player_id={player_id}"
-        append_line(f"[system] Connecting to {url} ...")
-        status_text.value = "Connecting..."
-        page.update()
-
-        try:
-            ws = await websockets.connect(url)
-        except Exception as e:
-            append_line(f"[error] Could not connect: {e!r}")
-            status_text.value = "Not connected"
-            page.update()
-            return
-
-        state["ws"] = ws
-        state["connected"] = True
-        status_text.value = "Connected"
-        append_line("[system] Connected.")
-        page.update()
-
-        # Server sends initial room description via register_player, no need to send look
-
-        try:
-            async for raw in ws:
-                try:
-                    ev = json.loads(raw)
-                except json.JSONDecodeError:
-                    append_line(f"[error] Invalid JSON: {raw}", ft.Colors.RED)
-                    continue
-
-                ev_type = ev.get("type")
-                text = ev.get("text")
-                payload = ev.get("payload")
-
-                if ev_type == "message" and text:
-                    append_line(text)
-                elif ev_type == "stat_update" and payload:
-                    # Update HP display if health stats are in payload
-                    if "current_health" in payload:
-                        state["current_health"] = payload["current_health"]
-                    if "max_health" in payload:
-                        state["max_health"] = payload["max_health"]
-
-                    # Update HP status display
-                    if (
-                        state["current_health"] is not None
-                        and state["max_health"] is not None
-                    ):
-                        current = state["current_health"]
-                        maximum = state["max_health"]
-                        hp_status.value = f"HP: {current}/{maximum}"
-
-                        # Color code based on health percentage
-                        health_pct = current / maximum if maximum > 0 else 0
-                        if health_pct > 0.6:
-                            hp_status.color = ft.Colors.GREEN
-                        elif health_pct > 0.3:
-                            hp_status.color = ft.Colors.YELLOW
-                        else:
-                            hp_status.color = ft.Colors.RED
-
-                        page.update()
-                elif ev_type == "respawn_countdown":
-                    # Respawn countdown is handled via message events, ignore the data event
-                    pass
-                elif ev_type in ("npc_state", "room_state", "cooldown_update", "ability_cast_complete", "resource_update"):
-                    # Internal state updates - silently ignore
-                    pass
-                else:
-                    # Unknown event type - show for debugging
-                    append_line(f"[event] {ev}", ft.Colors.GREY_700)
-        except Exception as e:
-            append_line(f"[error] WebSocket closed: {e!r}")
-        finally:
-            state["connected"] = False
-            state["ws"] = None
-            status_text.value = "Disconnected"
-            append_line("[system] Disconnected.")
-            page.update()
 
     async def send_command(cmd: str) -> None:
         cmd = cmd.strip()
@@ -516,14 +403,7 @@ def main(page: ft.Page):
         page.run_task(do_register, username, password)
 
     def connect_click(e: ft.ControlEvent) -> None:
-        if auth_mode.value == "authenticated":
-            page.run_task(connect_ws_auth)
-        else:
-            player_id = player_id_field.value.strip()
-            if not player_id:
-                append_line("[system] Enter a player ID from /players.")
-                return
-            page.run_task(connect_ws, player_id)
+        page.run_task(connect_ws_auth)
 
     def send_command_click(e: ft.ControlEvent) -> None:
         cmd = command_field.value
@@ -535,7 +415,6 @@ def main(page: ft.Page):
 
     login_button.on_click = login_click
     register_button.on_click = register_click
-    connect_button.on_click = connect_click
     send_button.on_click = send_command_click
     command_field.on_submit = command_submit
 

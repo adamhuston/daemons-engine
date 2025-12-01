@@ -1,4 +1,5 @@
 """Fix indentation issues in test_clans.py"""
+
 import re
 
 test_file = r"backend\tests\commands\test_clans.py"

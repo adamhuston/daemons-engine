@@ -7,7 +7,6 @@ Tests event scheduling, execution, cancellation, and recurring events.
 import asyncio
 
 import pytest
-
 from app.engine.systems.context import GameContext
 from app.engine.systems.time_manager import TimeEventManager
 from app.engine.world import World

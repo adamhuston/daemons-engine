@@ -9,7 +9,6 @@ Comprehensive test suite covering:
 """
 
 import pytest
-
 from app.commands.social.follow import FollowCommand
 from app.commands.social.tell import TellCommand
 from app.commands.social.yell import YellCommand

@@ -5,7 +5,6 @@ from typing import Any, Dict, Optional
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-
 from app.engine.systems.abilities import AbilityExecutor
 from app.engine.systems.classes import ClassSystem
 from app.engine.systems.combat import CombatSystem
@@ -213,6 +212,41 @@ def mock_enemy_npc():
         dexterity=12,
         intelligence=6,
         vitality=10,
+    )
+
+
+@pytest.fixture
+def npc_mage_sheet():
+    """Character sheet for NPC spellcaster (Phase 14 - Entity Abilities)"""
+    return CharacterSheet(
+        class_id="mage",
+        level=5,
+        experience=0,
+        learned_abilities={"fireball", "frostbolt", "arcane_missiles"},
+        resource_pools={
+            "mana": ResourcePool(
+                resource_id="mana", current=100, max=150, regen_per_second=5.0
+            )
+        },
+    )
+
+
+@pytest.fixture
+def mock_npc_caster(npc_mage_sheet):
+    """WorldNpc with spellcasting abilities (Phase 14 - Entity Abilities)"""
+    return WorldNpc(
+        id="test_npc_mage",
+        name="Dark Cultist",
+        room_id="test_room",
+        template_id="dark_cultist",
+        entity_type=EntityType.NPC,
+        current_health=80,
+        max_health=80,
+        strength=6,
+        dexterity=10,
+        intelligence=14,
+        vitality=8,
+        character_sheet=npc_mage_sheet,
     )
 
 

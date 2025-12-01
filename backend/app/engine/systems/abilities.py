@@ -15,9 +15,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
-
 from app.engine.systems.context import GameContext
-from app.engine.world import ResourceDef, StatGrowth, WorldEntity, WorldPlayer
+from app.engine.world import ResourceDef, StatGrowth, WorldEntity, WorldNpc
 
 logger = logging.getLogger(__name__)
 
@@ -374,7 +373,7 @@ class AbilityExecutor:
 
     async def execute_ability(
         self,
-        caster: WorldPlayer,
+        caster: WorldEntity,
         ability_id: str,
         target_id: Optional[str] = None,
         target_entity: Optional[WorldEntity] = None,
@@ -385,8 +384,10 @@ class AbilityExecutor:
         Main entry point for ability execution. Validates, resolves targets,
         applies cooldowns, and calls the behavior function.
 
+        Phase 14.2: Now accepts any WorldEntity (players, NPCs, items) as caster.
+
         Args:
-            caster: The player casting the ability
+            caster: The entity casting the ability (player, NPC, or item)
             ability_id: The ability to cast
             target_id: Optional target ID (overrides target resolution)
             target_entity: Optional target entity (for passed-in targets)
@@ -448,8 +449,9 @@ class AbilityExecutor:
 
             # Emit ability_cast event (cast has started)
             target_ids = [t.id for t in targets] if targets else []
+            entity_type = "npc" if isinstance(caster, WorldNpc) else "player"
             cast_event = self.context.event_dispatcher.ability_cast(
-                caster.id, ability_id, ability.name, target_ids
+                caster.id, ability_id, ability.name, target_ids, entity_type=entity_type
             )
             await self.context.event_dispatcher.dispatch([cast_event])
 
@@ -649,6 +651,7 @@ class AbilityExecutor:
                 behavior_result.message,
                 damage_dealt=behavior_result.damage_dealt,
                 targets_hit=behavior_result.targets_hit,
+                entity_type=entity_type,
             )
 
             # Dispatch ability completion events FIRST, then death events
@@ -694,21 +697,23 @@ class AbilityExecutor:
             )
 
     def _validate_ability_use(
-        self, caster: WorldPlayer, ability_id: str
+        self, caster: WorldEntity, ability_id: str
     ) -> Optional[str]:
         """
-        Validate that a player can use an ability.
+        Validate that an entity can use an ability.
+
+        Phase 14.2: Now works with any WorldEntity (players, NPCs, items).
 
         Checks:
-        - Player has a character sheet (class chosen)
+        - Entity has a character sheet (class chosen)
         - Ability is learned
-        - Player is high enough level
-        - Player has enough resources
+        - Entity is high enough level
+        - Entity has enough resources
         - Personal cooldown is ready
         - GCD is ready
 
         Args:
-            caster: The player attempting to cast
+            caster: The entity attempting to cast (player, NPC, or item)
             ability_id: The ability ID
 
         Returns:
@@ -760,13 +765,15 @@ class AbilityExecutor:
 
     def _resolve_targets(
         self,
-        caster: WorldPlayer,
+        caster: WorldEntity,
         ability: AbilityTemplate,
         target_id: Optional[str],
         target_entity: Optional[WorldEntity],
     ) -> List[WorldEntity]:
         """
         Resolve targets for an ability based on its target_type.
+
+        Phase 14.2: Now works with any WorldEntity (players, NPCs, items) as caster.
 
         Target types:
         - "self": The caster
@@ -775,7 +782,7 @@ class AbilityExecutor:
         - "room": All entities in the room
 
         Args:
-            caster: The caster
+            caster: The casting entity (player, NPC, or item)
             ability: The ability template
             target_id: Optional explicit target ID
             target_entity: Optional explicit target entity
@@ -824,12 +831,14 @@ class AbilityExecutor:
 
         return []
 
-    def _apply_cooldowns(self, caster: WorldPlayer, ability: AbilityTemplate) -> None:
+    def _apply_cooldowns(self, caster: WorldEntity, ability: AbilityTemplate) -> None:
         """
         Apply personal cooldown and GCD after ability execution.
 
+        Phase 14.2: Now works with any WorldEntity (players, NPCs, items) as caster.
+
         Args:
-            caster: The caster
+            caster: The casting entity (player, NPC, or item)
             ability: The ability template
         """
         current_time = time.time()

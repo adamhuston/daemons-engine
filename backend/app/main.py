@@ -117,6 +117,24 @@ async def lifespan(app: FastAPI):
                     f"Initialized character sheet for {player.name} ({player.character_class})"
                 )
 
+    # 4a1b) Initialize character sheets for NPCs with class_id (Phase 14.4)
+    from .engine.loader import create_npc_character_sheet
+
+    npc_sheet_count = 0
+    for npc in engine_instance.world.npcs.values():
+        template = engine_instance.world.npc_templates.get(npc.template_id)
+        if template and template.class_id and not npc.character_sheet:
+            npc.character_sheet = create_npc_character_sheet(
+                template,
+                engine_instance.class_system.class_templates,
+            )
+            if npc.character_sheet:
+                npc_sheet_count += 1
+    if npc_sheet_count > 0:
+        logger.info(
+            f"Initialized character sheets for {npc_sheet_count} NPCs with abilities"
+        )
+
     # 4a2) Load clans from database into ClanSystem (Phase 10.2)
     await engine_instance.clan_system.load_clans_from_db()
     logger.info("Loaded clans from database into ClanSystem")

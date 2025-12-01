@@ -2429,6 +2429,15 @@ class WorldEngine:
                         npc.room_id = npc.spawn_room_id
                         npc.target_id = None
 
+                        # Phase 14.4: Restore character sheet with full resources on respawn
+                        if template.class_id:
+                            from .loader import create_npc_character_sheet
+
+                            npc.character_sheet = create_npc_character_sheet(
+                                template,
+                                self.class_system.class_templates,
+                            )
+
                         # Add back to room
                         spawn_room = self.world.rooms.get(npc.spawn_room_id)
                         if spawn_room:
@@ -2570,6 +2579,24 @@ class WorldEngine:
                             npc.max_health, npc.current_health + hp_gained
                         )
                         # NPCs don't get UI updates, regeneration happens silently
+
+                # Phase 14.2: Regenerate resources for NPCs with character sheets
+                # NPCs with abilities (mana, rage, energy) regenerate like players
+                if npc.character_sheet:
+                    for (
+                        resource_id,
+                        pool,
+                    ) in npc.character_sheet.resource_pools.items():
+                        if pool.current < pool.max:
+                            # Use awake rate for NPC resource regen (consistent with HP)
+                            resource_gained = int(
+                                pool.max * d20.RESOURCE_REGEN_AWAKE * time_delta
+                            )
+                            if resource_gained > 0:
+                                pool.current = min(
+                                    pool.max, pool.current + resource_gained
+                                )
+                                # NPCs don't get UI updates, resource regen happens silently
 
             # Dispatch all regen events
             if events:
@@ -3036,7 +3063,9 @@ class WorldEngine:
         self, npc_id: str, result: BehaviorResult
     ) -> None:
         """
-        Process a BehaviorResult - handle movement, messages, attacks, etc.
+        Process a BehaviorResult - handle movement, messages, attacks, abilities, etc.
+
+        Phase 14.3: Added handling for cast_ability to trigger NPC ability usage.
         """
         npc = self.world.npcs.get(npc_id)
         if not npc:
@@ -3047,6 +3076,14 @@ class WorldEngine:
         # Handle messages
         if result.message:
             events.append(self._msg_to_room(npc.room_id, result.message))
+
+        # Phase 14.3: Handle ability casting
+        if result.cast_ability:
+            await self._npc_cast_ability(
+                npc_id,
+                result.cast_ability,
+                result.ability_target or result.attack_target,
+            )
 
         # Handle movement
         if result.move_to:
@@ -3154,8 +3191,8 @@ class WorldEngine:
             - target_index: 1-based index (1 for first match, 2 for second, etc.)
             - actual_search_term: The search term without the number prefix
         """
-        if '.' in search_term:
-            parts = search_term.split('.', 1)
+        if "." in search_term:
+            parts = search_term.split(".", 1)
             if len(parts) == 2 and parts[0].isdigit():
                 target_num = int(parts[0])
                 if target_num >= 1:
@@ -5349,6 +5386,82 @@ class WorldEngine:
                     if events:
                         to_dispatch.extend(events)
                     await self._dispatch_events(to_dispatch)
+
+    async def _npc_cast_ability(
+        self, npc_id: str, ability_id: str, target_id: str | None = None
+    ) -> None:
+        """
+        Phase 14.3: Have an NPC cast an ability.
+
+        Called by _process_behavior_result when a behavior returns cast_ability.
+
+        Args:
+            npc_id: The NPC casting the ability
+            ability_id: The ability to cast
+            target_id: Optional target entity ID (defaults to combat target)
+        """
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
+            return
+
+        # Check if NPC has abilities
+        if not npc.has_character_sheet():
+            print(
+                f"[NPC Ability] {npc.name} has no character_sheet, skipping {ability_id}"
+            )
+            return
+
+        # Get ability executor from context
+        ability_executor = self.context.ability_executor
+        if not ability_executor:
+            print("[NPC Ability] No ability executor available")
+            return
+
+        # Resolve target - default to combat target if not specified
+        if not target_id and npc.combat.is_in_combat():
+            target_id = npc.combat.target_id
+
+        target_entity = None
+        if target_id:
+            target_entity = self.world.get_entity(target_id)
+
+        # Get ability template for flavor text
+        ability = (
+            self.context.class_system.get_ability(ability_id)
+            if self.context.class_system
+            else None
+        )
+
+        try:
+            # Execute the ability
+            result = await ability_executor.execute_ability(
+                caster=npc,
+                ability_id=ability_id,
+                target_id=target_id,
+                target_entity=target_entity,
+            )
+
+            if result.success:
+                print(f"[NPC Ability] {npc.name} cast {ability_id}: {result.message}")
+
+                # Phase 14.5: Broadcast NPC ability cast to room
+                ability_name = ability.name if ability else ability_id
+                if target_entity:
+                    flavor_msg = (
+                        f"⚡ {npc.name} uses {ability_name} on {target_entity.name}!"
+                    )
+                else:
+                    flavor_msg = f"⚡ {npc.name} uses {ability_name}!"
+
+                room_event = self._msg_to_room(npc.room_id, flavor_msg)
+                await self._dispatch_events([room_event])
+            else:
+                print(
+                    f"[NPC Ability] {npc.name} failed to cast {ability_id}: {result.error}"
+                )
+
+        except Exception as e:
+            print(f"[NPC Ability] Error casting {ability_id}: {e}")
 
     def _test_timer(self, player_id: PlayerId, delay: float) -> List[Event]:
         """

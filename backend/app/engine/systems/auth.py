@@ -13,12 +13,11 @@ from enum import Enum
 from functools import wraps
 from typing import Callable
 
+from app.models import Player, RefreshToken, SecurityEvent, UserAccount
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models import Player, RefreshToken, SecurityEvent, UserAccount
 
 # ============================================================================
 # Configuration

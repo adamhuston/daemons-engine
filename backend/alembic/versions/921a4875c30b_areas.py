@@ -11,9 +11,8 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 import yaml
-from sqlalchemy import MetaData, Table
-
 from alembic import op
+from sqlalchemy import MetaData, Table
 
 # revision identifiers, used by Alembic.
 revision: str = "921a4875c30b"

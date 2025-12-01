@@ -7,12 +7,11 @@ Tests model creation, validation, relationships, and constraints.
 import time
 
 import pytest
-from sqlalchemy.exc import IntegrityError
-
 from app.models import (AdminAction, Area, Clan, ClanMember, Faction,
                         ItemInstance, ItemTemplate, NpcInstance, NpcTemplate,
                         Player, PlayerInventory, Room, RoomType, SecurityEvent,
                         UserAccount)
+from sqlalchemy.exc import IntegrityError
 
 # ============================================================================
 # Player Model Tests

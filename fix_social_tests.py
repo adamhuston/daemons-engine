@@ -1,4 +1,5 @@
 """Fix all test_social.py issues - player names and missing fields."""
+
 import re
 
 test_file = r"backend\tests\commands\test_social.py"

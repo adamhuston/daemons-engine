@@ -293,6 +293,28 @@ class ItemTemplate(Base):
         Integer, nullable=True
     )  # Duration in seconds (None = permanent)
 
+    # Phase 14+: Ability system support (magic items with spells)
+    class_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # Character class for items with abilities
+    default_abilities: Mapped[list] = mapped_column(
+        JSON, default=list
+    )  # Abilities item grants
+    ability_loadout: Mapped[list] = mapped_column(
+        JSON, default=list
+    )  # Pre-equipped abilities
+
+    # Phase 14+: Combat stats (destructible items like doors, barrels)
+    max_health: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # HP for destructible items (None = indestructible)
+    base_armor_class: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="10"
+    )  # AC for destructible items
+    resistances: Mapped[dict] = mapped_column(
+        JSON, default=dict
+    )  # Damage resistances {"fire": -50, "physical": 20}
+
     # Flavor and metadata
     flavor_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     rarity: Mapped[str] = mapped_column(
@@ -426,6 +448,17 @@ class NpcTemplate(Base):
     keywords: Mapped[list] = mapped_column(
         JSON, default=list
     )  # For targeting: ["goblin", "warrior"]
+
+    # Phase 14: Character class and abilities
+    class_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # "warrior", "mage", "rogue" - enables ability system
+    default_abilities: Mapped[list] = mapped_column(
+        JSON, default=list
+    )  # Abilities NPC spawns with (list of ability_ids)
+    ability_loadout: Mapped[list] = mapped_column(
+        JSON, default=list
+    )  # Pre-equipped abilities in slot order
 
 
 class NpcInstance(Base):

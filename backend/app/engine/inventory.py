@@ -265,8 +265,8 @@ def find_item_by_name(
     # Parse numbered targeting
     target_index = 1
     actual_search = item_name
-    if '.' in item_name:
-        parts = item_name.split('.', 1)
+    if "." in item_name:
+        parts = item_name.split(".", 1)
         if len(parts) == 2 and parts[0].isdigit():
             target_num = int(parts[0])
             if target_num >= 1:
@@ -338,8 +338,8 @@ def find_item_in_room(world: World, room_id: str, item_name: str) -> Optional[It
     # Parse numbered targeting
     target_index = 1
     actual_search = item_name
-    if '.' in item_name:
-        parts = item_name.split('.', 1)
+    if "." in item_name:
+        parts = item_name.split(".", 1)
         if len(parts) == 2 and parts[0].isdigit():
             target_num = int(parts[0])
             if target_num >= 1:

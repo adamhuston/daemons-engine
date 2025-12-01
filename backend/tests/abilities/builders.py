@@ -306,6 +306,7 @@ class WorldNpcBuilder:
                   .with_template("goblin_scout")
                   .with_health(50, 50)
                   .with_stats(strength=8, dexterity=12)
+                  .with_character_sheet(mage_sheet)
                   .build())
     """
 
@@ -320,6 +321,7 @@ class WorldNpcBuilder:
         self._dexterity = 10
         self._intelligence = 10
         self._vitality = 10
+        self._character_sheet: Optional[CharacterSheet] = None
 
     def with_id(self, entity_id: str) -> "WorldNpcBuilder":
         self._id = entity_id
@@ -355,6 +357,11 @@ class WorldNpcBuilder:
         self._vitality = vitality
         return self
 
+    def with_character_sheet(self, sheet: CharacterSheet) -> "WorldNpcBuilder":
+        """Add a character sheet for NPC ability support (Phase 14)"""
+        self._character_sheet = sheet
+        return self
+
     def build(self) -> WorldNpc:
         return WorldNpc(
             id=self._id,
@@ -368,4 +375,5 @@ class WorldNpcBuilder:
             dexterity=self._dexterity,
             intelligence=self._intelligence,
             vitality=self._vitality,
+            character_sheet=self._character_sheet,
         )

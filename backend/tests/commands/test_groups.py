@@ -12,7 +12,6 @@ Comprehensive test suite covering:
 import time
 
 import pytest
-
 from app.engine.systems.context import GameContext
 # Import the systems and models
 from app.engine.systems.group_system import GroupSystem

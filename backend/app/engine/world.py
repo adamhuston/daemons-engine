@@ -1,4 +1,6 @@
 # backend/app/engine/world.py
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -584,6 +586,76 @@ class CombatResult:
 
 
 @dataclass
+class EntityCombatStats:
+    """
+    Combat-related stats that can be applied to items, objects, or other destructibles.
+
+    This dataclass provides combat functionality (HP, damage, resistances) for things that
+    are NOT WorldEntity instances but still need to participate in combat (e.g., destructible
+    doors, explosive barrels, magic items that can be destroyed).
+
+    Used by: WorldItem (for destructible items), future WorldObject (for environmental objects)
+    """
+
+    max_health: int
+    current_health: int
+    armor_class: int = 10
+
+    # Damage resistances (-100 = takes double damage, 0 = normal, 50 = half damage, 100 = immune)
+    physical_resist: int = 0
+    fire_resist: int = 0
+    cold_resist: int = 0
+    lightning_resist: int = 0
+    poison_resist: int = 0
+    psychic_resist: int = 0
+
+    # Active effects (buffs/debuffs)
+    active_effects: Dict[str, Effect] = field(default_factory=dict)
+
+    def is_alive(self) -> bool:
+        """Check if this object is still intact (not destroyed)."""
+        return self.current_health > 0
+
+    def take_damage(self, amount: int, damage_type: str = "physical") -> int:
+        """
+        Apply damage to this object, accounting for resistances.
+
+        Returns actual damage dealt after resistances.
+        """
+        # Get resistance for damage type
+        resistance = 0
+        if damage_type == "physical":
+            resistance = self.physical_resist
+        elif damage_type == "fire":
+            resistance = self.fire_resist
+        elif damage_type == "cold":
+            resistance = self.cold_resist
+        elif damage_type == "lightning":
+            resistance = self.lightning_resist
+        elif damage_type == "poison":
+            resistance = self.poison_resist
+        elif damage_type == "psychic":
+            resistance = self.psychic_resist
+
+        # Calculate effective damage
+        damage_multiplier = 1.0 - (resistance / 100.0)
+        actual_damage = int(amount * damage_multiplier)
+
+        # Apply damage
+        self.current_health = max(0, self.current_health - actual_damage)
+        return actual_damage
+
+    def apply_effect(self, effect: Effect) -> None:
+        """Apply an effect to this object."""
+        effect.applied_at = time.time()
+        self.active_effects[effect.effect_id] = effect
+
+    def remove_effect(self, effect_id: str) -> Effect | None:
+        """Remove an effect by ID. Returns the removed effect, or None if not found."""
+        return self.active_effects.pop(effect_id, None)
+
+
+@dataclass
 class WorldEntity:
     """
     Base class for all entities in the world (players and NPCs).
@@ -650,9 +722,53 @@ class WorldEntity:
     death_time: float | None = None  # Unix timestamp when entity died
     respawn_event_id: str | None = None  # Event ID for scheduled respawn countdown
 
+    # Phase 14: Character class and abilities
+    # Moved to WorldEntity to enable abilities on NPCs, magic items, and environment
+    character_sheet: CharacterSheet | None = None  # Optional - backward compatible
+
     def is_alive(self) -> bool:
         """Check if entity is alive."""
         return self.current_health > 0
+
+    # ========== Phase 14: Character Sheet Helper Methods ==========
+    # These methods enable any entity (player, NPC, item, environment) to use abilities
+
+    def has_character_sheet(self) -> bool:
+        """Check if entity has a character sheet (has a class with abilities)."""
+        return self.character_sheet is not None
+
+    def get_class_id(self) -> str | None:
+        """Get the entity's class ID, or None if no class."""
+        return self.character_sheet.class_id if self.character_sheet else None
+
+    def get_resource_pool(self, resource_id: str) -> ResourcePool | None:
+        """
+        Get a resource pool by ID (e.g., "mana", "rage", "charges").
+        Returns None if entity has no character sheet or resource doesn't exist.
+        """
+        if not self.character_sheet:
+            return None
+        return self.character_sheet.resource_pools.get(resource_id)
+
+    def get_learned_abilities(self) -> set[str]:
+        """Get the set of learned ability IDs, or empty set if no class."""
+        if not self.character_sheet:
+            return set()
+        return self.character_sheet.learned_abilities
+
+    def get_ability_loadout(self) -> list[AbilitySlot]:
+        """Get the current ability loadout, or empty list if no class."""
+        if not self.character_sheet:
+            return []
+        return self.character_sheet.ability_loadout
+
+    def has_learned_ability(self, ability_id: str) -> bool:
+        """Check if entity has learned a specific ability."""
+        if not self.character_sheet:
+            return False
+        return ability_id in self.character_sheet.learned_abilities
+
+    # ========== Effect and Stat Management ==========
 
     def apply_effect(self, effect: Effect) -> None:
         """
@@ -1043,6 +1159,22 @@ class ItemTemplate:
     light_intensity: int = 0  # Light contribution (0-50)
     light_duration: int | None = None  # Duration in seconds (None = permanent)
 
+    # Phase 14+: Ability system support (magic items with spells)
+    class_id: str | None = None  # Character class for items with abilities
+    default_abilities: Set[str] = field(
+        default_factory=set
+    )  # Abilities item grants when used/equipped
+    ability_loadout: list[str] = field(
+        default_factory=list
+    )  # Pre-equipped abilities for items
+
+    # Phase 14+: Combat stats (destructible items like doors, barrels)
+    max_health: int | None = None  # HP for destructible items (None = indestructible)
+    base_armor_class: int = 10  # AC for destructible items
+    resistances: Dict[str, int] = field(
+        default_factory=dict
+    )  # Damage resistances (e.g., {"fire": -50, "physical": 20})
+
     def is_weapon(self) -> bool:
         """Check if this item is a weapon."""
         return self.item_type == "weapon"
@@ -1090,6 +1222,14 @@ class WorldItem:
     # Cached description from template
     _description: str = ""
 
+    # Phase 14+: Optional ability support (magic items)
+    # Items can optionally have character_sheet for abilities (staffs with spells, etc.)
+    character_sheet: CharacterSheet | None = None
+
+    # Phase 14+: Optional combat stats (destructible items)
+    # Items can optionally have combat_stats to be destructible (doors, barrels, etc.)
+    combat_stats: EntityCombatStats | None = None
+
     def is_equipped(self) -> bool:
         """Check if item is currently equipped."""
         return self.equipped_slot is not None
@@ -1108,7 +1248,80 @@ class WorldItem:
             and self.current_durability == other.current_durability
         )
 
-    # Targetable protocol implementation
+    # ========== Phase 14+: Character Sheet Helper Methods ==========
+    # These enable magic items to have abilities (staffs with spells, etc.)
+
+    def has_character_sheet(self) -> bool:
+        """Check if item has a character sheet (has abilities)."""
+        return self.character_sheet is not None
+
+    def get_class_id(self) -> str | None:
+        """Get the item's class ID, or None if no abilities."""
+        return self.character_sheet.class_id if self.character_sheet else None
+
+    def get_resource_pool(self, resource_id: str) -> ResourcePool | None:
+        """
+        Get a resource pool by ID (e.g., "charges", "mana").
+        Returns None if item has no character sheet or resource doesn't exist.
+        """
+        if not self.character_sheet:
+            return None
+        return self.character_sheet.resource_pools.get(resource_id)
+
+    def get_learned_abilities(self) -> set[str]:
+        """Get the set of learned ability IDs, or empty set if no abilities."""
+        if not self.character_sheet:
+            return set()
+        return self.character_sheet.learned_abilities
+
+    def get_ability_loadout(self) -> list[AbilitySlot]:
+        """Get the current ability loadout, or empty list if no abilities."""
+        if not self.character_sheet:
+            return []
+        return self.character_sheet.ability_loadout
+
+    def has_learned_ability(self, ability_id: str) -> bool:
+        """Check if item has a specific ability."""
+        if not self.character_sheet:
+            return False
+        return ability_id in self.character_sheet.learned_abilities
+
+    # ========== Phase 14+: Combat Stats Helper Methods ==========
+    # These enable destructible items (doors, barrels, etc.)
+
+    def is_destructible(self) -> bool:
+        """Check if this item has combat stats (can take damage and be destroyed)."""
+        return self.combat_stats is not None
+
+    def is_alive(self) -> bool:
+        """Check if this destructible item is still intact (not destroyed)."""
+        if not self.combat_stats:
+            return True  # Non-destructible items are always "alive"
+        return self.combat_stats.is_alive()
+
+    def take_damage(self, amount: int, damage_type: str = "physical") -> int:
+        """
+        Apply damage to this item if it's destructible.
+
+        Returns actual damage dealt, or 0 if item is not destructible.
+        """
+        if not self.combat_stats:
+            return 0  # Indestructible items take no damage
+        return self.combat_stats.take_damage(amount, damage_type)
+
+    def apply_effect(self, effect: Effect) -> None:
+        """Apply an effect to this item if it has combat stats."""
+        if self.combat_stats:
+            self.combat_stats.apply_effect(effect)
+
+    def remove_effect(self, effect_id: str) -> Effect | None:
+        """Remove an effect from this item if it has combat stats."""
+        if not self.combat_stats:
+            return None
+        return self.combat_stats.remove_effect(effect_id)
+
+    # ========== Targetable Protocol Implementation ==========
+
     def get_description(self) -> str:
         """Return the description of this item."""
         if self.quantity > 1:
@@ -1198,6 +1411,15 @@ class NpcTemplate:
     # Used for companions, unique bosses, escort targets
     persist_state: bool = False
 
+    # Phase 14: Character class and abilities
+    class_id: str | None = None  # "warrior", "mage", "rogue" - enables ability system
+    default_abilities: Set[str] = field(
+        default_factory=set
+    )  # Abilities NPC spawns with
+    ability_loadout: list[str] = field(
+        default_factory=list
+    )  # Pre-equipped abilities in slot order
+
     # Resolved behavior config (populated at load time from behavior tags)
     resolved_behavior: dict = field(default_factory=dict)
 
@@ -1216,7 +1438,8 @@ class WorldNpc(WorldEntity):
     - on_move_effect
     - inventory_items, equipped_items (NPCs can carry/equip items!)
     - base_attack_damage_min/max, base_attack_speed
-    - active_effects
+    - active_effects, combat
+    - character_sheet (Phase 14: abilities system)
     """
 
     # NPC-specific: template reference
@@ -1362,7 +1585,8 @@ class WorldPlayer(WorldEntity):
     - on_move_effect
     - inventory_items, equipped_items
     - base_attack_damage_min/max, base_attack_speed
-    - active_effects
+    - active_effects, combat
+    - character_sheet (Phase 14: abilities system)
     """
 
     # Player-specific inventory capacity tracking
@@ -1387,9 +1611,6 @@ class WorldPlayer(WorldEntity):
     dialogue_node: str | None = None  # Current node ID in dialogue tree
     active_dialogue_npc_id: str | None = None  # Instance ID of NPC being talked to
 
-    # Phase 9: Character class and abilities
-    character_sheet: CharacterSheet | None = None  # Optional - backward compatible
-
     # Resting and regeneration
     is_sleeping: bool = False  # Whether player is sleeping for faster regen
     sleep_start_time: float | None = None  # When player started sleeping
@@ -1400,43 +1621,6 @@ class WorldPlayer(WorldEntity):
     def __post_init__(self):
         """Ensure entity_type is set correctly."""
         object.__setattr__(self, "entity_type", EntityType.PLAYER)
-
-    # ========== Phase 9: Character Sheet Helper Methods ==========
-
-    def has_character_sheet(self) -> bool:
-        """Check if player has a character sheet (has chosen a class)."""
-        return self.character_sheet is not None
-
-    def get_class_id(self) -> str | None:
-        """Get the player's class ID, or None if no class."""
-        return self.character_sheet.class_id if self.character_sheet else None
-
-    def get_resource_pool(self, resource_id: str) -> ResourcePool | None:
-        """
-        Get a resource pool by ID (e.g., "mana", "rage").
-        Returns None if player has no character sheet or resource doesn't exist.
-        """
-        if not self.character_sheet:
-            return None
-        return self.character_sheet.resource_pools.get(resource_id)
-
-    def get_learned_abilities(self) -> set[str]:
-        """Get the set of learned ability IDs, or empty set if no class."""
-        if not self.character_sheet:
-            return set()
-        return self.character_sheet.learned_abilities
-
-    def get_ability_loadout(self) -> list[AbilitySlot]:
-        """Get the current ability loadout, or empty list if no class."""
-        if not self.character_sheet:
-            return []
-        return self.character_sheet.ability_loadout
-
-    def has_learned_ability(self, ability_id: str) -> bool:
-        """Check if player has learned a specific ability."""
-        if not self.character_sheet:
-            return False
-        return ability_id in self.character_sheet.learned_abilities
 
     def get_effective_armor_class(self) -> int:
         """

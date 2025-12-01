@@ -334,16 +334,18 @@ class EventDispatcher:
         ability_name: str,
         target_ids: List["PlayerId"] | None = None,
         room_id: "RoomId | None" = None,
+        entity_type: str = "player",
     ) -> Event:
         """
         Create an ability_cast event when an ability is used.
 
         Args:
-            caster_id: Player who cast the ability
+            caster_id: Entity who cast the ability
             ability_id: The ability ID
             ability_name: Human-readable ability name
-            target_ids: List of target player IDs affected
+            target_ids: List of target entity IDs affected
             room_id: Room where ability was cast (for room-scoped events)
+            entity_type: Type of caster ("player" or "npc")
 
         Returns:
             An ability_cast event dict
@@ -353,6 +355,7 @@ class EventDispatcher:
             "caster_id": caster_id,
             "ability_id": ability_id,
             "ability_name": ability_name,
+            "entity_type": entity_type,
         }
         if target_ids:
             ev["target_ids"] = target_ids
@@ -398,18 +401,20 @@ class EventDispatcher:
         message: str,
         damage_dealt: int | None = None,
         targets_hit: int | None = None,
+        entity_type: str = "player",
     ) -> Event:
         """
         Create an ability_cast_complete event when ability execution finishes.
 
         Args:
-            caster_id: Player who cast the ability
+            caster_id: Entity who cast the ability
             ability_id: The ability ID
             ability_name: Human-readable ability name
             success: Whether the ability succeeded
             message: Result message
             damage_dealt: Optional total damage dealt
             targets_hit: Optional number of targets hit
+            entity_type: Type of caster ("player" or "npc")
 
         Returns:
             An ability_cast_complete event dict
@@ -429,6 +434,7 @@ class EventDispatcher:
             "player_id": caster_id,
             "ability_id": ability_id,
             "ability_name": ability_name,
+            "entity_type": entity_type,
             "payload": payload,
         }
         return ev

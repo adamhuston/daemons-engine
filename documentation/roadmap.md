@@ -1365,12 +1365,118 @@ Before adding big systems, make the core loop solid.
 
 ---
 
-### Phase 13 - Abilities Audit ⬜
-Ensure test engine is working
-Make sure every ability produced does what it claims to do
+### Phase 13 - Test Engine & CI/CD ✅ COMPLETE
 
-### Phase 14 - NPC Abilities
-Extend classes, abilities, communications abilities, and factions to NPCs
+**Goals**: Build robust testing infrastructure and continuous integration pipeline before auditing ability behaviors.
+
+**Status**: ✅ All immediate actions complete
+
+**Rationale**: Deferred the ability audit to a later phase. Before locking down default ability behaviors, we want to give content creators maximum flexibility. The ability system is mature and stable; a comprehensive audit will be more valuable once we better understand content creation patterns.
+
+**Completed Work**:
+- ✅ Comprehensive test fixtures (conftest.py, ability_samples.py)
+- ✅ Coverage reporting (.coveragerc, coverage.xml)
+- ✅ GitHub Actions CI/CD (test.yml)
+- ✅ Pre-commit hooks for code quality
+- ✅ Fixed existing test failures
+
+**Future Work** (Deferred):
+- [ ] Systematic testing of all 29 ability behaviors
+- [ ] Validate AbilityExecutor execution pipeline
+- [ ] Comprehensive edge case testing
+- [ ] Performance profiling of ability system
+
+---
+
+---
+
+### Phase 14 - Entity Abilities ✅ COMPLETE
+
+**Goals**: Extend the ability system from players to all entities (NPCs, magic items, environmental objects).
+
+**Phase 14.1: Universal Entity Ability Support** ✅
+- ✅ Moved `character_sheet` to WorldEntity base class
+- ✅ Moved 6 helper methods to WorldEntity (has_character_sheet, get_class_id, etc.)
+- ✅ Updated NpcTemplate with class_id, default_abilities, ability_loadout fields
+- ✅ Database migration l4m5n6o7p8q9_phase14_npc_abilities.py
+- ✅ Updated ORM model in models.py
+
+**Phase 14.2: Ability System Generalization** ✅
+- ✅ Refactored AbilityExecutor to accept WorldEntity instead of WorldPlayer
+- ✅ Updated all method type hints and docstrings
+- ✅ Verified all 24 ability behaviors are entity-agnostic
+- ✅ Implemented NPC resource regeneration in engine.py
+- ✅ All 25 ability tests pass
+
+**Phase 14.3: NPC AI Integration** ✅
+- ✅ Added ability hooks to BehaviorScript base class
+- ✅ Extended BehaviorContext with ability helpers (get_available_abilities, etc.)
+- ✅ Added `cast_ability` to BehaviorResult
+- ✅ Created CasterAI and TacticalCasterAI behaviors (combat_caster.py)
+- ✅ Created BruteAI and BerserkerAI behaviors (combat_brute.py)
+- ✅ Integrated ability casting into combat flow via on_combat_action hook
+- ✅ Added _npc_cast_ability helper to WorldEngine
+
+**Phase 14.4: Content & Loading** ✅
+- ✅ Updated NPC YAML schema with class_id, default_abilities, ability_loadout, ai_behavior
+- ✅ Added create_npc_character_sheet() helper in loader.py
+- ✅ NPC character sheets initialized after ClassSystem loads
+- ✅ Character sheet restored on NPC respawn
+- ✅ Created example NPCs:
+  - goblin_shaman.yaml (Mage with CasterAI)
+  - skeleton_champion.yaml (Warrior with BruteAI)
+  - forest_guardian.yaml (Nature mage with TacticalCasterAI)
+
+**Phase 14.5: Events & Admin Integration** ✅
+- ✅ Added `entity_type` field to `ability_cast` and `ability_cast_complete` events
+- ✅ NPC ability casts broadcast flavor messages to room (⚡ format)
+- ✅ Extended `NpcSummary` model with ability fields (class_id, has_abilities, resource_pools, etc.)
+- ✅ Added `verbose=True` query param to `GET /world/npcs` for ability details
+
+**Phase 14.6: Testing** ✅
+- ✅ Added `with_character_sheet()` method to WorldNpcBuilder
+- ✅ Added `npc_mage_sheet` and `mock_npc_caster` fixtures
+- ✅ Comprehensive test suite (test_npc_abilities.py - 16 tests):
+  - NPC ability casting with character_sheet
+  - NPC without character_sheet validation
+  - NPC ability learning validation
+  - NPC mana consumption
+  - NPC cooldown tracking (independent from players)
+  - Entity type in ability events
+  - Builder pattern tests
+  - Integration tests (NPC targeting players, GCD, multiple NPCs)
+
+**Documentation**:
+- [ ] Update ARCHITECTURE.md with NPC ability system details
+- [ ] Update protocol.md with NPC ability events
+- [ ] Create content creator guide for designing NPCs with abilities
+- [ ] Document NPC AI behavior hooks and patterns
+- [ ] Add examples to YAML schema documentation
+
+### Future Enhancements
+
+**NPC AI**:
+- Dynamic difficulty scaling (NPCs use more abilities on higher difficulty)
+- NPC ability combos (coordinated ability usage between allied NPCs)
+- Learning AI (NPCs adapt ability usage based on player behavior)
+- Ability teaching (NPCs can teach players new abilities via dialogue/quests)
+
+**Magic Items** (Phase 14+ enabled):
+- Staffs/wands with charged spell abilities
+- Weapons with special attack abilities (whirlwind, cleave)
+- Armor with defensive abilities (shield block, dodge)
+- Consumables that grant temporary abilities
+- Items that recharge abilities via rest/mana transfer
+
+**Environmental Objects** (Phase 14+ enabled):
+- Explosive barrels (AoE damage ability on destruction)
+- Healing fountains (periodic AoE heal ability)
+- Magical traps (spike/poison abilities triggered by proximity)
+- Ballistas/cannons (mounted weapon abilities)
+- Cursed totems (debuff aura abilities)
+- Interactive objects (lockpick triggers "unlock" ability)
+
+---
 
 ### Phase 15 - Player quality of life ⬜
 In-game documentation: listing all commands, player role, etc

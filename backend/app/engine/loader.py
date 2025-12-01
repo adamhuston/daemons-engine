@@ -1,19 +1,22 @@
 # backend/app/engine/loader.py
+import time
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import (Area, ItemInstance, ItemTemplate, NpcInstance,
                       NpcTemplate, Player, PlayerInventory, Room, RoomType)
 from .behaviors import resolve_behaviors
-from .world import (DEFAULT_ROOM_TYPE_EMOJIS, DEFAULT_TIME_PHASES, AreaId,
-                    EntityType, ItemId)
+from .world import (DEFAULT_ROOM_TYPE_EMOJIS, DEFAULT_TIME_PHASES, AbilitySlot,
+                    AreaId, CharacterSheet, EntityType, ItemId)
 from .world import ItemTemplate as WorldItemTemplate
 from .world import ItemTemplateId, NpcId
 from .world import NpcTemplate as WorldNpcTemplate
 from .world import NpcTemplateId, PlayerId
 from .world import PlayerInventory as WorldPlayerInventory
-from .world import (RoomId, World, WorldArea, WorldItem, WorldNpc, WorldPlayer,
-                    WorldRoom, WorldTime, set_room_type_emojis)
+from .world import (ResourcePool, RoomId, World, WorldArea, WorldItem,
+                    WorldNpc, WorldPlayer, WorldRoom, WorldTime,
+                    set_room_type_emojis)
 
 
 async def load_room_types(session: AsyncSession) -> dict[str, str]:
@@ -327,6 +330,10 @@ async def load_world(session: AsyncSession) -> World:
             idle_messages=t.idle_messages or [],
             keywords=t.keywords or [],
             persist_state=t.persist_state if hasattr(t, "persist_state") else False,
+            # Phase 14: Character class and abilities
+            class_id=t.class_id,
+            default_abilities=set(t.default_abilities or []),
+            ability_loadout=list(t.ability_loadout or []),
         )
 
     # ----- Load NPC instances (Phase 4) -----
@@ -387,6 +394,72 @@ async def load_world(session: AsyncSession) -> World:
         npc_templates=npc_templates,
         npcs=npcs,
         container_contents=container_contents,
+    )
+
+
+def create_npc_character_sheet(
+    template: WorldNpcTemplate,
+    class_templates: dict,
+) -> CharacterSheet | None:
+    """
+    Create a CharacterSheet for an NPC based on its template.
+
+    Phase 14: NPCs with class_id get a character sheet with abilities and resources.
+    Called when spawning NPCs to initialize their ability system.
+
+    Args:
+        template: The NPC template containing class_id, default_abilities, ability_loadout
+        class_templates: Dict of loaded class templates from ClassSystem
+
+    Returns:
+        CharacterSheet if template has class_id, None otherwise (backward compatible)
+    """
+    if not template.class_id:
+        return None
+
+    class_template = class_templates.get(template.class_id)
+    if not class_template:
+        # Class not found - log warning and skip
+        import logging
+
+        logging.getLogger(__name__).warning(
+            f"NPC template '{template.id}' references unknown class '{template.class_id}'"
+        )
+        return None
+
+    # Initialize resource pools at max capacity
+    resource_pools = {}
+    if hasattr(class_template, "resources") and class_template.resources:
+        for resource_id, resource_def in class_template.resources.items():
+            max_amount = getattr(resource_def, "max_amount", 100)
+            regen_rate = getattr(resource_def, "regen_rate", 0.0)
+            resource_pools[resource_id] = ResourcePool(
+                resource_id=resource_id,
+                current=max_amount,  # NPCs spawn with full resources
+                max=max_amount,
+                regen_per_second=regen_rate,
+                last_regen_tick=time.time(),
+            )
+
+    # Create ability loadout slots
+    ability_loadout = []
+    for slot_idx, ability_id in enumerate(template.ability_loadout):
+        ability_loadout.append(
+            AbilitySlot(
+                slot_id=slot_idx,
+                ability_id=ability_id,
+                last_used_at=0.0,
+                learned_at=1,
+            )
+        )
+
+    return CharacterSheet(
+        class_id=template.class_id,
+        level=template.level,
+        experience=0,
+        learned_abilities=set(template.default_abilities),
+        ability_loadout=ability_loadout,
+        resource_pools=resource_pools,
     )
 
 

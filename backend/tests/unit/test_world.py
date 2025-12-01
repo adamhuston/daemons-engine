@@ -5,7 +5,6 @@ Tests WorldPlayer, WorldNpc, WorldRoom, World, and related structures.
 """
 
 import pytest
-
 from app.engine.world import (EntityType, TargetableType, World, WorldArea,
                               WorldNpc, WorldPlayer, WorldRoom)
 

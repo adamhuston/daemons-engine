@@ -21,16 +21,15 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db import get_session
 from app.engine.systems.auth import (ROLE_PERMISSIONS, AuthSystem, Permission,
                                      UserRole, verify_access_token)
 from app.logging import admin_audit, get_logger
 from app.models import Room, SecurityEvent, UserAccount
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Module logger
 logger = get_logger(__name__)
@@ -245,6 +244,12 @@ class NpcSummary(BaseModel):
     current_health: int
     max_health: int
     is_alive: bool
+    # Phase 14.5: Optional ability-related fields (included when verbose=True)
+    class_id: Optional[str] = None
+    has_abilities: bool = False
+    resource_pools: Optional[dict] = None
+    learned_abilities: Optional[list[str]] = None
+    ability_loadout: Optional[list[str]] = None
 
 
 class ItemSummary(BaseModel):
@@ -1015,10 +1020,9 @@ async def get_prometheus_metrics(
         bearer_token: '<admin_jwt_token>'
     ```
     """
-    from starlette.responses import Response
-
     from app.metrics import (get_metrics, get_metrics_content_type,
                              update_world_metrics)
+    from starlette.responses import Response
 
     engine = get_engine_from_request(request)
     world = engine.world
@@ -1697,10 +1701,16 @@ async def list_npcs(
     admin: dict = Depends(get_current_admin),
     room_id: Optional[str] = None,
     alive_only: bool = False,
+    verbose: bool = False,
 ):
     """
     List all NPCs, optionally filtered by room or alive status.
     Requires: MODERATOR or higher
+
+    Args:
+        room_id: Filter NPCs by room ID
+        alive_only: Only return living NPCs
+        verbose: Include ability and resource pool details (Phase 14.5)
     """
     engine = get_engine_from_request(request)
     world = engine.world
@@ -1715,17 +1725,34 @@ async def list_npcs(
         if alive_only and npc.current_health <= 0:
             continue
 
-        npcs.append(
-            NpcSummary(
-                id=npc.id,
-                template_id=npc.template_id,
-                name=npc.name,
-                room_id=npc.room_id,
-                current_health=npc.current_health,
-                max_health=npc.max_health,
-                is_alive=npc.current_health > 0,
-            )
+        npc_data = NpcSummary(
+            id=npc.id,
+            template_id=npc.template_id,
+            name=npc.name,
+            room_id=npc.room_id,
+            current_health=npc.current_health,
+            max_health=npc.max_health,
+            is_alive=npc.current_health > 0,
         )
+
+        # Phase 14.5: Include ability details in verbose mode
+        if verbose and npc.has_character_sheet():
+            npc_data.class_id = npc.get_class_id()
+            npc_data.has_abilities = True
+            npc_data.learned_abilities = list(npc.get_learned_abilities())
+            npc_data.ability_loadout = [
+                slot.ability_id for slot in npc.get_ability_loadout()
+            ]
+            # Include resource pools with current/max values
+            if npc.character_sheet and npc.character_sheet.resource_pools:
+                npc_data.resource_pools = {
+                    rid: {"current": pool.current, "max": pool.max}
+                    for rid, pool in npc.character_sheet.resource_pools.items()
+                }
+        elif verbose:
+            npc_data.has_abilities = False
+
+        npcs.append(npc_data)
 
     return npcs
 
@@ -4010,7 +4037,6 @@ class ContentReloader:
     ) -> ReloadResult:
         """Reload item templates from YAML files."""
         import yaml
-
         from app.engine.world import ItemTemplate as WorldItemTemplate
 
         items_dir = self.world_data_dir / "items"
@@ -4088,7 +4114,6 @@ class ContentReloader:
     ) -> ReloadResult:
         """Reload NPC templates from YAML files."""
         import yaml
-
         from app.engine.behaviors import resolve_behaviors
         from app.engine.world import NpcTemplate as WorldNpcTemplate
 

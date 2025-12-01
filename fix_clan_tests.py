@@ -1,4 +1,5 @@
 """Script to fix all test_clans.py issues systematically."""
+
 import re
 
 test_file = r"backend\tests\commands\test_clans.py"
