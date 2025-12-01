@@ -41,15 +41,15 @@ CRIT_MULTIPLIER = 2.0  # Only used if CRIT_DOUBLES_DICE = False
 # =============================================================================
 
 # Health regeneration (HP per second)
-HEALTH_REGEN_AWAKE = 0.5  # HP/sec while awake
-HEALTH_REGEN_SLEEPING = 2.0  # HP/sec while sleeping (4x faster)
+HEALTH_REGEN_AWAKE = 0.1  # HP/sec while awake
+HEALTH_REGEN_SLEEPING = 0.5  # HP/sec while sleeping (5x faster)
 
 # Resource regeneration (% of max per second)
 RESOURCE_REGEN_AWAKE = 0.01  # 1% of max resource per second (100 sec to full)
 RESOURCE_REGEN_SLEEPING = 0.04  # 4% of max resource per second (25 sec to full)
 
 # Regeneration tick interval
-REGEN_TICK_INTERVAL = 3.0  # Apply regen every 3 seconds
+REGEN_TICK_INTERVAL = 4.0  # Apply regen every 4 seconds
 
 # Combat penalties
 SLEEPING_AC_PENALTY = -5  # AC penalty while sleeping (you're defenseless)

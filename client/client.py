@@ -25,7 +25,7 @@ def main(page: ft.Page):
     page.theme = ft.Theme(font_family="Consolas")
 
     # UI controls - Column for colored log lines
-    log_column = ft.Column([], scroll=ft.ScrollMode.AUTO, auto_scroll=True)
+    log_column = ft.Column([], scroll=ft.ScrollMode.AUTO, auto_scroll=True, spacing=0)
     output_view = ft.Container(
         content=log_column,
         expand=True,

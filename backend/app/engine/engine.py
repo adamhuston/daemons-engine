@@ -713,7 +713,7 @@ class WorldEngine:
         """Adapter for get/take command."""
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Get what?")]
-        return self._handle_get_command(player_id, args)
+        return self._get(player_id, args)
 
     def _drop_handler(self, engine: Any, player_id: PlayerId, args: str) -> List[Event]:
         """Adapter for drop command."""
@@ -1122,14 +1122,20 @@ class WorldEngine:
         if not player:
             return [self._msg_to_player(player_id, "You have no form.")]
 
-        target_name = args.strip().lower()
+        # Parse numbered targeting
+        target_index, actual_search = self._parse_target_number(args.strip())
+        target_name = actual_search.lower()
+
+        matches_found = 0
         target = None
         for p in self.world.players.values():
             if p.id != player_id and (
                 p.name.lower() == target_name or p.name.lower().startswith(target_name)
             ):
-                target = p
-                break
+                matches_found += 1
+                if matches_found == target_index:
+                    target = p
+                    break
 
         if not target:
             return [
@@ -2165,7 +2171,7 @@ class WorldEngine:
         return [
             self._msg_to_player(
                 player_id,
-                "\nYou feel the world fade away as you enter a state of stasis...\nFarewell, brave adventurer. May your return be swift.\n",
+                "\nYou feel the world fade away as you enter a state of stasis...\nFarewell, brave adventurer.\n",
             ),
             {
                 "type": "quit",
@@ -3136,6 +3142,26 @@ class WorldEngine:
             return set()
         return {eid for eid in room.entities if eid in self.world.players}
 
+    def _parse_target_number(self, search_term: str) -> tuple[int, str]:
+        """
+        Parse numbered targeting syntax (e.g., "2.yee" -> (2, "yee")).
+
+        Args:
+            search_term: The search term, potentially with a number prefix
+
+        Returns:
+            Tuple of (target_index, actual_search_term)
+            - target_index: 1-based index (1 for first match, 2 for second, etc.)
+            - actual_search_term: The search term without the number prefix
+        """
+        if '.' in search_term:
+            parts = search_term.split('.', 1)
+            if len(parts) == 2 and parts[0].isdigit():
+                target_num = int(parts[0])
+                if target_num >= 1:
+                    return target_num, parts[1]
+        return 1, search_term
+
     def _find_entity_in_room(
         self,
         room_id: RoomId,
@@ -3146,6 +3172,8 @@ class WorldEngine:
         """
         Find an entity in a room by name or keyword.
 
+        Supports numbered targeting: "2.yee" will find the second entity matching "yee".
+
         Returns:
             Tuple of (entity_id, entity_type) or (None, None) if not found.
         """
@@ -3153,7 +3181,11 @@ class WorldEngine:
         if not room:
             return None, None
 
-        search_lower = search_term.lower()
+        # Parse numbered targeting
+        target_index, actual_search = self._parse_target_number(search_term)
+        search_lower = actual_search.lower()
+
+        matches_found = 0
 
         for entity_id in room.entities:
             # Check players
@@ -3163,7 +3195,9 @@ class WorldEngine:
                     player.name.lower() == search_lower
                     or search_lower in player.name.lower()
                 ):
-                    return entity_id, EntityType.PLAYER
+                    matches_found += 1
+                    if matches_found == target_index:
+                        return entity_id, EntityType.PLAYER
 
             # Check NPCs
             if include_npcs and entity_id in self.world.npcs:
@@ -3177,7 +3211,10 @@ class WorldEngine:
 
                 # Exact or partial match on name
                 if npc_name.lower() == search_lower or search_lower in npc_name.lower():
-                    return entity_id, EntityType.NPC
+                    matches_found += 1
+                    if matches_found == target_index:
+                        return entity_id, EntityType.NPC
+                    continue
 
                 # Keyword match
                 for keyword in template.keywords:
@@ -3185,7 +3222,10 @@ class WorldEngine:
                         search_lower == keyword.lower()
                         or search_lower in keyword.lower()
                     ):
-                        return entity_id, EntityType.NPC
+                        matches_found += 1
+                        if matches_found == target_index:
+                            return entity_id, EntityType.NPC
+                        break
 
         return None, None
 
@@ -3203,9 +3243,11 @@ class WorldEngine:
         Searches through entities (players, NPCs) and items in priority order.
         This provides a unified targeting interface for commands.
 
+        Supports numbered targeting: "2.yee" will find the second targetable matching "yee".
+
         Args:
             room_id: The room to search in
-            search_term: Name or keyword to search for
+            search_term: Name or keyword to search for (supports "N.keyword" syntax)
             include_players: Whether to search players
             include_npcs: Whether to search NPCs
             include_items: Whether to search items
@@ -3217,30 +3259,38 @@ class WorldEngine:
         if not room:
             return None, None
 
-        search_term.lower()
+        # Parse numbered targeting
+        target_index, actual_search = self._parse_target_number(search_term)
+        matches_found = 0
 
         # Search entities first (players and NPCs)
         for entity_id in room.entities:
             # Check players
             if include_players and entity_id in self.world.players:
                 player = self.world.players[entity_id]
-                if player.matches_keyword(search_term):
-                    return player, TargetableType.PLAYER
+                if player.matches_keyword(actual_search):
+                    matches_found += 1
+                    if matches_found == target_index:
+                        return player, TargetableType.PLAYER
 
             # Check NPCs
             if include_npcs and entity_id in self.world.npcs:
                 npc = self.world.npcs[entity_id]
                 if not npc.is_alive():
                     continue
-                if npc.matches_keyword(search_term):
-                    return npc, TargetableType.NPC
+                if npc.matches_keyword(actual_search):
+                    matches_found += 1
+                    if matches_found == target_index:
+                        return npc, TargetableType.NPC
 
         # Search items in the room
         if include_items:
             for item_id in room.items:
                 item = self.world.items.get(item_id)
-                if item and item.matches_keyword(search_term):
-                    return item, TargetableType.ITEM
+                if item and item.matches_keyword(actual_search):
+                    matches_found += 1
+                    if matches_found == target_index:
+                        return item, TargetableType.ITEM
 
         return None, None
 
@@ -3252,9 +3302,11 @@ class WorldEngine:
         """
         Find an item in a room by name or keyword.
 
+        Supports numbered targeting: "2.potion" will find the second potion.
+
         Args:
             room_id: The room to search in
-            search_term: Name or keyword to search for
+            search_term: Name or keyword to search for (supports "N.keyword" syntax)
 
         Returns:
             The matching WorldItem or None if not found.
@@ -3263,10 +3315,16 @@ class WorldEngine:
         if not room:
             return None
 
+        # Parse numbered targeting
+        target_index, actual_search = self._parse_target_number(search_term)
+        matches_found = 0
+
         for item_id in room.items:
             item = self.world.items.get(item_id)
-            if item and item.matches_keyword(search_term):
-                return item
+            if item and item.matches_keyword(actual_search):
+                matches_found += 1
+                if matches_found == target_index:
+                    return item
 
         return None
 
@@ -3278,9 +3336,11 @@ class WorldEngine:
         """
         Find an item in a player's inventory by name or keyword.
 
+        Supports numbered targeting: "2.potion" will find the second potion in inventory.
+
         Args:
             player_id: The player whose inventory to search
-            search_term: Name or keyword to search for
+            search_term: Name or keyword to search for (supports "N.keyword" syntax)
 
         Returns:
             The matching WorldItem or None if not found.
@@ -3289,10 +3349,16 @@ class WorldEngine:
         if not player:
             return None
 
+        # Parse numbered targeting
+        target_index, actual_search = self._parse_target_number(search_term)
+        matches_found = 0
+
         for item_id in player.inventory_items:
             item = self.world.items.get(item_id)
-            if item and item.matches_keyword(search_term):
-                return item
+            if item and item.matches_keyword(actual_search):
+                matches_found += 1
+                if matches_found == target_index:
+                    return item
 
         return None
 
@@ -5578,7 +5644,17 @@ class WorldEngine:
         inventory = player.inventory_meta
 
         if not inventory:
-            return [self._msg_to_player(player_id, "You have no inventory.")]
+            # Auto-initialize inventory if missing (for legacy/test players)
+            from .world import PlayerInventory
+
+            player.inventory_meta = PlayerInventory(
+                player_id=player_id,
+                max_weight=100.0,
+                max_slots=20,
+                current_weight=0.0,
+                current_slots=0,
+            )
+            inventory = player.inventory_meta
 
         if not player.inventory_items:
             return [self._msg_to_player(player_id, "Your inventory is empty.")]
@@ -5664,6 +5740,8 @@ class WorldEngine:
             new_item = WorldItem(
                 id=new_item_id,
                 template_id=item.template_id,
+                name=template.name,
+                keywords=list(template.keywords),
                 room_id=None,
                 player_id=player_id,
                 container_id=None,
@@ -5671,6 +5749,7 @@ class WorldEngine:
                 current_durability=item.current_durability,
                 equipped_slot=None,
                 instance_data=dict(item.instance_data),
+                _description=template.description,
             )
             world.items[new_item_id] = new_item
 

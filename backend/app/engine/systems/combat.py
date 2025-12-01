@@ -997,7 +997,11 @@ class CombatSystem:
     def _find_target(
         self, player_id: "PlayerId", target_name: str
     ) -> "WorldEntity | None":
-        """Simple target finding by name in current room."""
+        """
+        Simple target finding by name in current room.
+
+        Supports numbered targeting: "2.goblin" will find the second goblin.
+        """
         world = self.ctx.world
         player = world.players.get(player_id)
         if not player:
@@ -1007,7 +1011,19 @@ class CombatSystem:
         if not room:
             return None
 
-        search_lower = target_name.lower()
+        # Parse numbered targeting
+        target_index = 1
+        actual_search = target_name
+        if '.' in target_name:
+            parts = target_name.split('.', 1)
+            if len(parts) == 2 and parts[0].isdigit():
+                target_num = int(parts[0])
+                if target_num >= 1:
+                    target_index = target_num
+                    actual_search = parts[1]
+
+        search_lower = actual_search.lower()
+        matches_found = 0
 
         for entity_id in room.entities:
             # Check players
@@ -1017,7 +1033,9 @@ class CombatSystem:
                     target.name.lower() == search_lower
                     or search_lower in target.name.lower()
                 ):
-                    return target
+                    matches_found += 1
+                    if matches_found == target_index:
+                        return target
 
             # Check NPCs
             if entity_id in world.npcs:
@@ -1031,10 +1049,16 @@ class CombatSystem:
 
                 npc_name = target.instance_data.get("name_override", target.name)
                 if npc_name.lower() == search_lower or search_lower in npc_name.lower():
-                    return target
+                    matches_found += 1
+                    if matches_found == target_index:
+                        return target
+                    continue
 
                 for keyword in template.keywords:
                     if search_lower == keyword.lower():
-                        return target
+                        matches_found += 1
+                        if matches_found == target_index:
+                            return target
+                        break
 
         return None

@@ -48,7 +48,17 @@ def can_add_item(
     template = world.item_templates[template_id]
 
     if not inventory:
-        return False, "No inventory found"
+        # Auto-initialize inventory if missing (for legacy/test players)
+        from .world import PlayerInventory
+
+        player.inventory_meta = PlayerInventory(
+            player_id=player_id,
+            max_weight=100.0,
+            max_slots=20,
+            current_weight=0.0,
+            current_slots=0,
+        )
+        inventory = player.inventory_meta
 
     # Check weight
     new_weight = calculate_inventory_weight(world, player_id) + (
@@ -239,10 +249,12 @@ def find_item_by_name(
     Uses WorldItem.matches_keyword() for consistent targeting behavior.
     Prioritizes exact matches over partial matches.
 
+    Supports numbered targeting: "2.potion" will find the second potion.
+
     Args:
         world: Game world
         player_id: Player ID
-        item_name: Name or keyword to search for (case insensitive)
+        item_name: Name or keyword to search for (case insensitive, supports "N.keyword" syntax)
         location: "inventory", "equipped", or "both"
 
     Returns:
@@ -250,33 +262,57 @@ def find_item_by_name(
     """
     player = world.players[player_id]
 
+    # Parse numbered targeting
+    target_index = 1
+    actual_search = item_name
+    if '.' in item_name:
+        parts = item_name.split('.', 1)
+        if len(parts) == 2 and parts[0].isdigit():
+            target_num = int(parts[0])
+            if target_num >= 1:
+                target_index = target_num
+                actual_search = parts[1]
+
+    matches_found = 0
+
     # First try exact match in inventory
     if location in ("inventory", "both"):
         for item_id in player.inventory_items:
             item = world.items[item_id]
-            if item.matches_keyword(item_name, match_mode="exact"):
-                return item_id
+            if item.matches_keyword(actual_search, match_mode="exact"):
+                matches_found += 1
+                if matches_found == target_index:
+                    return item_id
 
     # First try exact match in equipped items
     if location in ("equipped", "both"):
         for item_id in player.equipped_items.values():
             item = world.items[item_id]
-            if item.matches_keyword(item_name, match_mode="exact"):
-                return item_id
+            if item.matches_keyword(actual_search, match_mode="exact"):
+                matches_found += 1
+                if matches_found == target_index:
+                    return item_id
+
+    # Reset counter for startswith matches
+    matches_found = 0
 
     # If no exact match, try startswith match in inventory
     if location in ("inventory", "both"):
         for item_id in player.inventory_items:
             item = world.items[item_id]
-            if item.matches_keyword(item_name, match_mode="startswith"):
-                return item_id
+            if item.matches_keyword(actual_search, match_mode="startswith"):
+                matches_found += 1
+                if matches_found == target_index:
+                    return item_id
 
     # If no exact match, try startswith match in equipped items
     if location in ("equipped", "both"):
         for item_id in player.equipped_items.values():
             item = world.items[item_id]
-            if item.matches_keyword(item_name, match_mode="startswith"):
-                return item_id
+            if item.matches_keyword(actual_search, match_mode="startswith"):
+                matches_found += 1
+                if matches_found == target_index:
+                    return item_id
 
     return None
 
@@ -287,26 +323,48 @@ def find_item_in_room(world: World, room_id: str, item_name: str) -> Optional[It
     Uses WorldItem.matches_keyword() for consistent targeting behavior.
     Prioritizes exact matches over partial matches.
 
+    Supports numbered targeting: "2.potion" will find the second potion.
+
     Args:
         world: Game world
         room_id: Room ID
-        item_name: Name or keyword to search for (case insensitive)
+        item_name: Name or keyword to search for (case insensitive, supports "N.keyword" syntax)
 
     Returns:
         Item ID if found, None otherwise
     """
     room = world.rooms[room_id]
 
+    # Parse numbered targeting
+    target_index = 1
+    actual_search = item_name
+    if '.' in item_name:
+        parts = item_name.split('.', 1)
+        if len(parts) == 2 and parts[0].isdigit():
+            target_num = int(parts[0])
+            if target_num >= 1:
+                target_index = target_num
+                actual_search = parts[1]
+
+    matches_found = 0
+
     # First try exact match
     for item_id in room.items:
         item = world.items[item_id]
-        if item.matches_keyword(item_name, match_mode="exact"):
-            return item_id
+        if item.matches_keyword(actual_search, match_mode="exact"):
+            matches_found += 1
+            if matches_found == target_index:
+                return item_id
+
+    # Reset counter for startswith matches
+    matches_found = 0
 
     # If no exact match, try startswith match
     for item_id in room.items:
         item = world.items[item_id]
-        if item.matches_keyword(item_name, match_mode="startswith"):
-            return item_id
+        if item.matches_keyword(actual_search, match_mode="startswith"):
+            matches_found += 1
+            if matches_found == target_index:
+                return item_id
 
     return None

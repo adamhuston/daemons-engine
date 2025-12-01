@@ -672,6 +672,7 @@ async def create_character(
     # Add to in-memory world if engine is running
     engine = getattr(app.state, "world_engine", None)
     if engine:
+        from .engine.world import PlayerInventory as WorldPlayerInventory
         from .engine.world import WorldPlayer
 
         world_player = WorldPlayer(
@@ -683,6 +684,13 @@ async def create_character(
             current_health=100,
             data={},
             account_id=user_id,
+            inventory_meta=WorldPlayerInventory(
+                player_id=character_id,
+                max_weight=100.0,
+                max_slots=20,
+                current_weight=0.0,
+                current_slots=0,
+            ),
         )
         engine.world.players[character_id] = world_player
 
