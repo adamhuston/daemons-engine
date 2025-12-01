@@ -1,0 +1,25 @@
+# Phase 11: Sample Darkness Trigger
+# Players stumble and take damage when moving in very dark rooms
+
+id: darkness_stumble
+event: on_enter
+description: "Stumble when entering a very dark room without light"
+
+conditions:
+  # Only trigger in very dark rooms (light level < 20)
+  - type: light_level
+    params:
+      operator: "<"
+      value: 20
+
+actions:
+  - type: stumble_in_darkness
+    params:
+      damage_min: 2
+      damage_max: 6
+      message: "You stumble blindly in the pitch darkness, scraping against unseen walls!"
+
+# Fire every time but with cooldown to prevent spam
+cooldown: 30.0
+max_fires: -1
+enabled: true

@@ -1,0 +1,45 @@
+# Phase 11: Darkness Spawn - Hostile NPC spawns in low light
+# Shadow creatures only appear when the room is dark enough
+
+id: shadow_spawn_dark
+event: on_enter
+description: "Shadow creatures spawn when entering a dark room"
+
+conditions:
+  # Only spawn in minimal visibility or worse (light < 26)
+  - type: light_level
+    params:
+      operator: "<"
+      value: 26
+
+  # Don't spawn if shadows already present
+  - type: entity_present
+    params:
+      template_id: "npc_shadow_lurker"
+    negate: true
+
+  # Don't spawn if player is high level
+  - type: level
+    params:
+      operator: "<"
+      value: 10
+
+actions:
+  - type: message_player
+    params:
+      text: "The darkness stirs... something is moving in the shadows!"
+
+  - type: spawn_npc
+    params:
+      template_id: "npc_shadow_lurker"
+      position: "ambient"
+
+  - type: message_room
+    params:
+      text: "A shadowy figure materializes from the darkness!"
+    delay: 1.0
+
+# Fire once per entry, but can fire again after cooldown
+cooldown: 300.0
+max_fires: -1
+enabled: true

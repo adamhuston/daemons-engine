@@ -1,0 +1,285 @@
+# Wandering Merchant Dialogue Tree
+# Provides quests and merchant services
+
+npc_template_id: wandering_merchant
+entry_node: greet
+
+# Context-sensitive greetings based on quest state
+entry_overrides:
+  # If goblin_threat quest is completed, greet with turn-in
+  - conditions:
+      - type: quest_status
+        params:
+          quest_id: goblin_threat
+          status: completed
+    node_id: greet_goblin_complete
+
+  # If goblin_threat in progress
+  - conditions:
+      - type: has_quest
+        params:
+          quest_id: goblin_threat
+    node_id: greet_goblin_progress
+
+  # If wisp_investigation completed, greet with turn-in
+  - conditions:
+      - type: quest_status
+        params:
+          quest_id: wisp_investigation
+          status: completed
+    node_id: greet_wisp_complete
+
+  # If wisp_investigation in progress
+  - conditions:
+      - type: has_quest
+        params:
+          quest_id: wisp_investigation
+    node_id: greet_wisp_progress
+
+  # If already completed wisp quest, offer goblin quest
+  - conditions:
+      - type: quest_complete
+        params:
+          quest_id: wisp_investigation
+    node_id: greet_offer_goblin
+
+nodes:
+  # === Default greeting (no quests yet) ===
+  greet:
+    text: |
+      The merchant looks up from arranging their wares and smiles warmly.
+
+      "Ah, a traveler! Welcome, welcome. Name's Aldric. I've been wandering
+      these ethereal corridors for years, trading with whoever passes through.
+
+      Say, you look capable. I could use some help with something..."
+    options:
+      - text: "What do you need help with?"
+        next_node: offer_wisp_quest
+      - text: "What do you sell?"
+        next_node: show_wares
+      - text: "Tell me about this place."
+        next_node: about_nexus
+      - text: "Farewell."
+        next_node: null
+
+  # === Offer wisp investigation quest ===
+  offer_wisp_quest:
+    text: |
+      "See, there are these wisps—ethereal creatures that drift through
+      the chambers here. They're harmless, but mysterious. I've always
+      wondered what they truly are.
+
+      Would you be willing to investigate? Explore the Nexus, find where
+      they gather, and observe one up close. I'll pay you for your findings."
+    options:
+      - text: "I'll investigate the wisps for you."
+        accept_quest: wisp_investigation
+        next_node: quest_accepted
+      - text: "What do you know about them already?"
+        next_node: wisp_lore
+      - text: "Maybe later."
+        next_node: null
+
+  quest_accepted:
+    text: |
+      "Excellent! The wisps tend to gather in the central chambers of the
+      Nexus. Look for rooms with strong ethereal resonance—you'll feel it.
+
+      Come back when you've made your observations. Safe travels!"
+    options:
+      - text: "I'll be back soon."
+        next_node: null
+
+  wisp_lore:
+    text: |
+      "Not much, I'm afraid. Some say they're fragments of ancient magic,
+      leftover from when this place was created. Others claim they're the
+      spirits of those who got lost in the temporal rifts.
+
+      Whatever they are, they seem drawn to certain rooms. That's what
+      I want you to find out—where they gather and why."
+    options:
+      - text: "Alright, I'll investigate for you."
+        accept_quest: wisp_investigation
+        next_node: quest_accepted
+      - text: "Interesting. I'll think about it."
+        next_node: null
+
+  # === Wisp quest in progress ===
+  greet_wisp_progress:
+    text: |
+      Aldric looks up hopefully.
+
+      "Ah, you're back! How goes the investigation? Have you found where
+      the wisps gather? Try the central chambers—room coordinates around
+      1,1,1 if I remember correctly."
+    options:
+      - text: "Still working on it."
+        next_node: null
+      - text: "Any tips?"
+        next_node: wisp_tips
+
+  wisp_tips:
+    text: |
+      "The wisps seem to respond to magical energy. Move slowly when you
+      approach them—sudden movements might spook them. Though honestly,
+      I've never seen them react to anything.
+
+      Just get close enough to observe one, and you should be fine."
+    options:
+      - text: "Thanks for the advice."
+        next_node: null
+
+  # === Wisp quest complete - ready for turn in ===
+  greet_wisp_complete:
+    text: |
+      Aldric's eyes light up as you approach.
+
+      "You've done it! I can tell by that look in your eyes—you've seen
+      them up close, haven't you? Tell me everything!"
+    options:
+      - text: "They're fascinating creatures. Here's what I observed..."
+        turn_in_quest: wisp_investigation
+        next_node: wisp_turnin_complete
+
+  wisp_turnin_complete:
+    text: |
+      Aldric listens intently to your observations, nodding thoughtfully.
+
+      "Remarkable! So they truly are fragments of pure ethereal energy.
+      This confirms theories I've had for years. Thank you, traveler.
+
+      Here's your reward—some healing potions and a bit of gold.
+      You've earned it."
+    actions:
+      - type: set_flag
+        params:
+          name: merchant_friend
+          value: true
+    options:
+      - text: "Thank you. Is there anything else you need?"
+        next_node: offer_goblin_quest
+      - text: "Glad I could help. Farewell."
+        next_node: null
+
+  # === Offer goblin quest (after wisp quest) ===
+  greet_offer_goblin:
+    text: |
+      "Ah, my friend returns! I hope those potions served you well.
+
+      Listen, there's another matter—more serious this time. Goblins
+      have been spotted in the area. They're scaring off other travelers
+      and disrupting the magical balance here."
+    options:
+      - text: "Goblins? Tell me more."
+        next_node: offer_goblin_quest
+      - text: "What do you sell?"
+        next_node: show_wares
+      - text: "Farewell."
+        next_node: null
+
+  offer_goblin_quest:
+    text: |
+      "Goblin scouts have been prowling the outer chambers. Three of them,
+      at least—maybe more. They're cowardly alone but dangerous in groups.
+
+      Defeat three of them, and I'll reward you handsomely. I might even
+      have an old sword you could use."
+    options:
+      - text: "I'll deal with the goblins."
+        accept_quest: goblin_threat
+        conditions:
+          - type: quest_complete
+            params:
+              quest_id: wisp_investigation
+        next_node: goblin_quest_accepted
+      - text: "That sounds dangerous. Maybe later."
+        next_node: null
+
+  goblin_quest_accepted:
+    text: |
+      "Brave soul! Watch yourself out there—goblins are trickier than they
+      look. Try to fight them one at a time if you can.
+
+      Come back when you've dealt with three of them. Good luck!"
+    options:
+      - text: "I'll be back."
+        next_node: null
+
+  # === Goblin quest in progress ===
+  greet_goblin_progress:
+    text: |
+      Aldric peers at you with concern.
+
+      "How goes the goblin hunting? Those creatures are persistent—if you
+      killed one, more will likely take its place eventually. But three
+      should send a message."
+    options:
+      - text: "Still hunting them."
+        next_node: null
+      - text: "Any combat tips?"
+        next_node: combat_tips
+
+  combat_tips:
+    text: |
+      "Goblins are quick but fragile. They'll try to surround you if
+      they can, so pick them off one at a time. Watch your health—
+      retreat if you need to heal.
+
+      And always be ready to flee if things go badly. Pride won't help
+      you if you're dead."
+    options:
+      - text: "Good advice. Thanks."
+        next_node: null
+
+  # === Goblin quest complete ===
+  greet_goblin_complete:
+    text: |
+      Aldric beams as you approach, noticing the signs of battle on you.
+
+      "You've done it! The goblin menace is dealt with. The roads should
+      be safer now—at least for a while. Excellent work!"
+    options:
+      - text: "It's done. They won't bother anyone for a while."
+        turn_in_quest: goblin_threat
+        next_node: goblin_turnin_complete
+
+  goblin_turnin_complete:
+    text: |
+      "Here, take this sword—it's seen better days, but it'll serve you
+      well. And some gold for your trouble. You've more than earned it.
+
+      You're a true hero, {player.name}. If you ever need supplies,
+      you know where to find me."
+    options:
+      - text: "Thank you, Aldric."
+        next_node: null
+
+  # === General dialogue options ===
+  show_wares:
+    text: |
+      Aldric gestures to an array of items spread on a worn cloth.
+
+      "I've got potions, basic supplies, a few curiosities. Nothing fancy,
+      but useful for a traveler. Unfortunately, my trading system isn't
+      fully set up yet—check back later!"
+    options:
+      - text: "I'll look around."
+        next_node: null
+      - text: "Maybe later."
+        next_node: null
+
+  about_nexus:
+    text: |
+      "The Ethereal Nexus? A strange place, to be sure. They say it exists
+      between moments of time—that's why everything feels so... suspended.
+
+      Been here for years, trading with travelers who pass through. The
+      wisps keep me company, in their way. And occasionally goblins show
+      up to cause trouble. Such is life in the between-places."
+    options:
+      - text: "Fascinating. Thank you."
+        next_node: null
+      - text: "Tell me about the wisps."
+        next_node: wisp_lore

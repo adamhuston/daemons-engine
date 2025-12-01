@@ -1,0 +1,256 @@
+# Utility Abilities
+# Non-combat abilities for exploration, interaction, and utility
+
+abilities:
+  # Light/Visibility
+  - ability_id: light
+    name: "Light"
+    description: "Creates a magical light source around you"
+    ability_type: "active"
+    ability_category: "utility"
+    costs: {}
+    cooldown: 0.5
+    gcd_category: "utility"
+    behavior_id: "create_light"
+    effects: []
+    target_type: "self"
+    target_range: 0
+    requires_target: false
+    requires_los: false
+    can_use_while_moving: true
+    required_level: 1
+    required_class: null
+    keywords:
+      - utility
+      - light
+      - support
+    metadata:
+      light_level: 50
+      duration: 300.0
+      radius: 1
+
+  - ability_id: daylight
+    name: "Daylight"
+    description: "Creates bright daylight in an area, dispelling darkness"
+    ability_type: "active"
+    ability_category: "utility"
+    costs:
+      mana: 40
+    cooldown: 5.0
+    gcd_category: "utility"
+    behavior_id: "create_light"
+    effects: []
+    target_type: "room"
+    target_range: 3
+    requires_target: false
+    requires_los: false
+    can_use_while_moving: true
+    required_level: 5
+    required_class: null
+    keywords:
+      - utility
+      - light
+      - magic
+      - support
+
+    metadata:
+      light_level: 100
+      duration: 600.0
+      radius: 5
+
+  - ability_id: darkness
+    name: "Darkness"
+    description: "Shrouds an area in magical darkness"
+    ability_type: "active"
+    ability_category: "utility"
+    costs:
+      mana: 35
+    cooldown: 4.0
+    gcd_category: "utility"
+    behavior_id: "darkness"
+    effects: []
+    target_type: "self"
+    target_range: 0
+    requires_target: false
+    requires_los: false
+    can_use_while_moving: true
+    required_level: 3
+    required_class: null
+    keywords:
+      - utility
+      - darkness
+      - stealth
+      - magic
+
+    metadata:
+      darkness_level: 75
+      duration: 180.0
+
+  # Unlocking/Opening
+  - ability_id: unlock
+    name: "Unlock"
+    description: "Magically unlocks a door or lock"
+    ability_type: "active"
+    ability_category: "utility"
+    costs:
+      mana: 20
+    cooldown: 2.0
+    gcd_category: "utility"
+    behavior_id: "unlock_door"
+    effects: []
+    target_type: "enemy"
+    target_range: 1
+    requires_target: true
+    requires_los: true
+    can_use_while_moving: false
+    required_level: 3
+    required_class: null
+    keywords:
+      - utility
+      - unlock
+      - lock-picking
+      - magic
+
+    metadata:
+      lock_difficulty: 1
+
+  - ability_id: open_container
+    name: "Open Container"
+    description: "Opens a sealed or locked container without a key"
+    ability_type: "active"
+    ability_category: "utility"
+    costs:
+      mana: 25
+    cooldown: 2.5
+    gcd_category: "utility"
+    behavior_id: "unlock_container"
+    effects: []
+    target_type: "enemy"
+    target_range: 2
+    requires_target: true
+    requires_los: true
+    can_use_while_moving: false
+    required_level: 4
+    required_class: null
+    keywords:
+      - utility
+      - containers
+      - treasure
+      - magic
+
+    metadata:
+      lock_difficulty: 2
+
+  # Detection/Sensing
+  - ability_id: detect_magic
+    name: "Detect Magic"
+    description: "Senses magical auras and enchantments in the area"
+    ability_type: "active"
+    ability_category: "utility"
+    costs:
+      mana: 15
+    cooldown: 3.0
+    gcd_category: "utility"
+    behavior_id: "detect_magic"
+    effects: []
+    target_type: "self"
+    target_range: 0
+    requires_target: false
+    requires_los: false
+    can_use_while_moving: true
+    required_level: 2
+    required_class: null
+    keywords:
+      - utility
+      - detection
+      - magic
+      - sensing
+
+    metadata:
+      duration: 60.0
+      radius: 3
+
+  - ability_id: true_sight
+    name: "True Sight"
+    description: "Penetrates illusions and reveals hidden objects and creatures"
+    ability_type: "active"
+    ability_category: "utility"
+    costs:
+      mana: 50
+    cooldown: 10.0
+    gcd_category: "utility"
+    behavior_id: "true_sight"
+    effects: []
+    target_type: "self"
+    target_range: 0
+    requires_target: false
+    requires_los: false
+    can_use_while_moving: true
+    required_level: 8
+    required_class: null
+    keywords:
+      - utility
+      - detection
+      - illusion
+      - magic
+      - high-level
+
+    metadata:
+      duration: 30.0
+      radius: 10
+
+  # Transportation
+  - ability_id: teleport
+    name: "Teleport"
+    description: "Teleports you to a location you know"
+    ability_type: "active"
+    ability_category: "utility"
+    costs:
+      mana: 100
+    cooldown: 30.0
+    gcd_category: "utility"
+    behavior_id: "teleport"
+    effects: []
+    target_type: "self"
+    target_range: 0
+    requires_target: false
+    requires_los: false
+    can_use_while_moving: false
+    required_level: 10
+    required_class: null
+    keywords:
+      - utility
+      - transportation
+      - magic
+      - high-level
+
+    metadata:
+      duration: null
+
+  - ability_id: create_passage
+    name: "Create Passage"
+    description: "Opens a temporary passage through walls or barriers"
+    ability_type: "active"
+    ability_category: "utility"
+    costs:
+      mana: 75
+    cooldown: 20.0
+    gcd_category: "utility"
+    behavior_id: "create_passage"
+    effects: []
+    target_type: "enemy"
+    target_range: 2
+    requires_target: true
+    requires_los: true
+    can_use_while_moving: false
+    required_level: 7
+    required_class: null
+    keywords:
+      - utility
+      - walls
+      - barriers
+      - magic
+      - exploration
+
+    metadata:
+      duration: 120.0

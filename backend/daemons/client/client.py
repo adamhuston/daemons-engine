@@ -1,9 +1,13 @@
 # Daemons reference client
 import json
+from pathlib import Path
 
 import flet as ft
 import httpx
 import websockets
+
+# Get the fonts directory relative to this module
+_FONTS_DIR = Path(__file__).parent / "fonts"
 
 
 def create_main(host: str = "127.0.0.1", port: int = 8000):
@@ -15,11 +19,11 @@ def create_main(host: str = "127.0.0.1", port: int = 8000):
         page.title = "Dungeon Flet Stub"
         page.vertical_alignment = ft.MainAxisAlignment.START
 
-        # Load custom fonts
+        # Load custom fonts from package directory
         page.fonts = {
-            "IM Fell English": "fonts/IM_Fell_English/IMFellEnglish-Regular.ttf",
-            "IM Fell English Italic": "fonts/IM_Fell_English/IMFellEnglish-Italic.ttf",
-            "Staatliches": "fonts/Staatliches/Staatliches-Regular.ttf",
+            "IM Fell English": str(_FONTS_DIR / "IM_Fell_English" / "IMFellEnglish-Regular.ttf"),
+            "IM Fell English Italic": str(_FONTS_DIR / "IM_Fell_English" / "IMFellEnglish-Italic.ttf"),
+            "Staatliches": str(_FONTS_DIR / "Staatliches" / "Staatliches-Regular.ttf"),
         }
 
         # Set default font for the page (optional)

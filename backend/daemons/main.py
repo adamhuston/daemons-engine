@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
     # 4a) Load class/ability content into ClassSystem (Phase 9c)
     from pathlib import Path
 
-    class_dir = Path(__file__).parent.parent / "world_data"
+    class_dir = Path(__file__).parent / "world_data"
     await engine_instance.class_system.load_content(class_dir)
     logger.info("Loaded character classes and abilities from world_data")
 
@@ -154,7 +154,7 @@ async def lifespan(app: FastAPI):
     # 4a3) Load factions from YAML into FactionSystem (Phase 10.3)
     from pathlib import Path
 
-    factions_dir = Path(__file__).parent.parent / "world_data" / "factions"
+    factions_dir = Path(__file__).parent / "world_data" / "factions"
     await engine_instance.faction_system.load_factions_from_yaml(str(factions_dir))
     logger.info("Loaded factions from YAML into FactionSystem")
 

@@ -11,6 +11,18 @@ venv/
 ENV/
 env/
 
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
 # SQLite database
 *.db
 *.db-shm

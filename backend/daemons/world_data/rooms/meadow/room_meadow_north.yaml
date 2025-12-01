@@ -1,0 +1,15 @@
+# Northern Meadow - Under shade trees
+# Demonstrates lower lighting in same area due to tree cover
+
+id: room_meadow_north
+area_id: area_sunlit_meadow
+name: Shaded Grove
+description: The northern edge of the meadow where ancient oak trees provide welcome shade. Dappled sunlight filters through the leaves.
+room_type: outdoor
+lighting_override: "70"  # Shaded but still bright (70/100)
+exits:
+  south: room_meadow_center
+on_enter_effect: Cool shade provides relief from the bright sun.
+on_exit_effect: null
+
+triggers: []

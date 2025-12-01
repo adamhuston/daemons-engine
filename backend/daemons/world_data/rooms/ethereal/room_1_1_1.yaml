@@ -1,0 +1,64 @@
+# Ethereal Cloud Chamber at position (1, 1, 1)
+# This is the central room of the Ethereal Nexus - a magical hub with triggers
+
+id: room_1_1_1
+area_id: area_ethereal_nexus
+name: An Ethereal Cloud Chamber
+description: At the center of the luminous ethereal cloud. Bright, disorienting swirls
+  of sparkling vapor surrounds you in all directions.
+room_type: ethereal
+exits:
+  north: room_1_2_1
+  south: room_1_0_1
+  east: room_2_1_1
+  west: room_0_1_1
+  up: room_1_1_2
+  down: room_1_1_0
+on_enter_effect: null
+on_exit_effect: The ethereal clouds part and swirl around you as you pass.
+
+# Example Phase 5 triggers
+triggers:
+  # Trigger 1: Welcome message when entering the central hub
+  - id: central_hub_welcome
+    # name is for documentation only
+    event: on_enter
+    conditions: []
+    actions:
+      - type: message_player
+        message: "The ethereal energies coalesce around you, welcoming you to the heart of the nexus."
+    cooldown: 60  # Only show once per minute per player
+
+  # Trigger 2: Interactive prayer/meditation command
+  - id: meditate_trigger
+    event: on_command
+    command_pattern: "meditate*"
+    conditions: []
+    actions:
+      - type: message_player
+        message: "You close your eyes and let the ethereal energies wash over you. A sense of peace fills your mind."
+      - type: message_room
+        message: "{player.name} sits down and begins to meditate, glowing faintly with ethereal light."
+      - type: set_flag
+        flag: meditated_recently
+        value: true
+
+  # Trigger 3: Touch the clouds - custom interaction
+  - id: touch_clouds_trigger
+    event: on_command
+    command_pattern: "touch cloud*"
+    conditions: []
+    actions:
+      - type: message_player
+        message: "You reach out to touch the swirling vapors. They feel cool and tingle with magical energy."
+      - type: message_room
+        message: "{player.name} reaches into the ethereal clouds, causing them to shimmer and dance."
+
+  # Trigger 4: Periodic ethereal pulse (timer-based)
+  - id: ethereal_pulse
+    event: on_timer
+    timer_interval: 120  # Every 2 minutes
+    conditions: []
+    actions:
+      - type: message_room
+        message: "A pulse of ethereal energy ripples through the cloud chamber, causing the air to shimmer with iridescent colors."

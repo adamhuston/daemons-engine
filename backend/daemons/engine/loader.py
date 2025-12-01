@@ -505,8 +505,8 @@ def load_triggers_from_yaml(world: World, world_data_dir: str | None = None) -> 
     import yaml
 
     if world_data_dir is None:
-        # Default: backend/world_data relative to this file
-        world_data_dir = Path(__file__).parent.parent.parent / "world_data"
+        # Default: daemons/world_data relative to this file
+        world_data_dir = Path(__file__).parent.parent / "world_data"
     else:
         world_data_dir = Path(world_data_dir)
 
@@ -700,7 +700,7 @@ def load_quests_into_system(quest_system, world_data_dir: str | None = None) -> 
     )
 
     if world_data_dir is None:
-        world_data_dir = Path(__file__).parent.parent.parent / "world_data"
+        world_data_dir = Path(__file__).parent.parent / "world_data"
     else:
         world_data_dir = Path(world_data_dir)
 
@@ -824,7 +824,7 @@ def load_dialogues_into_system(quest_system, world_data_dir: str | None = None) 
     )
 
     if world_data_dir is None:
-        world_data_dir = Path(__file__).parent.parent.parent / "world_data"
+        world_data_dir = Path(__file__).parent.parent / "world_data"
     else:
         world_data_dir = Path(world_data_dir)
 
@@ -984,7 +984,7 @@ def load_quest_chains_into_system(
     from .systems.quests import QuestChain, QuestReward
 
     if world_data_dir is None:
-        world_data_dir = Path(__file__).parent.parent.parent / "world_data"
+        world_data_dir = Path(__file__).parent.parent / "world_data"
     else:
         world_data_dir = Path(world_data_dir)
 

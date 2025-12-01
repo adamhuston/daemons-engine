@@ -1,0 +1,15 @@
+# Eastern Meadow - Morning brightness
+# Another variation of bright outdoor lighting
+
+id: room_meadow_east
+area_id: area_sunlit_meadow
+name: Eastern Rise
+description: A gentle slope rising to the east where the morning sun first touches the meadow. Everything here seems to sparkle with renewed life.
+room_type: outdoor
+lighting_override: "90"  # Very bright (90/100)
+exits:
+  west: room_meadow_center
+on_enter_effect: The morning light is particularly radiant here.
+on_exit_effect: null
+
+triggers: []

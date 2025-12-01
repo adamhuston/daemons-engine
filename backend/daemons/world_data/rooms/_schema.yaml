@@ -1,0 +1,136 @@
+# Room Schema Documentation
+# Reference for content creators defining new rooms
+# Database Model: Room (backend/app/models.py)
+
+# Required Fields
+# ===============
+id: string
+  # Unique identifier for the room
+  # Example: "room_0_0_0", "room_entrance_hall"
+
+name: string
+  # Display name of the room
+  # Example: "An Ethereal Cloud Chamber", "Entrance Hall"
+
+description: string
+  # Detailed flavor text describing what the player sees
+  # Supports multi-line text with proper YAML formatting (use | or >)
+  # Example: "A lower pocket in the southern western region of the clouds."
+
+room_type: string (default: "ethereal")
+  # Type of room (affects default emoji/icon in UI)
+  # Options: "ethereal", "forest", "cave", "urban", "chamber", "corridor", "outdoor"
+  # Example: "ethereal"
+
+# Area Association (Optional but Recommended)
+# ==========================================
+area_id: string | null (optional)
+  # ID of the area this room belongs to
+  # If null, room exists independently (not recommended for new rooms)
+  # Example: "area_ethereal_nexus"
+
+# Exit Connections (All Optional)
+# ===============================
+exits: dictionary (optional)
+  # Dictionary of exits to other rooms
+  # Keys: direction names (north, south, east, west, up, down, or custom)
+  # Values: room IDs
+  # Example:
+  #   north: room_0_1_0
+  #   east: room_1_0_0
+  #   up: room_0_0_1
+  #   secret: room_hidden_chamber
+
+# Movement Effects (Optional)
+# ===========================
+on_enter_effect: string | null (optional)
+  # Message shown when player enters this room
+  # Example: "You feel a chill as you enter."
+
+on_exit_effect: string | null (optional)
+  # Message shown when player exits this room
+  # Example: "The ethereal clouds part and swirl around you as you pass."
+
+# Phase 11: Lighting Override (Optional)
+# ======================================
+lighting_override: string | null (optional)
+  # Override area's ambient lighting for this specific room
+  # Useful for dark caves in bright areas, or bright chambers in dark areas
+  # Options: "pitch_black", "dim", "normal", "bright", "prismatic"
+  # If null, uses area's ambient_lighting
+  # Example: "pitch_black" (for a deep cave in a normally bright area)
+
+# Room Type Customization (Optional)
+# ==================================
+room_type_emoji: string | null (optional)
+  # Custom emoji/icon for this specific room (overrides room_type default)
+  # Example: "🏰" (castle), "🌲" (forest), "⛰️" (mountain)
+
+# Content Management (Optional)
+# =============================
+yaml_managed: bool (default: true)
+  # Whether this room is managed by YAML files or created via API
+  # true = YAML managed (most common)
+  # false = API created (dynamic rooms)
+  # Example: true
+
+# Triggers (Optional)
+# ==================
+triggers: array (optional, default: [])
+  # Room-specific triggers that fire based on events
+  # Each trigger is a dictionary with structure defined in triggers/_schema.yaml
+  # Example:
+  #   - id: newcomer_welcome
+  #     event: on_enter
+  #     conditions:
+  #       - type: flag_set
+  #         flag: visited_origin
+  #         expected: false
+  #     actions:
+  #       - type: message_player
+  #         message: "Welcome message here"
+  #       - type: set_flag
+  #         flag: visited_origin
+  #         value: true
+  #     max_fires: 1
+
+# Database Mapping Notes
+# ======================
+# This YAML schema maps to the Room SQLAlchemy model in backend/app/models.py
+# All fields are stored in the 'rooms' database table
+# Exits are stored as separate foreign key fields (north_id, south_id, etc.)
+# Custom/secret exits may require special handling
+#
+# Direction mapping:
+#   north -> north_id (foreign key to rooms.id)
+#   south -> south_id
+#   east -> east_id
+#   west -> west_id
+#   up -> up_id
+#   down -> down_id
+
+# Complete Example
+# ===============
+# id: room_forest_clearing
+# area_id: area_sunlit_forest
+# name: A Peaceful Forest Clearing
+# description: |
+#   Sunlight filters through the canopy above, illuminating a small clearing
+#   carpeted with soft moss. Butterflies dance between wildflowers.
+# room_type: forest
+# exits:
+#   north: room_forest_path_1
+#   south: room_forest_path_2
+#   east: room_deep_woods
+# on_enter_effect: "The peaceful atmosphere calms your spirit."
+# on_exit_effect: null
+# lighting_override: "bright"
+# triggers:
+#   - id: forest_rest_spot
+#     event: on_command
+#     command_pattern: "rest*"
+#     actions:
+#       - type: heal_player
+#         amount: 20
+#       - type: message_player
+#         message: "You rest in the clearing and feel refreshed."

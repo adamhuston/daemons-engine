@@ -1,0 +1,55 @@
+# Sunlit Meadow Area - High ambient lighting, demonstrates bright environments
+
+id: area_sunlit_meadow
+name: The Radiant Meadow
+description: An open field bathed in brilliant sunlight, where flowers bloom eternally.
+
+# Time system
+time_scale: 1.0
+starting_day: 1
+starting_hour: 12
+starting_minute: 0
+
+# Environmental properties
+biome: grassland
+climate: warm
+ambient_lighting: bright  # High base light (85 in AMBIENT_LIGHTING_VALUES)
+weather_profile: clear
+
+# Gameplay properties
+danger_level: 1
+magic_intensity: medium
+default_respawn_time: 600
+
+# Atmospheric details
+ambient_sound: Birds sing cheerfully and a gentle breeze rustles the tall grass.
+
+# Phase 5: Area metadata
+recommended_level: 1
+theme: peaceful
+area_flags:
+  safe_zone: true
+  pvp_enabled: false
+  always_bright: true
+
+# Time phase flavor text (emphasizes brightness)
+time_phases:
+  dawn: The first rays of sun kiss the meadow, painting the wildflowers in gold.
+  morning: Brilliant morning light floods the meadow, making the dew sparkle like diamonds.
+  afternoon: The sun blazes overhead, bathing everything in warm, golden radiance.
+  dusk: Sunset paints the meadow in shades of amber and rose.
+  evening: Even as twilight approaches, the meadow retains a warm, welcoming glow.
+  night: Moonlight and starlight keep the meadow softly illuminated through the night.
+
+# Entry points
+entry_points:
+  - room_meadow_center
+
+# Phase 5: Area-wide triggers
+triggers:
+  - id: meadow_welcome
+    event: on_area_enter
+    conditions: []
+    actions:
+      - type: message_player
+        message: "☀️ Warm sunlight washes over you as you enter the radiant meadow."

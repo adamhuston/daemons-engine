@@ -1,0 +1,50 @@
+id: npc_goblin_scout
+name: Goblin Scout
+description: >
+  A small, green-skinned creature with beady yellow eyes and pointed ears.
+  It clutches a rusty dagger and watches you with a mixture of curiosity and malice.
+  Scraps of leather armor barely cover its wiry frame.
+
+npc_type: hostile
+
+# Base stats
+level: 1
+max_health: 30
+armor_class: 8
+strength: 8
+dexterity: 14
+intelligence: 6
+
+# Combat properties (Phase 4.5)
+attack_damage_min: 2
+attack_damage_max: 6
+attack_speed: 2.5
+experience_reward: 15
+
+# AI behavior - tags that define NPC behavior
+behavior:
+  - wanders_sometimes     # 10% wander chance
+  - aggressive            # aggro_on_sight: true
+  - cowardly              # flees at 20% health
+  - loner                 # calls_for_help: false
+
+# Loot table (Phase 4.5)
+loot_table:
+  - template_id: item_gold_coins
+    quantity: [1, 5]
+    chance: 0.8
+  - template_id: item_rusty_dagger
+    quantity: 1
+    chance: 0.15
+
+# Flavor
+idle_messages:
+  - "The goblin scout sniffs the air suspiciously."
+  - "The goblin mutters something in its guttural tongue."
+  - "The goblin scratches at its leather armor."
+  - "The goblin's eyes dart around nervously."
+
+keywords:
+  - goblin
+  - scout
+  - creature

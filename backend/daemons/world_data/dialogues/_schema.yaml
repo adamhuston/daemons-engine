@@ -1,0 +1,296 @@
+# Dialogue Tree Schema Documentation
+# Reference for content creators defining NPC dialogue trees
+# Dialogue trees create branching conversations with conditions, quest integration, and player choices
+
+# Required Fields
+# ===============
+npc_template_id: string
+  # Which NPC template this dialogue tree belongs to
+  # Must match an existing npc_templates.id
+  # Example: "wandering_merchant", "village_elder"
+
+entry_node: string
+  # ID of the starting node for the conversation
+  # This is the default greeting
+  # Example: "greet"
+
+nodes: dictionary
+  # Collection of all dialogue nodes
+  # Keys: node IDs
+  # Values: node configurations (see Node Structure below)
+
+# Entry Overrides (Optional)
+# ==========================
+entry_overrides: array (optional, default: [])
+  # Context-sensitive entry points based on conditions
+  # Allows different greetings based on quest state, flags, etc.
+  # Evaluated in order - first matching override is used
+  # If no override matches, uses entry_node
+
+  # Each override entry:
+  #   conditions: array - list of conditions (same as trigger conditions)
+  #   node_id: string - which node to start at if conditions met
+
+  # Example:
+  #   - conditions:
+  #       - type: quest_status
+  #         params:
+  #           quest_id: goblin_threat
+  #           status: completed
+  #     node_id: greet_goblin_complete
+  #   - conditions:
+  #       - type: has_quest
+  #         params:
+  #           quest_id: wisp_investigation
+  #     node_id: greet_wisp_progress
+
+# Node Structure
+# ==============
+# Each node in the nodes dictionary has:
+
+text: string
+  # The NPC's dialogue text for this node
+  # Supports multi-line text with proper YAML formatting (use | or >)
+  # Can include character descriptions, emotions, actions
+  # Example: |
+  #   The merchant looks up from arranging their wares.
+  #   "Ah, a traveler! Welcome, welcome."
+
+options: array
+  # Player response choices
+  # Each option is a dictionary with:
+
+  #   text: string - what the player says/chooses
+  #     Example: "What do you need help with?"
+
+  #   next_node: string | null - which node to go to next
+  #     null = end conversation
+  #     Example: "offer_quest" or null
+
+  #   accept_quest: string (optional) - quest ID to give player
+  #     Example: "wisp_investigation"
+
+  #   turn_in_quest: string (optional) - quest ID to complete
+  #     Example: "goblin_threat"
+
+  #   conditions: array (optional) - show option only if conditions met
+  #     Same structure as trigger conditions
+  #     Example:
+  #       - type: level
+  #         min: 5
+
+  #   set_flags: dictionary (optional) - flags to set when chosen
+  #     Example:
+  #       talked_to_merchant: true
+
+  #   give_items: array (optional) - items to give player
+  #     Format: [item_id, quantity]
+  #     Example:
+  #       - ["item_quest_starter", 1]
+
+  #   remove_items: array (optional) - items to take from player
+  #     Format: [item_id, quantity]
+  #     Example:
+  #       - ["item_quest_item", 1]
+
+  #   grant_experience: int (optional) - XP to award
+  #     Example: 50
+
+  #   teleport_to: string (optional) - room_id to teleport player to
+  #     Example: "room_secret_area"
+
+  #   action: string (optional) - special action to trigger
+  #     Custom actions defined by game logic
+  #     Example: "open_shop", "start_trade", "begin_combat"
+
+# Node-Level Conditions (Optional)
+# ================================
+conditions: array (optional)
+  # Conditions for the entire node to be accessible
+  # If conditions fail, conversation ends or returns to previous node
+  # Same structure as trigger conditions
+  # Example:
+  #   - type: has_item
+  #     item_id: "item_special_key"
+
+# Node-Level Actions (Optional)
+# =============================
+on_enter: array (optional)
+  # Actions triggered when node is entered
+  # Same structure as trigger actions
+  # Example:
+  #   - type: set_flag
+  #     flag: met_merchant
+  #     value: true
+
+on_exit: array (optional)
+  # Actions triggered when leaving node
+  # Example:
+  #   - type: message_player
+  #     message: "The merchant nods farewell."
+
+# Common Dialogue Patterns
+# ========================
+
+# Pattern 1: Quest Giver
+# ----------------------
+# entry_node: greet
+# nodes:
+#   greet:
+#     text: "Hello traveler! I have a problem..."
+#     options:
+#       - text: "What's wrong?"
+#         next_node: offer_quest
+#       - text: "Not interested."
+#         next_node: null
+#   offer_quest:
+#     text: "Goblins are attacking! Help me!"
+#     options:
+#       - text: "I'll help."
+#         accept_quest: goblin_threat
+#         next_node: quest_accepted
+#       - text: "Maybe later."
+#         next_node: null
+#   quest_accepted:
+#     text: "Thank you! Be careful out there."
+#     options:
+#       - text: "I'll be back."
+#         next_node: null
+
+# Pattern 2: Quest Turn-In
+# ------------------------
+# Use entry_overrides to detect completed quest:
+# entry_overrides:
+#   - conditions:
+#       - type: quest_status
+#         params:
+#           quest_id: goblin_threat
+#           status: completed
+#     node_id: quest_complete
+# nodes:
+#   quest_complete:
+#     text: "You did it! Thank you so much!"
+#     options:
+#       - text: "Here's proof of the deed."
+#         turn_in_quest: goblin_threat
+#         next_node: reward_given
+
+# Pattern 3: Conditional Branches
+# -------------------------------
+# Show different options based on player state:
+# nodes:
+#   merchant_greeting:
+#     text: "Welcome to my shop!"
+#     options:
+#       - text: "Show me your wares."
+#         action: open_shop
+#         next_node: null
+#       - text: "I need special items." (VIP only)
+#         conditions:
+#           - type: flag_set
+#             flag: vip_member
+#             expected: true
+#         action: open_vip_shop
+#         next_node: null
+
+# Pattern 4: Information Gathering
+# --------------------------------
+# Multi-level conversation with info nodes:
+# nodes:
+#   greet:
+#     text: "What would you like to know?"
+#     options:
+#       - text: "Tell me about the area."
+#         next_node: info_area
+#       - text: "Any rumors?"
+#         next_node: info_rumors
+#       - text: "Nevermind."
+#         next_node: null
+#   info_area:
+#     text: "This place is ancient and dangerous..."
+#     options:
+#       - text: "Anything else?"
+#         next_node: greet
+#       - text: "Thanks."
+#         next_node: null
+
+# Complete Example
+# ===============
+# npc_template_id: wandering_merchant
+# entry_node: greet
+#
+# entry_overrides:
+#   - conditions:
+#       - type: quest_status
+#         params:
+#           quest_id: wisp_investigation
+#           status: completed
+#     node_id: greet_wisp_complete
+#   - conditions:
+#       - type: has_quest
+#         params:
+#           quest_id: wisp_investigation
+#     node_id: greet_wisp_progress
+#
+# nodes:
+#   greet:
+#     text: |
+#       The merchant looks up from arranging their wares.
+#       "Ah, a traveler! Welcome. I could use some help..."
+#     options:
+#       - text: "What do you need help with?"
+#         next_node: offer_wisp_quest
+#       - text: "What do you sell?"
+#         action: open_shop
+#         next_node: null
+#       - text: "Farewell."
+#         next_node: null
+#
+#   offer_wisp_quest:
+#     text: |
+#       "There are ethereal wisps in the Nexus. I'd like you to
+#       investigate them. Will you help?"
+#     options:
+#       - text: "I'll investigate for you."
+#         accept_quest: wisp_investigation
+#         next_node: quest_accepted
+#       - text: "Maybe later."
+#         next_node: null
+#
+#   quest_accepted:
+#     text: "Excellent! Come back when you've made your observations."
+#     options:
+#       - text: "I'll be back soon."
+#         next_node: null
+#
+#   greet_wisp_progress:
+#     text: "How goes the investigation?"
+#     options:
+#       - text: "Still working on it."
+#         next_node: null
+#
+#   greet_wisp_complete:
+#     text: "You've done it! Tell me everything!"
+#     options:
+#       - text: "Here's what I observed..."
+#         turn_in_quest: wisp_investigation
+#         next_node: wisp_turnin_complete
+#
+#   wisp_turnin_complete:
+#     text: |
+#       "Remarkable! Thank you for this information.
+#       Here's your reward."
+#     on_enter:
+#       - type: set_flag
+#         flag: helped_merchant
+#         value: true
+#     options:
+#       - text: "Happy to help."
+#         next_node: null
+
+# Database Mapping Notes
+# ======================
+# Dialogue trees are loaded from YAML files at server start
+# No dialogue state is stored in the database
+# Only quest progress and player flags (which affect dialogue) are persisted
+# Dialogue flow is entirely driven by current quest/flag state

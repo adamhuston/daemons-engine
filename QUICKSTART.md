@@ -330,7 +330,7 @@ daemons run --port 8080
 
 ## Next Steps
 
-- **Browse example content:** [world_data examples](https://github.com/adamhuston/1126/tree/main/backend/world_data)
+- **Browse example content:** [world_data examples](https://github.com/adamhuston/1126/tree/main/backend/daemons/world_data)
 - **Read the architecture:** [ARCHITECTURE.md](https://github.com/adamhuston/1126/blob/main/documentation/ARCHITECTURE.md)
 - **Understand the protocol:** [protocol.md](https://github.com/adamhuston/1126/blob/main/documentation/protocol.md)
 - **See the roadmap:** [roadmap.md](https://github.com/adamhuston/1126/blob/main/documentation/roadmap.md)

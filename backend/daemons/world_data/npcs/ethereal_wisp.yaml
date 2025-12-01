@@ -1,0 +1,50 @@
+id: npc_ethereal_wisp
+name: Ethereal Wisp
+description: >
+  A softly glowing orb of pale blue light that drifts lazily through the air.
+  It seems curious rather than threatening, occasionally circling visitors
+  as if examining them. Ancient texts say wisps are fragments of lost souls.
+
+npc_type: neutral
+
+# Base stats
+level: 2
+max_health: 20
+armor_class: 15  # Hard to hit - incorporeal
+strength: 2
+dexterity: 18
+intelligence: 12
+
+# Combat properties (Phase 4.5)
+attack_damage_min: 1
+attack_damage_max: 4
+attack_speed: 2.0
+experience_reward: 20
+
+# AI behavior - tags that define NPC behavior
+behavior:
+  - wanders_frequently    # 25% wander chance (wisps move around a lot)
+  - defensive             # Only fights back if attacked
+  - cautious              # Flees at 50% health
+  - loner                 # calls_for_help: false
+
+# Loot table (Phase 4.5)
+loot_table:
+  - template_id: item_wisp_essence
+    quantity: 1
+    chance: 0.4
+
+# Flavor
+idle_messages:
+  - "The wisp bobs gently in the air, pulsing with soft light."
+  - "The ethereal wisp circles around you curiously."
+  - "A faint chiming sound comes from the wisp."
+  - "The wisp's glow intensifies briefly before fading."
+  - "The ethereal wisp drifts upward, leaving a trail of sparkling motes."
+
+keywords:
+  - wisp
+  - ethereal
+  - light
+  - orb
+  - spirit

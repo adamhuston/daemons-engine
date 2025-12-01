@@ -1,0 +1,228 @@
+# Ability Schema Documentation
+# Reference for content creators defining new abilities
+
+# Required Fields
+# ===============
+ability_id: string
+  # Unique identifier for the ability (lowercase, no spaces)
+  # Example: "slash", "fireball", "backstab"
+
+name: string
+  # Display name of the ability
+  # Example: "Slash", "Fireball", "Backstab"
+
+description: string
+  # Flavor text describing what the ability does
+  # Example: "A basic melee attack"
+
+ability_type: string
+  # Type of ability: "active", "passive", "reactive"
+  # active: player uses on command
+  # passive: always-on benefit
+  # reactive: triggers on conditions (not yet implemented)
+
+ability_category: string
+  # Category for GCD and organization
+  # Example: "melee", "ranged", "magic", "utility"
+
+# Optional but Important Fields
+# =============================
+costs: dictionary (default: empty)
+  # Resource costs to use this ability
+  # Example: {"mana": 30}
+  # Example: {"rage": 25, "health": 10}
+
+cooldown: float (default: 1.0)
+  # Seconds between uses (personal cooldown)
+  # Example: 3.0
+
+gcd_category: string | null (default: null)
+  # If set, ability shares cooldown with others in same category
+  # Common values: "melee", "spell", "shared", or null (no shared cooldown)
+
+behavior_id: string (default: empty)
+  # LEGACY: ID of a single behavior function (converted to behaviors list)
+  # Example: "slash_behavior", "fireball_behavior"
+  # Note: For new abilities, use 'behaviors' list instead
+
+behaviors: array of strings (default: empty)
+  # NEW: List of behavior IDs to execute in sequence (behavior chaining)
+  # Each behavior in the list executes in order, results are aggregated
+  # Example: ["melee_attack"] (single behavior, same as legacy)
+  # Example: ["melee_attack", "stun_effect"] (damage + stun combo)
+  # Example: ["fireball", "knockback_effect"] (fire damage + knockback)
+  #
+  # Available behaviors (29 total):
+  # Core: melee_attack, arcane_bolt, power_attack, rally_passive, aoe_attack,
+  #       stun_effect, mana_regen, fireball, frostbolt, mana_shield, polymorph,
+  #       backstab, quick_strike, poison_strike, evasion_passive, damage_boost
+  # Custom: whirlwind_attack, shield_bash, inferno, arcane_missiles, shadow_clone
+  # Utility: create_light, darkness, unlock_door, unlock_container, detect_magic,
+  #          true_sight, teleport, create_passage
+  #
+  # Behavior chaining enables creating complex abilities without coding:
+  # - Combine damage + crowd control (melee + stun)
+  # - Stack buffs (shield + damage boost)
+  # - Create combo effects (poison + slow)
+  #
+  # BACKWARD COMPATIBILITY: Old YAMLs with 'behavior_id' are automatically
+  # converted to single-item 'behaviors' list at load time.
+
+effects: array of strings (default: empty)
+  # Effect template IDs to apply after behavior executes
+  # Example: ["stun_effect", "bleed_effect"]
+
+target_type: string (default: "self")
+  # How target is selected: "self", "enemy", "ally", "room"
+  # self: affects user only
+  # enemy: requires enemy target
+  # ally: requires ally target
+  # room: affects all entities in room (except caster)
+
+target_range: int (default: 0)
+  # Range in rooms: 0 = self, 1 = adjacent, 2+ = distance
+  # Example: 0 (self), 1 (melee), 5 (ranged spells)
+
+requires_target: bool (default: false)
+  # If true, ability fails if no valid target selected
+
+requires_los: bool (default: false)
+  # If true, requires line of sight to target
+  # Not yet implemented in Phase 9
+
+can_use_while_moving: bool (default: false)
+  # If true, ability can be used while moving
+  # Not yet implemented in Phase 9
+
+required_level: int (default: 1)
+  # Minimum character level to learn this ability
+
+required_class: string | null (default: null)
+  # If set, restricts ability to specific class
+  # Example: "warrior", "mage", or null for any class
+
+scaling: dictionary (default: empty)
+  # Damage/effect scaling from character stats and level
+  # Keys: stat names (strength, intelligence, etc.) or "level"
+  # Values: multiplier floats
+  # Example: {"strength": 1.2, "level": 0.1}
+  # Meaning: damage = base * (1 + strength*1.2) + level*0.1
+
+# UI/Flavor Fields (Optional)
+# ============================
+icon: string | null (default: null)
+  # URL or file path to ability icon
+
+animation: string | null (default: null)
+  # Name of animation to play on client
+  # Example: "slash", "fireball", "heal_pulse"
+
+sound: string | null (default: null)
+  # Name of sound effect to play
+  # Example: "sword_swing", "explosion", "magic_cast"
+
+keywords: array of strings (default: empty)
+  # Search tags for this ability
+  # Example: ["damage", "fire", "aoe"]
+
+# Examples
+# ========
+
+# Basic melee attack (legacy format with behavior_id)
+# abilities:
+#   - ability_id: slash
+#     name: "Slash"
+#     description: "A basic melee attack"
+#     ability_type: "active"
+#     ability_category: "melee"
+#     cooldown: 1.0
+#     gcd_category: "melee"
+#     behavior_id: "melee_attack"  # Legacy: auto-converted to behaviors: ["melee_attack"]
+#     target_type: "enemy"
+#     target_range: 1
+#     requires_target: true
+#     required_level: 1
+#     scaling:
+#       strength: 1.2
+
+# Mana-costing spell (new format with behaviors list)
+# abilities:
+#   - ability_id: fireball
+#     name: "Fireball"
+#     description: "Hurl a ball of flame"
+#     ability_type: "active"
+#     ability_category: "magic"
+#     costs:
+#       mana: 50
+#     cooldown: 4.0
+#     gcd_category: "spell"
+#     behaviors: ["fireball"]  # New format: single behavior in list
+#     target_type: "enemy"
+#     target_range: 5
+#     requires_target: true
+#     required_level: 8
+#     scaling:
+#       intelligence: 1.6
+
+# Behavior chaining example: damage + stun combo
+# abilities:
+#   - ability_id: shield_slam
+#     name: "Shield Slam"
+#     description: "Bash an enemy with your shield, dealing damage and stunning them"
+#     ability_type: "active"
+#     ability_category: "melee"
+#     costs:
+#       rage: 30
+#     cooldown: 5.0
+#     gcd_category: "melee"
+#     behaviors:
+#       - "melee_attack"   # First: deal melee damage
+#       - "stun_effect"    # Then: apply stun
+#     target_type: "enemy"
+#     target_range: 1
+#     requires_target: true
+#     required_level: 10
+#     scaling:
+#       strength: 1.5
+
+# Behavior chaining example: multi-buff utility
+# abilities:
+#   - ability_id: battle_preparation
+#     name: "Battle Preparation"
+#     description: "Fortify yourself with protective magic and enhanced power"
+#     ability_type: "active"
+#     ability_category: "magic"
+#     costs:
+#       mana: 80
+#     cooldown: 10.0
+#     gcd_category: "spell"
+#     behaviors:
+#       - "mana_shield"     # First: create damage absorption shield
+#       - "damage_boost"    # Then: increase damage output
+#     target_type: "self"
+#     target_range: 0
+#     requires_target: false
+#     required_level: 15
+#     behavior_id: "fireball"
+#     effects:
+#       - "burn_effect"
+#     target_type: "enemy"
+#     target_range: 5
+#     requires_target: true
+#     required_level: 8
+#     scaling:
+#       intelligence: 1.6
+
+# Passive buff
+# abilities:
+#   - ability_id: rally
+#     name: "Rally"
+#     description: "Passive: gain +10% armor when above 50% health"
+#     ability_type: "passive"
+#     ability_category: "utility"
+#     cooldown: 0
+#     gcd_category: null
+#     behavior_id: "rally_passive"
+#     target_type: "self"
+#     requires_target: false
+#     required_level: 10

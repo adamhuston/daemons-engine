@@ -1,0 +1,72 @@
+# Skeleton Champion - A warrior-type NPC demonstrating Phase 14 ability system
+# Uses BruteAI behavior for aggressive melee combat with abilities
+
+id: npc_skeleton_champion
+name: Skeleton Champion
+description: >
+  A towering skeletal warrior clad in rusted but once-magnificent plate armor.
+  It grips a massive two-handed battleaxe, the blade still keen despite ages
+  of decay. Unholy flames burn in its empty eye sockets, and ancient runes
+  etched into its bones pulse with dark energy. This is no mere animated
+  corpse - it was a mighty warrior in life and remains deadly in undeath.
+
+npc_type: hostile
+level: 8
+max_health: 150
+armor_class: 16
+strength: 16
+dexterity: 8
+intelligence: 4
+
+# Combat - devastating melee attacks
+attack_damage_min: 12
+attack_damage_max: 20
+attack_speed: 4.0
+experience_reward: 75
+
+# Phase 14: Character class and abilities
+class_id: warrior
+default_abilities:
+  - power_attack
+  - shield_bash
+  - whirlwind
+ability_loadout:
+  - power_attack
+  - shield_bash
+  - whirlwind
+ai_behavior: brute_ai
+
+# AI behavior tags
+behavior:
+  - aggressive
+  - brave           # Never flees
+  - guard           # Stays near spawn point
+  - loner           # Doesn't call for help
+
+# Loot
+loot_table:
+  - template_id: item_gold_coins
+    quantity: [20, 50]
+    chance: 1.0
+  - template_id: item_ancient_bone
+    quantity: [1, 3]
+    chance: 0.5
+  - template_id: item_rusty_plate_armor
+    quantity: 1
+    chance: 0.1
+
+# Flavor
+idle_messages:
+  - "The skeleton champion's bones rattle as it shifts its weight."
+  - "Unholy flames flicker in the champion's empty eye sockets."
+  - "The ancient warrior raises its axe and tests the edge with a bony finger."
+  - "A hollow, echoing groan escapes the champion's fleshless jaw."
+  - "The runes on the skeleton's bones pulse with malevolent energy."
+
+keywords:
+  - skeleton
+  - champion
+  - undead
+  - warrior
+  - knight
+  - bones

@@ -1,0 +1,38 @@
+# Quest Chain: Ethereal Mystery
+# Phase X.4 - Linked quest series with chain-level rewards
+#
+# This chain links the wisp_investigation and goblin_threat quests
+# into a cohesive storyline with bonus rewards on completion.
+
+id: ethereal_mystery
+name: "The Ethereal Mystery"
+description: |
+  Unravel the secrets of the Ethereal Nexus. Strange energies
+  have awakened ancient threats - investigate the wisps and
+  neutralize the goblin incursion to restore peace.
+
+# Quests in this chain, in order
+quest_ids:
+  - wisp_investigation
+  - goblin_threat
+
+# Requirements to unlock this chain
+unlock_requirements:
+  - type: level
+    min: 1
+  # - type: flag
+  #   name: tutorial_complete
+  #   value: true
+
+# Bonus rewards for completing the entire chain
+chain_rewards:
+  experience: 100
+  currency: 50
+  items: []
+  flags:
+    ethereal_mystery_complete: true
+
+# Flags set when chain is completed
+completion_flags:
+  knows_nexus_secrets: true
+  hero_of_nexus: true

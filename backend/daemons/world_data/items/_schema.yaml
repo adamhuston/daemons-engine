@@ -1,0 +1,246 @@
+# Item Template Schema Documentation
+# Reference for content creators defining new item templates
+# Database Model: ItemTemplate (backend/app/models.py)
+
+# Required Fields
+# ===============
+id: string
+  # Unique identifier for the item template (prefix with 'item_')
+  # Example: "item_rusty_sword", "item_health_potion"
+
+name: string
+  # Display name of the item
+  # Example: "Rusty Sword", "Minor Health Potion"
+
+description: string
+  # Detailed flavor text describing the item
+  # Example: "A weathered blade, its edge dulled by time and neglect."
+
+item_type: string
+  # Primary item category
+  # Options: "weapon", "armor", "consumable", "container", "quest", "junk", "material"
+  # Example: "weapon"
+
+# Item Classification (Optional)
+# ==============================
+item_subtype: string | null (optional)
+  # Subcategory for more specific classification
+  # Weapons: "sword", "axe", "bow", "staff", "dagger"
+  # Armor: "helmet", "chest", "legs", "boots", "gloves", "shield"
+  # Consumables: "potion", "food", "scroll"
+  # Example: "sword"
+
+equipment_slot: string | null (optional)
+  # Which slot this item can be equipped to (if equippable)
+  # Options: "weapon", "head", "chest", "hands", "legs", "feet", "neck", "ring", "back"
+  # null if not equippable
+  # Example: "weapon"
+
+# Stat Modifiers (Optional)
+# =========================
+stat_modifiers: dictionary (default: {})
+  # Stat bonuses/penalties when item is equipped
+  # Keys: stat names (strength, dexterity, intelligence, vitality, armor_class, max_health, max_energy)
+  # Values: integer modifiers (can be negative)
+  # Example:
+  #   strength: 2
+  #   armor_class: 5
+  #   max_health: 10
+
+# Physical Properties
+# ==================
+weight: float (default: 1.0)
+  # Weight in pounds/kilograms
+  # Affects inventory capacity
+  # Example: 3.5
+
+max_stack_size: int (default: 1)
+  # How many can stack in a single inventory slot
+  # 1 = unique item (doesn't stack)
+  # >1 = stackable (consumables, materials)
+  # Example: 99 (for stackable items like arrows)
+
+# Durability System (Optional)
+# ============================
+has_durability: bool (default: false)
+  # Whether this item degrades with use
+  # Example: true
+
+max_durability: int | null (optional)
+  # Maximum durability points (required if has_durability = true)
+  # Item breaks at 0 durability
+  # Example: 50
+
+# Container Properties (Optional)
+# ===============================
+is_container: bool (default: false)
+  # Whether this item can hold other items
+  # Example: true (for backpacks, chests)
+
+container_capacity: int | null (optional)
+  # Max items or weight the container can hold (required if is_container = true)
+  # Example: 50
+
+container_type: string | null (optional)
+  # How capacity is measured (required if is_container = true)
+  # Options: "weight_based", "slot_based"
+  # Example: "slot_based"
+
+# Consumable Properties (Optional)
+# ================================
+is_consumable: bool (default: false)
+  # Whether this item can be consumed/used up
+  # Example: true (for potions, food)
+
+consume_effect: dictionary | null (optional)
+  # Effect applied when consumed (required if is_consumable = true)
+  # Structure:
+  #   type: string (heal, buff, debuff, etc.)
+  #   amount: int (healing amount, buff duration)
+  #   duration: int (effect duration in seconds)
+  # Example:
+  #   type: heal
+  #   amount: 50
+  #   stat: health
+
+# Weapon Combat Stats (Optional)
+# ==============================
+damage_min: int (default: 0)
+  # Minimum damage dealt by weapon attacks
+  # Only used when item_type = "weapon"
+  # Example: 3
+
+damage_max: int (default: 0)
+  # Maximum damage dealt by weapon attacks
+  # Only used when item_type = "weapon"
+  # Example: 7
+
+attack_speed: float (default: 2.0)
+  # Seconds between weapon attacks
+  # Lower = faster attacks
+  # Only used when item_type = "weapon"
+  # Example: 2.2
+
+damage_type: string (default: "physical")
+  # Type of damage dealt
+  # Options: "physical", "magic", "fire", "ice", "lightning", "poison", "holy", "shadow"
+  # Only used when item_type = "weapon"
+  # Example: "physical"
+
+# Phase 11: Light Source Properties (Optional)
+# ============================================
+provides_light: bool (default: false)
+  # Whether this item emits light
+  # Example: true (for torches, lanterns, glowing items)
+
+light_intensity: int (default: 0)
+  # How much light the item provides (0-50)
+  # Contributes to player's total light level
+  # Example: 30
+
+light_duration: int | null (optional)
+  # How long the light lasts in seconds
+  # null = permanent light source
+  # Example: 600 (10 minutes)
+
+# Flavor and Metadata (Optional)
+# ==============================
+flavor_text: string | null (optional)
+  # Additional flavor text or lore
+  # Example: "The hilt is wrapped in cracked leather, and rust flakes off with each swing."
+
+rarity: string (default: "common")
+  # Item rarity tier (affects color coding in UI)
+  # Options: "common", "uncommon", "rare", "epic", "legendary", "artifact"
+  # Example: "common"
+
+value: int (default: 0)
+  # Gold/currency value for buying/selling
+  # Example: 5
+
+# Special Flags (Optional)
+# ========================
+flags: dictionary (default: {})
+  # Special item properties
+  # Common flags:
+  #   quest_item: bool - required for quest, can't be dropped
+  #   no_drop: bool - cannot be dropped or traded
+  #   no_sell: bool - cannot be sold to merchants
+  #   unique: bool - player can only have one
+  #   soulbound: bool - binds to player on pickup
+  # Example:
+  #   quest_item: true
+  #   no_drop: true
+
+keywords: array of strings (default: [])
+  # Search keywords for finding this item
+  # Used by the "get" and "examine" commands
+  # Example: ["sword", "blade", "weapon"]
+
+# Database Mapping Notes
+# ======================
+# This YAML schema maps to the ItemTemplate SQLAlchemy model in backend/app/models.py
+# All fields are stored in the 'item_templates' database table
+# stat_modifiers, consume_effect, and flags are stored as JSON
+# Boolean fields are stored as integers (0/1) in SQLite
+
+# Complete Example: Weapon
+# ========================
+# id: item_rusty_sword
+# name: Rusty Sword
+# description: A weathered blade, its edge dulled by time and neglect.
+# item_type: weapon
+# item_subtype: sword
+# equipment_slot: weapon
+# stat_modifiers:
+#   strength: 1
+# damage_min: 3
+# damage_max: 7
+# attack_speed: 2.2
+# damage_type: physical
+# weight: 3.5
+# max_stack_size: 1
+# has_durability: true
+# max_durability: 50
+# is_container: false
+# is_consumable: false
+# flavor_text: The hilt is wrapped in cracked leather, and rust flakes off with each swing.
+# rarity: common
+# value: 5
+# flags: {}
+# keywords: [sword, blade, weapon]
+
+# Complete Example: Consumable
+# ============================
+# id: item_health_potion
+# name: Minor Health Potion
+# description: A small vial of red liquid that glows faintly.
+# item_type: consumable
+# item_subtype: potion
+# weight: 0.5
+# max_stack_size: 99
+# is_consumable: true
+# consume_effect:
+#   type: heal
+#   amount: 50
+#   stat: health
+# rarity: common
+# value: 10
+# keywords: [potion, health, healing]
+
+# Complete Example: Container
+# ===========================
+# id: item_leather_backpack
+# name: Leather Backpack
+# description: A sturdy leather pack with multiple compartments.
+# item_type: container
+# item_subtype: backpack
+# equipment_slot: back
+# weight: 2.0
+# max_stack_size: 1
+# is_container: true
+# container_capacity: 20
+# container_type: slot_based
+# rarity: common
+# value: 25
+# keywords: [backpack, pack, bag, container]

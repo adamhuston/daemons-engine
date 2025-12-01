@@ -87,6 +87,7 @@ daemons = [
     "alembic/*",
     "alembic/**/*",
     "world_data/**/*",
+    "client/fonts/**/*",
 ]
 
 [tool.ruff]

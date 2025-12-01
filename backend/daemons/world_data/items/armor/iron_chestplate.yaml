@@ -1,0 +1,33 @@
+# Iron Chestplate - Heavy body armor
+
+id: item_iron_chestplate
+name: Iron Chestplate
+description: A sturdy iron chestplate that offers solid protection.
+item_type: armor
+item_subtype: chestplate
+equipment_slot: chest
+
+stat_modifiers:
+  armor_class: 5
+  dexterity: -1
+
+weight: 15.0
+max_stack_size: 1
+
+has_durability: true
+max_durability: 80
+
+is_container: false
+is_consumable: false
+
+flavor_text: The iron plates are well-forged and polished to a dull shine.
+rarity: uncommon
+value: 25
+
+flags: {}
+
+keywords:
+  - chestplate
+  - chest
+  - armor
+  - plate

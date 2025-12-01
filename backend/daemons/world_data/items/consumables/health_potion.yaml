@@ -1,0 +1,37 @@
+# Health Potion - Basic healing consumable
+
+id: item_health_potion
+name: Health Potion
+description: A small vial filled with crimson liquid that glows faintly.
+item_type: consumable
+item_subtype: potion
+equipment_slot: null
+
+stat_modifiers: {}
+
+weight: 0.2
+max_stack_size: 10
+
+has_durability: false
+max_durability: null
+
+is_container: false
+is_consumable: true
+
+consume_effect:
+  effect_type: hot
+  name: Regeneration
+  duration: 0.0
+  magnitude: 25
+
+flavor_text: The liquid swirls hypnotically when agitated.
+rarity: common
+value: 15
+
+flags: {}
+
+# Keywords for searching
+keywords:
+  - potion
+  - heal
+  - health

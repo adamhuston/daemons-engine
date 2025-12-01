@@ -1,0 +1,55 @@
+id: npc_skeleton_warrior
+name: Skeletal Warrior
+description: >
+  The animated remains of an ancient warrior, bones held together by dark magic.
+  Empty eye sockets glow with an eerie blue light. It grips a notched sword
+  in its bony fingers, forever bound to guard this place.
+
+npc_type: hostile
+
+# Base stats
+level: 3
+max_health: 60
+armor_class: 12
+strength: 14
+dexterity: 10
+intelligence: 3
+
+# Combat properties (Phase 4.5)
+attack_damage_min: 5
+attack_damage_max: 12
+attack_speed: 3.5
+experience_reward: 35
+
+# AI behavior - tags that define NPC behavior
+behavior:
+  - wanders_nowhere       # Guards a specific area (never wanders)
+  - aggressive            # aggro_on_sight: true
+  - fearless              # flees_at_health_percent: 0 (never flees)
+  - calls_for_help        # Will summon other undead
+
+# Loot table (Phase 4.5)
+loot_table:
+  - template_id: item_bone_dust
+    quantity: [1, 3]
+    chance: 0.6
+  - template_id: item_ancient_coin
+    quantity: [1, 2]
+    chance: 0.3
+  - template_id: item_notched_sword
+    quantity: 1
+    chance: 0.1
+
+# Flavor
+idle_messages:
+  - "The skeleton stands motionless, awaiting intruders."
+  - "A faint rattling sound emanates from the skeleton's bones."
+  - "The blue glow in the skeleton's eye sockets flickers briefly."
+  - "The skeletal warrior shifts its grip on its ancient blade."
+
+keywords:
+  - skeleton
+  - skeletal
+  - warrior
+  - undead
+  - bones

@@ -1,0 +1,9 @@
+# Items spawned in room_1_1_1 (Nexus Core)
+room_id: room_1_1_1
+items:
+  - template_id: item_leather_backpack
+    quantity: 1
+    current_durability: 100
+
+  - template_id: item_health_potion
+    quantity: 2

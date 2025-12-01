@@ -3892,7 +3892,7 @@ class ContentReloader:
         self.engine = engine
         self.world = engine.world
         self.session = session
-        self.world_data_dir = Path(__file__).parent.parent.parent / "world_data"
+        self.world_data_dir = Path(__file__).parent.parent / "world_data"
 
     async def validate_yaml_file(
         self, file_path: Path, content_type: ReloadContentType

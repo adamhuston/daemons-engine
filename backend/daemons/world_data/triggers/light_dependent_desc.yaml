@@ -1,0 +1,27 @@
+# Phase 11: Light-Dependent Room Description
+# Room description changes based on light levels
+
+id: light_dependent_description
+event: on_enter
+description: "Updates room description based on current light level"
+
+conditions:
+  # Trigger when entering with low light
+  - type: light_level
+    params:
+      operator: "<"
+      value: 40
+
+actions:
+  - type: set_description
+    params:
+      description: "This chamber is shrouded in deep shadows. You can barely make out the shapes of furniture and debris scattered about. The darkness seems to press in on all sides, and you feel distinctly uneasy."
+
+  - type: message_player
+    params:
+      text: "[The room is too dark to see clearly. Try finding a light source.]"
+      style: "system"
+
+# Fires every time to update description
+max_fires: -1
+enabled: true

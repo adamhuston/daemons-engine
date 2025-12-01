@@ -1,0 +1,137 @@
+# Area Schema Documentation
+# Reference for content creators defining new areas
+# Database Model: Area (backend/app/models.py)
+
+# Required Fields
+# ===============
+id: string
+  # Unique identifier for the area (prefix with 'area_')
+  # Example: "area_ethereal_nexus", "area_dark_caves"
+
+name: string
+  # Display name of the area
+  # Example: "The Ethereal Nexus", "Dark Caves"
+
+description: string
+  # Detailed flavor text describing the area
+  # Supports multi-line text with proper YAML formatting (use | or >)
+  # Example: "A mystical convergence point where realities blur..."
+
+# Time System Fields (Required)
+# ============================
+time_scale: float (default: 1.0)
+  # How fast time passes relative to real time
+  # 1.0 = normal, 2.0 = twice as fast, 0.5 = half speed
+  # Example: 4.0 (4x faster)
+
+starting_day: int (default: 1)
+  # Which day the area starts on
+  # Example: 1
+
+starting_hour: int (default: 6)
+  # Starting hour (0-23)
+  # Example: 6 (dawn)
+
+starting_minute: int (default: 0)
+  # Starting minute (0-59)
+  # Example: 0
+
+# Environmental Properties (Required)
+# ==================================
+biome: string (default: "ethereal")
+  # Type of environment
+  # Options: "ethereal", "forest", "cave", "urban", "desert", "arctic", "swamp"
+  # Example: "ethereal"
+
+climate: string (default: "mild")
+  # Climate type
+  # Options: "mild", "hot", "cold", "humid", "arid"
+  # Example: "mild"
+
+ambient_lighting: string (default: "normal")
+  # Base lighting level for the area
+  # Options: "pitch_black", "dim", "normal", "bright", "prismatic"
+  # Example: "prismatic"
+
+weather_profile: string (default: "clear")
+  # Weather pattern
+  # Options: "clear", "stable", "rainy", "stormy", "variable"
+  # Example: "stable"
+
+# Gameplay Properties (Required)
+# ==============================
+danger_level: int (default: 1)
+  # How dangerous this area is (affects NPC strength/spawns)
+  # Range: 1-10 (1 = starter area, 10 = endgame)
+  # Example: 3
+
+magic_intensity: string (default: "low")
+  # How much magical energy is present
+  # Options: "none", "low", "moderate", "high", "extreme"
+  # Affects magic abilities and enchantments
+  # Example: "extreme"
+
+default_respawn_time: int (default: 300)
+  # Default NPC respawn time in seconds (unless overridden by NPC)
+  # Example: 120 (2 minutes)
+
+# Optional Fields
+# ==============
+ambient_sound: string | null (optional)
+  # Atmospheric sound description or audio file reference
+  # Example: "A gentle humming resonates through the air."
+
+time_phases: dictionary (optional, default: {})
+  # Custom flavor text for each time of day
+  # Keys: dawn, morning, afternoon, dusk, evening, night
+  # Values: string descriptions
+  # Example:
+  #   dawn: "Prismatic light filters through the mist..."
+  #   morning: "The ethereal mists glow with soft light."
+  #   afternoon: "Shimmering energy pulses through the air..."
+  #   dusk: "The mists darken to deep purples and blues..."
+  #   evening: "Ghostly stars begin to emerge..."
+  #   night: "The nexus glows with bioluminescent energy..."
+
+entry_points: array of strings (default: [])
+  # List of room IDs where players can spawn into this area
+  # Example: ["room_1_1_1", "room_entrance"]
+
+# Area Metadata (Optional)
+# ========================
+recommended_level: int (optional)
+  # Suggested player level for this area
+  # Example: 1
+
+theme: string (optional)
+  # Thematic tag for organization
+  # Example: "mystical", "combat", "exploration"
+
+area_flags: dictionary (optional, default: {})
+  # Special area-wide flags
+  # Common flags:
+  #   safe_zone: bool - no combat allowed
+  #   pvp_enabled: bool - player vs player combat
+  #   magic_enhanced: bool - magic abilities boosted
+  #   no_teleport: bool - teleportation disabled
+  # Example:
+  #   safe_zone: false
+  #   pvp_enabled: false
+  #   magic_enhanced: true
+
+triggers: array (optional, default: [])
+  # Area-wide triggers that fire for all rooms in the area
+  # See triggers/_schema.yaml for trigger structure
+  # Example:
+  #   - id: area_welcome
+  #     event: on_enter
+  #     actions:
+  #       - type: message_player
+  #         message: "Welcome to the Ethereal Nexus!"
+
+# Database Mapping Notes
+# ======================
+# This YAML schema maps to the Area SQLAlchemy model in backend/app/models.py
+# All fields are stored in the 'areas' database table
+# Time phases and area_flags are stored as JSON in the database
+# Entry points are stored as a JSON array

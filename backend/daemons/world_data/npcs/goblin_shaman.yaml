@@ -1,0 +1,65 @@
+# Goblin Shaman - A mage-type NPC demonstrating Phase 14 ability system
+# Uses CasterAI behavior to cast spells intelligently
+
+id: npc_goblin_shaman
+name: Goblin Shaman
+description: >
+  A hunched goblin clutching a gnarled staff adorned with bones and feathers.
+  Faint wisps of arcane energy crackle around its gnarled fingers, and its
+  yellow eyes gleam with malevolent cunning. Despite its small stature,
+  there is an unmistakable aura of magical power surrounding this creature.
+
+npc_type: hostile
+level: 5
+max_health: 60
+armor_class: 10
+strength: 6
+dexterity: 12
+intelligence: 14
+
+# Combat - basic melee attacks (fallback if no mana)
+attack_damage_min: 3
+attack_damage_max: 6
+attack_speed: 3.5
+experience_reward: 35
+
+# Phase 14: Character class and abilities
+class_id: mage
+default_abilities:
+  - arcane_bolt
+  - fireball
+  - mana_shield
+ability_loadout:
+  - fireball
+  - arcane_bolt
+  - mana_shield
+ai_behavior: caster_ai
+
+# AI behavior tags
+behavior:
+  - aggressive
+  - social           # Calls for help from nearby goblins
+  - cowardly         # Flees at low health
+
+# Loot
+loot_table:
+  - template_id: item_gold_coins
+    quantity: [5, 15]
+    chance: 0.9
+  - template_id: item_minor_mana_potion
+    quantity: 1
+    chance: 0.25
+
+# Flavor
+idle_messages:
+  - "The goblin shaman mutters an incantation under its breath."
+  - "Sparks of green energy dance between the shaman's fingers."
+  - "The shaman's staff pulses with a faint, eerie glow."
+  - "The goblin shaman cackles quietly to itself."
+
+keywords:
+  - goblin
+  - shaman
+  - caster
+  - mage
+  - spellcaster

@@ -1,0 +1,65 @@
+# Goblin Threat Quest
+# A combat-focused quest to defeat goblins
+
+id: goblin_threat
+name: "The Goblin Menace"
+description: |
+  Goblin scouts have been spotted near the Ethereal Nexus, threatening travelers
+  and disrupting the delicate magical balance. Someone must deal with this threat.
+category: main
+
+# Quest giver
+giver_npc_template: wandering_merchant
+turn_in_npc_template: wandering_merchant
+
+# Requirements - must complete wisp investigation first
+level_requirement: 2
+prerequisites:
+  - wisp_investigation
+required_flags: {}
+required_items: []
+
+# Objectives
+objectives:
+  - id: kill_scouts
+    type: kill
+    description: "Defeat Goblin Scouts"
+    target_template_id: goblin_scout
+    required_count: 3
+    hidden: false
+    optional: false
+
+  - id: collect_tokens
+    type: collect
+    description: "Collect Goblin Scout Tokens"
+    target_template_id: goblin_token
+    required_count: 3
+    hidden: false
+    optional: true  # Bonus objective
+
+# Rewards
+rewards:
+  experience: 150
+  items:
+    - ["rusty_sword", 1]
+    - ["health_potion", 3]
+  flags:
+    goblin_slayer: true
+  currency: 25
+
+# Dialogue
+accept_dialogue: |
+  "These goblins are becoming a real problem. They've been scaring off
+  other travelers—bad for business, you know? Defeat three of their
+  scouts and I'll make it worth your while."
+
+progress_dialogue: |
+  "How goes the goblin hunting? Watch yourself—they're crafty little
+  creatures. Fight them one at a time if you can."
+
+complete_dialogue: |
+  "Excellent work! The roads should be safer now. Take this sword—
+  it's seen better days, but it'll serve you well. And here's some
+  gold for your trouble."
+
+auto_complete: false

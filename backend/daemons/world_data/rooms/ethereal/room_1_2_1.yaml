@@ -1,0 +1,15 @@
+# Ethereal Cloud Chamber at position (1, 2, 1)
+
+id: room_1_2_1
+area_id: area_ethereal_nexus
+name: An Ethereal Cloud Chamber
+description: A central pocket in the northern central region of the clouds.
+room_type: ethereal
+exits:
+  south: room_1_1_1
+  east: room_2_2_1
+  west: room_0_2_1
+  up: room_1_2_2
+  down: room_1_2_0
+on_enter_effect: null
+on_exit_effect: The ethereal clouds part and swirl around you as you pass.

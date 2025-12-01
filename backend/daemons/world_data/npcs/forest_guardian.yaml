@@ -1,0 +1,74 @@
+# Forest Guardian - A nature-themed NPC demonstrating Phase 14 ability system
+# Uses TacticalCasterAI for intelligent spell selection based on situation
+
+id: npc_forest_guardian
+name: Forest Guardian
+description: >
+  A towering figure of intertwined vines, bark, and glowing moss stands before
+  you. Its form is vaguely humanoid, with two deep green orbs serving as eyes.
+  Ancient leaves rustle as it moves, and the air around it smells of earth and
+  growing things. This is no mere plant - it is a sentient protector of the
+  forest, awakened to defend its domain against intruders.
+
+npc_type: neutral    # Only attacks if provoked or forest is threatened
+level: 10
+max_health: 200
+armor_class: 14
+strength: 14
+dexterity: 8
+intelligence: 12
+
+# Combat - sweeping vine attacks
+attack_damage_min: 8
+attack_damage_max: 15
+attack_speed: 3.0
+experience_reward: 100
+
+# Phase 14: Character class and abilities
+# Uses mage class for mana pool, but with nature-themed ability selection
+class_id: mage
+default_abilities:
+  - arcane_bolt     # Reskinned as "Nature's Wrath" - a blast of thorns
+  - frostbolt       # Reskinned as "Entangling Roots" - slows target
+  - mana_shield     # Reskinned as "Bark Skin" - defensive shield
+  - daylight        # Natural light ability
+ability_loadout:
+  - arcane_bolt
+  - frostbolt
+  - mana_shield
+ai_behavior: caster_tactical
+
+# AI behavior tags
+behavior:
+  - guard           # Protects its spawn area
+  - peaceful        # Doesn't attack on sight (neutral)
+
+# Loot - nature-themed drops
+loot_table:
+  - template_id: item_gold_coins
+    quantity: [10, 30]
+    chance: 0.5
+  - template_id: item_healing_herb
+    quantity: [2, 5]
+    chance: 0.8
+  - template_id: item_ancient_bark
+    quantity: 1
+    chance: 0.3
+
+# Flavor
+idle_messages:
+  - "The forest guardian's leaves rustle in an unfelt breeze."
+  - "Moss creeps slowly across the guardian's bark-like skin."
+  - "A soft, ancient hum emanates from within the guardian."
+  - "The guardian's green eyes scan the forest watchfully."
+  - "Small creatures nestle in the guardian's branches, unafraid."
+  - "The scent of wildflowers intensifies as the guardian shifts."
+
+keywords:
+  - guardian
+  - forest
+  - tree
+  - plant
+  - treant
+  - nature
+  - protector

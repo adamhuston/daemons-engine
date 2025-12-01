@@ -1,0 +1,54 @@
+id: npc_wandering_merchant
+name: Wandering Merchant
+description: >
+  A weathered traveler in dusty robes, carrying an impossibly large pack
+  stuffed with goods. Their eyes sparkle with the promise of exotic wares.
+  A friendly smile crosses their face as they notice your interest.
+
+npc_type: friendly
+
+# Base stats
+level: 5
+max_health: 80
+armor_class: 10
+strength: 12
+dexterity: 10
+intelligence: 16
+
+# Combat properties (Phase 4.5) - merchants can defend themselves
+attack_damage_min: 3
+attack_damage_max: 8
+attack_speed: 4.0
+experience_reward: 0  # Don't reward killing merchants!
+
+# AI behavior - tags that define NPC behavior
+behavior:
+  - wanders_rarely        # 5% wander chance (slow wandering)
+  - pacifist              # aggro_on_sight: false
+  - cowardly              # flees at 20% health (but we override below)
+  - calls_for_help        # Will call guards
+  - merchant              # is_merchant: true
+
+# Loot table (Phase 4.5) - attacking merchants has consequences!
+loot_table:
+  - template_id: item_gold_coins
+    quantity: [20, 50]
+    chance: 1.0
+  - template_id: item_merchant_key
+    quantity: 1
+    chance: 0.1
+
+# Flavor
+idle_messages:
+  - "\"Fine wares! Come see what I have for sale!\""
+  - "The merchant adjusts the straps of their heavy pack."
+  - "\"Looking to buy or sell? I offer fair prices.\""
+  - "The merchant polishes a trinket absentmindedly."
+  - "\"Traveled far and wide, I have. Seen many strange things.\""
+
+keywords:
+  - merchant
+  - trader
+  - wanderer
+  - vendor
+  - shop

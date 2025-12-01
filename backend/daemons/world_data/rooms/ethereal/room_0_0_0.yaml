@@ -1,0 +1,51 @@
+# Ethereal Cloud Chamber at position (0, 0, 0)
+# Starting room - demonstrates conditional triggers
+
+id: room_0_0_0
+area_id: area_ethereal_nexus
+name: An Ethereal Cloud Chamber
+description: A lower pocket in the southern western region of the clouds.
+room_type: ethereal
+exits:
+  north: room_0_1_0
+  east: room_1_0_0
+  up: room_0_0_1
+on_enter_effect: null
+on_exit_effect: The ethereal clouds part and swirl around you as you pass.
+
+# Phase 5 triggers demonstrating conditions
+triggers:
+  # Trigger that fires once when first entering this room
+  - id: newcomer_welcome
+    event: on_enter
+    conditions:
+      - type: flag_set
+        flag: visited_origin
+        expected: false
+    actions:
+      - type: message_player
+        message: "You sense this is a place of beginnings - the southwestern corner of the ethereal realm."
+      - type: set_flag
+        flag: visited_origin
+        value: true
+    max_fires: 1  # Only fires once ever
+
+  # Search interaction - check for hidden things
+  - id: search_clouds
+    event: on_command
+    command_pattern: "search*"
+    conditions: []
+    actions:
+      - type: message_player
+        message: "You search through the misty clouds. They swirl apart revealing... nothing but more ethereal vapor."
+
+  # Level-gated interaction example
+  - id: sense_magic
+    event: on_command
+    command_pattern: "sense magic"
+    conditions:
+      - type: level
+        min_level: 3
+    actions:
+      - type: message_player
+        message: "Your trained senses detect faint magical currents flowing upward from the depths below."
