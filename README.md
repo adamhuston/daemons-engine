@@ -61,19 +61,28 @@ python -c "import daemons; print(daemons.__version__)"
 Create the initial project structure:
 
 ```bash
-daemons init
+daemons init my-game
 ```
 
-This scaffolds:
+Or initialize in the current directory:
+
+```bash
+daemons init .
+```
+
+This scaffolds your project with all starter content:
 
 ```
 my-game/
 ├── world_data/          # Your game content (YAML files)
-│   ├── areas/
-│   ├── rooms/
-│   ├── items/
-│   ├── npcs/
-│   └── quests/
+│   ├── areas/           # Area definitions
+│   ├── rooms/           # Room definitions
+│   ├── items/           # Item templates
+│   ├── npcs/            # NPC templates
+│   ├── classes/         # Character classes
+│   ├── abilities/       # Class abilities
+│   ├── quests/          # Quest definitions
+│   └── ...              # And more!
 ├── behaviors/           # Custom NPC behaviors (Python)
 ├── alembic/             # Database migrations
 ├── alembic.ini          # Alembic configuration
@@ -425,8 +434,4 @@ mypy backend/daemons/
 daemons client
 ```
 
-See [CONTRIBUTING.md](https://github.com/adamhuston/1126/blob/main/CONTRIBUTING.md) for the full development workflow.
-
 ---
-
-Happy building! 🎮

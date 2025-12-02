@@ -24,10 +24,21 @@ def main():
 
 
 @main.command()
-@click.option("--name", "-n", default="my-game", help="Project name")
+@click.argument("name", default="my-game")
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
 def init(name: str, force: bool):
-    """Initialize a new game project with starter content."""
+    """Initialize a new game project with starter content.
+
+    NAME is the project directory name (default: my-game).
+    Use "." to initialize in the current directory.
+
+    Examples:
+        daemons init my-rpg
+        daemons init .
+        daemons init --force existing-project
+    """
+    import shutil
+
     project_dir = Path.cwd() / name if name != "." else Path.cwd()
 
     if project_dir.exists() and any(project_dir.iterdir()) and not force:
@@ -38,28 +49,51 @@ def init(name: str, force: bool):
 
     click.echo(f"Initializing Daemons project in {project_dir}...")
 
-    # Create directory structure
-    directories = [
-        "world_data/areas",
-        "world_data/rooms",
-        "world_data/items/weapons",
-        "world_data/items/armor",
-        "world_data/items/consumables",
-        "world_data/npcs",
-        "world_data/npc_spawns",
-        "world_data/quests",
-        "world_data/quest_chains",
-        "world_data/dialogues",
-        "world_data/triggers",
-        "world_data/classes",
-        "world_data/abilities",
-        "world_data/factions",
-        "behaviors",
-    ]
+    # Find the bundled world_data directory from the installed package
+    package_world_data = Path(__file__).parent / "world_data"
 
-    for dir_path in directories:
-        (project_dir / dir_path).mkdir(parents=True, exist_ok=True)
-        click.echo(f"  Created {dir_path}/")
+    # Create project directory
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy all world_data content from the package
+    dest_world_data = project_dir / "world_data"
+    if package_world_data.exists():
+        if dest_world_data.exists() and force:
+            shutil.rmtree(dest_world_data)
+        if not dest_world_data.exists():
+            shutil.copytree(package_world_data, dest_world_data)
+            click.echo("  Copied world_data/ (all starter content)")
+        else:
+            click.echo("  Skipped world_data/ (already exists)")
+
+        # Count copied files
+        yaml_count = len(list(dest_world_data.rglob("*.yaml")))
+        click.echo(f"    ({yaml_count} YAML files)")
+    else:
+        # Fallback: create empty directory structure
+        click.echo("  Warning: Bundled world_data not found, creating empty structure")
+        directories = [
+            "world_data/areas",
+            "world_data/rooms",
+            "world_data/items/weapons",
+            "world_data/items/armor",
+            "world_data/items/consumables",
+            "world_data/npcs",
+            "world_data/npc_spawns",
+            "world_data/quests",
+            "world_data/quest_chains",
+            "world_data/dialogues",
+            "world_data/triggers",
+            "world_data/classes",
+            "world_data/abilities",
+            "world_data/factions",
+        ]
+        for dir_path in directories:
+            (project_dir / dir_path).mkdir(parents=True, exist_ok=True)
+
+    # Create behaviors directory
+    (project_dir / "behaviors").mkdir(parents=True, exist_ok=True)
+    click.echo("  Created behaviors/")
 
     # Create main.py
     main_py = '''"""
@@ -260,41 +294,6 @@ def downgrade() -> None:
 '''
     (alembic_dir / "script.py.mako").write_text(script_mako)
     click.echo("  Created alembic/script.py.mako")
-
-    # Create starter area YAML
-    starter_area = """# Starter area definition
-id: starter_area
-name: "Tutorial Zone"
-description: "A peaceful area for new adventurers to learn the basics."
-level_range:
-  min: 1
-  max: 5
-time_scale: 1.0
-environment:
-  base_light: 100
-  weather: clear
-"""
-    (project_dir / "world_data/areas/starter_area.yaml").write_text(starter_area)
-    click.echo("  Created world_data/areas/starter_area.yaml")
-
-    # Create starter room YAML
-    starter_room = """# Starting room
-id: room_1_1_1
-name: "Town Square"
-description: |
-  You stand in the center of a bustling town square.
-  Cobblestones stretch beneath your feet, worn smooth
-  by countless travelers. A fountain burbles nearby.
-room_type: outdoor
-area_id: starter_area
-exits:
-  north: room_1_2_1
-  east: room_2_1_1
-  south: room_1_0_1
-  west: room_0_1_1
-"""
-    (project_dir / "world_data/rooms/starter_rooms.yaml").write_text(starter_room)
-    click.echo("  Created world_data/rooms/starter_rooms.yaml")
 
     # Create .gitignore
     gitignore = """# Daemons game project

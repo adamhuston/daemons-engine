@@ -125,7 +125,7 @@ class WorldEngine:
         from daemons.engine.systems.schema_registry import SchemaRegistry
 
         world_data_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "world_data"
+            os.path.dirname(os.path.dirname(__file__)), "world_data"
         )
         self.schema_registry = SchemaRegistry(world_data_path)
         self.ctx.schema_registry = self.schema_registry
