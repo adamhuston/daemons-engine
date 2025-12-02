@@ -36,7 +36,6 @@ Phase 14.3 additions:
 from __future__ import annotations
 
 import random
-from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -278,7 +277,7 @@ class BehaviorResult:
 # =============================================================================
 
 
-class BehaviorScript(ABC):
+class BehaviorScript:
     """
     Base class for all behavior scripts.
 
@@ -296,10 +295,9 @@ class BehaviorScript(ABC):
     priority: int = 100  # Lower = runs first
     defaults: dict[str, Any] = {}
 
-    @abstractmethod
     def get_behavior_id(self) -> str:
         """Return the unique identifier for this behavior."""
-        ...
+        return self.name
 
     # --- Lifecycle Hooks ---
 

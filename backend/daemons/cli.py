@@ -430,5 +430,80 @@ def client(host: str, port: int):
         sys.exit(1)
 
 
+@main.command()
+@click.option("--world-data", "-w", default=None, help="Path to world_data folder to open")
+def wright(world_data: str | None):
+    """Launch the Daemonswright Content Studio.
+
+    A visual content editor for creating and editing game content.
+    Works offline with local YAML files, optionally connects to a
+    running server for hot-reload and enhanced validation.
+
+    Examples:
+        daemons wright
+        daemons wright -w ./my-game/world_data
+    """
+    import subprocess
+
+    # Check if daemonswright is installed/available
+    wright_dir = Path(__file__).parent.parent.parent / "daemonswright"
+
+    if not wright_dir.exists():
+        click.echo(click.style("Error: Daemonswright not found.", fg="red"))
+        click.echo("")
+        click.echo("Daemonswright is the visual content editor for Daemons.")
+        click.echo("It should be installed alongside the daemons-engine package.")
+        click.echo("")
+        click.echo("If you're developing locally, ensure the daemonswright/ directory exists.")
+        sys.exit(1)
+
+    # Check if npm dependencies are installed
+    node_modules = wright_dir / "node_modules"
+    if not node_modules.exists():
+        click.echo(click.style("Daemonswright dependencies not installed.", fg="yellow"))
+        click.echo("Installing dependencies (this may take a moment)...")
+        click.echo("")
+
+        try:
+            subprocess.run(
+                ["npm", "install"],
+                cwd=str(wright_dir),
+                check=True,
+                shell=True,
+            )
+            click.echo(click.style("✓ Dependencies installed!", fg="green"))
+            click.echo("")
+        except subprocess.CalledProcessError:
+            click.echo(click.style("Error: Failed to install dependencies.", fg="red"))
+            click.echo("Try running 'npm install' manually in the daemonswright directory.")
+            sys.exit(1)
+
+    # Launch the electron app
+    click.echo("Launching Daemonswright Content Studio...")
+
+    args = ["npm", "run", "electron:dev"]
+    env = None
+
+    if world_data:
+        # Pass the world_data path as an environment variable
+        import os
+        env = os.environ.copy()
+        env["DAEMONSWRIGHT_WORLD_DATA"] = str(Path(world_data).resolve())
+
+    try:
+        subprocess.run(
+            args,
+            cwd=str(wright_dir),
+            env=env,
+            shell=True,
+        )
+    except KeyboardInterrupt:
+        click.echo("")
+        click.echo("Daemonswright closed.")
+    except subprocess.CalledProcessError as e:
+        click.echo(click.style(f"Error launching Daemonswright: {e}", fg="red"))
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()

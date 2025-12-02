@@ -1,0 +1,71 @@
+/* Daemonswright Global Styles */
+
+:root {
+  --color-bg-primary: #1e1e1e;
+  --color-bg-secondary: #252526;
+  --color-bg-tertiary: #2d2d30;
+  --color-text-primary: #cccccc;
+  --color-text-secondary: #858585;
+  --color-accent: #1890ff;
+  --color-success: #52c41a;
+  --color-warning: #faad14;
+  --color-error: #ff4d4f;
+  --border-color: #3c3c3c;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-bg-tertiary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Ant Design overrides for dark theme */
+.ant-layout {
+  background: var(--color-bg-primary) !important;
+}
+
+.ant-layout-sider {
+  background: var(--color-bg-secondary) !important;
+}
+
+.ant-tree {
+  background: transparent !important;
+  color: var(--color-text-primary) !important;
+}
+
+.ant-input {
+  background: var(--color-bg-tertiary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--color-text-primary) !important;
+}

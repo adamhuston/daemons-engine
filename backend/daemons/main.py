@@ -12,6 +12,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     WebSocket,
     WebSocketDisconnect,
     status,
@@ -406,6 +407,7 @@ class RegisterResponse(BaseModel):
 async def register(
     request: RegisterRequest,
     req: Request,
+    response: Response,
     auth_system: AuthSystem = Depends(get_auth_system),
 ):
     """
@@ -454,8 +456,9 @@ class LoginResponse(BaseModel):
 @app.post("/auth/login", response_model=LoginResponse)
 @limiter.limit(RATE_LIMITS["auth_login"])
 async def login(
-    request: LoginRequest,
-    req: Request,
+    request: Request,
+    response: Response,
+    login_request: LoginRequest,
     user_agent: str | None = Header(None),
     auth_system: AuthSystem = Depends(get_auth_system),
 ):
@@ -465,11 +468,11 @@ async def login(
     Use the access_token to connect via WebSocket.
     Use the refresh_token to get new access tokens when expired.
     """
-    ip_address = req.client.host if req.client else None
+    ip_address = request.client.host if request.client else None
 
     result = await auth_system.login(
-        username=request.username,
-        password=request.password,
+        username=login_request.username,
+        password=login_request.password,
         ip_address=ip_address,
         user_agent=user_agent,
     )
@@ -513,6 +516,7 @@ class RefreshResponse(BaseModel):
 async def refresh_token(
     request: RefreshRequest,
     req: Request,
+    response: Response,
     user_agent: str | None = Header(None),
     auth_system: AuthSystem = Depends(get_auth_system),
 ):
@@ -555,6 +559,7 @@ class LogoutRequest(BaseModel):
 async def logout(
     request: LogoutRequest,
     req: Request,
+    response: Response,
     user_agent: str | None = Header(None),
     auth_system: AuthSystem = Depends(get_auth_system),
 ):

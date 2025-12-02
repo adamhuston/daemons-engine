@@ -1,0 +1,173 @@
+/* App Layout Styles */
+
+.app-layout {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-layout {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Menu Bar */
+.menu-bar {
+  height: 36px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  -webkit-app-region: drag;
+}
+
+.menu-bar button {
+  -webkit-app-region: no-drag;
+}
+
+/* File Tree Sider */
+.file-tree-sider {
+  background: var(--color-bg-secondary) !important;
+  border-right: 1px solid var(--border-color);
+}
+
+.file-tree {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-tree-search {
+  margin: 8px;
+}
+
+.file-tree-content {
+  flex: 1;
+  overflow: auto;
+  padding: 0 8px;
+}
+
+.file-tree-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.file-tree-empty .hint {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+/* Editor Content */
+.editor-content {
+  background: var(--color-bg-primary);
+  overflow: hidden;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-secondary);
+}
+
+.empty-state h2 {
+  font-size: 24px;
+  font-weight: 400;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  font-size: 14px;
+}
+
+/* YAML Editor */
+.yaml-editor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-header {
+  height: 32px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 12px;
+}
+
+.file-path {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.content-type {
+  background: var(--color-bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--color-accent);
+}
+
+/* Status Bar */
+.status-bar {
+  height: 24px !important;
+  background: var(--color-bg-secondary) !important;
+  border-top: 1px solid var(--border-color);
+  padding: 0 12px !important;
+}
+
+.status-bar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  font-size: 12px;
+}
+
+.current-file {
+  color: var(--color-text-secondary);
+}
+
+/* Room Builder */
+.room-builder {
+  height: 100%;
+  width: 100%;
+}
+
+.room-node {
+  background: var(--color-bg-secondary);
+  border-radius: 4px;
+}
+
+.room-node.selected {
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.room-node-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+}
+
+.room-emoji {
+  font-size: 20px;
+}
+
+.room-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.room-id {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
