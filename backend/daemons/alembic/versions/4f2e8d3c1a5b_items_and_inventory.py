@@ -169,14 +169,16 @@ def load_items_from_yaml() -> None:
         sa.Column("keywords", sa.JSON),
     )
 
-    # Look for YAML files in world_data/items subdirectories
-    base_dir = Path("world_data/items")
+    # Look for YAML files in world_data/items subdirectories (package directory)
+    base_dir = Path(__file__).parent.parent.parent / "world_data" / "items"
     yaml_files = []
 
     if base_dir.exists():
         for subdir in base_dir.iterdir():
             if subdir.is_dir():
                 yaml_files.extend(subdir.glob("*.yaml"))
+        # Filter out schema/documentation files (starting with _)
+        yaml_files = [f for f in yaml_files if not f.name.startswith("_")]
 
     items_loaded = 0
 
@@ -252,14 +254,16 @@ def load_item_instances_from_yaml() -> None:
         sa.Column("instance_data", sa.JSON),
     )
 
-    # Look for YAML files in world_data/item_instances
-    base_dir = Path("world_data/item_instances")
+    # Look for YAML files in world_data/item_instances (package directory)
+    base_dir = Path(__file__).parent.parent.parent / "world_data" / "item_instances"
     yaml_files = []
 
     if base_dir.exists():
         # Get all YAML files in subdirectories
         for yaml_path in base_dir.rglob("*.yaml"):
-            yaml_files.append(yaml_path)
+            # Skip schema/documentation files (starting with _)
+            if not yaml_path.name.startswith("_"):
+                yaml_files.append(yaml_path)
 
     instances_loaded = 0
 

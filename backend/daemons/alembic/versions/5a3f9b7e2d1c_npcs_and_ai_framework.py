@@ -139,12 +139,14 @@ def load_npcs_from_yaml() -> None:
         sa.Column("keywords", sa.JSON),
     )
 
-    # Look for YAML files in world_data/npcs
-    base_dir = Path("world_data/npcs")
+    # Look for YAML files in world_data/npcs (package directory)
+    base_dir = Path(__file__).parent.parent.parent / "world_data" / "npcs"
     yaml_files = []
 
     if base_dir.exists():
         yaml_files = list(base_dir.glob("*.yaml"))
+        # Filter out schema/documentation files (starting with _)
+        yaml_files = [f for f in yaml_files if not f.name.startswith("_")]
 
     npcs_loaded = 0
 
@@ -220,12 +222,14 @@ def load_npc_spawns_from_yaml() -> None:
         sa.Column("max_health", sa.Integer),
     )
 
-    # Look for YAML files in world_data/npc_spawns
-    base_dir = Path("world_data/npc_spawns")
+    # Look for YAML files in world_data/npc_spawns (package directory)
+    base_dir = Path(__file__).parent.parent.parent / "world_data" / "npc_spawns"
     yaml_files = []
 
     if base_dir.exists():
         yaml_files = list(base_dir.glob("*.yaml"))
+        # Filter out schema/documentation files (starting with _)
+        yaml_files = [f for f in yaml_files if not f.name.startswith("_")]
 
     spawns_loaded = 0
 

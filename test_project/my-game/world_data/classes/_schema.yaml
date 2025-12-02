@@ -1,0 +1,84 @@
+# Class Schema Documentation
+# Reference for content creators defining new classes
+
+# Required Fields
+# ===============
+class_id: string
+  # Unique identifier for the class (lowercase, no spaces)
+  # Example: "warrior", "mage", "rogue"
+
+name: string
+  # Display name of the class
+  # Example: "Warrior", "Fire Mage", "Shadow Assassin"
+
+description: string
+  # Flavor text describing the class
+  # Example: "Master of melee combat with heavy armor and strong defense"
+
+base_stats: dictionary
+  # Starting stats at level 1
+  # Keys: strength, dexterity, intelligence, vitality
+  # Values: integers (1-20 typical range)
+  # Example:
+  #   strength: 14
+  #   dexterity: 10
+  #   intelligence: 8
+  #   vitality: 12
+
+stat_growth: dictionary
+  # How each stat progresses per level
+  # Each stat has per_level (float) and optional per_milestone (dict)
+  # Example:
+  #   strength:
+  #     per_level: 1.5          # +1.5 per level
+  #     per_milestone:
+  #       10: 5                 # +5 bonus at level 10
+  #       20: 10                # +10 bonus at level 20
+
+starting_resources: dictionary
+  # Base resource amounts at level 1
+  # Example:
+  #   health: 120
+  #   mana: 50
+  #   rage: 100
+
+resources: dictionary
+  # Resource definitions (regen rates, modifiers, etc.)
+  # Each resource has these fields:
+  #   resource_id: string      # Must match starting_resources key
+  #   name: string             # Display name
+  #   description: string      # Flavor text
+  #   max_amount: int          # Max value
+  #   regen_rate: float        # Per-second base regen
+  #   regen_type: string       # "passive", "in_combat", "out_of_combat"
+  #   regen_modifiers: dict    # Stat scaling for regen
+  #   color: string            # Hex color for UI (#RRGGBB)
+
+available_abilities: array of strings
+  # List of ability IDs available to this class
+  # Example: ["slash", "power_attack", "rally"]
+
+ability_slots: dictionary
+  # How many ability slots unlock at each level
+  # Example:
+  #   1: 2      # 2 slots at level 1
+  #   5: 3      # 3 slots at level 5
+  #   10: 4     # 4 slots at level 10
+
+# Optional Fields
+# ===============
+gcd_config: dictionary (optional)
+  # Global cooldown (GCD) config per category
+  # Example:
+  #   melee: 1.0
+  #   spell: 1.5
+  #   shared: 1.0
+  # Default: empty dict
+
+icon: string (optional)
+  # URL or file path to class icon
+  # Example: "assets/icons/warrior.png"
+
+keywords: array of strings (optional)
+  # Search tags for this class
+  # Example: ["melee", "tank", "heavy-armor"]

@@ -1,0 +1,314 @@
+# Quest Schema Documentation
+# Reference for content creators defining quests
+# Database Storage: Quest progress tracked in players.quest_progress (JSON)
+
+# Required Fields
+# ===============
+id: string
+  # Unique identifier for this quest
+  # Example: "goblin_threat", "wisp_investigation"
+
+name: string
+  # Display name of the quest
+  # Example: "The Goblin Menace", "Investigate the Wisps"
+
+description: string
+  # Full quest description shown to player
+  # Supports multi-line text with proper YAML formatting (use | or >)
+  # Example: "Goblin scouts have been spotted near the Ethereal Nexus..."
+
+category: string
+  # Quest category for organization
+  # Options: "main", "side", "daily", "repeatable", "epic"
+  # Example: "main"
+
+# Quest NPCs
+# ==========
+giver_npc_template: string (optional)
+  # NPC template ID that gives this quest
+  # Example: "wandering_merchant"
+
+turn_in_npc_template: string (optional)
+  # NPC template ID to turn quest in to (often same as giver)
+  # If not specified, uses giver_npc_template
+  # Example: "wandering_merchant"
+
+# Requirements (Optional)
+# =======================
+level_requirement: int (default: 1)
+  # Minimum player level to accept quest
+  # Example: 2
+
+prerequisites: array of strings (default: [])
+  # Quest IDs that must be completed before this quest is available
+  # Example: ["wisp_investigation", "tutorial_complete"]
+
+required_flags: dictionary (default: {})
+  # Player flags that must be set to accept quest
+  # Keys: flag names
+  # Values: expected flag values (bool, string, int)
+  # Example:
+  #   faction_member: true
+  #   reputation_level: "honored"
+
+required_items: array of strings (default: [])
+  # Item template IDs player must have to accept quest
+  # Example: ["item_key_to_castle"]
+
+required_class: string (optional)
+  # If set, only this class can accept the quest
+  # Example: "warrior", "mage"
+
+# Objectives (Required)
+# =====================
+objectives: array
+  # List of objectives player must complete
+  # Each objective is a dictionary with type-specific fields
+
+  # Objective Types:
+
+  # KILL - Defeat NPCs
+  #   id: string (unique objective identifier)
+  #   type: kill
+  #   description: string (shown to player)
+  #   target_template_id: string (NPC template to kill)
+  #   required_count: int (how many to kill)
+  #   hidden: bool (default: false) - if true, not shown until revealed
+  #   optional: bool (default: false) - if true, not required for completion
+
+  # COLLECT - Gather items
+  #   id: string
+  #   type: collect
+  #   description: string
+  #   target_template_id: string (item template)
+  #   required_count: int (how many to collect)
+  #   hidden: bool (default: false)
+  #   optional: bool (default: false)
+
+  # VISIT - Go to locations
+  #   id: string
+  #   type: visit
+  #   description: string
+  #   target_room_id: string (room to visit)
+  #   hidden: bool (default: false)
+  #   optional: bool (default: false)
+
+  # TALK - Speak with NPCs
+  #   id: string
+  #   type: talk
+  #   description: string
+  #   target_npc_template: string (NPC to talk to)
+  #   dialogue_node: string (optional - specific dialogue to trigger)
+  #   hidden: bool (default: false)
+  #   optional: bool (default: false)
+
+  # USE - Use an item
+  #   id: string
+  #   type: use
+  #   description: string
+  #   target_item_id: string (item template)
+  #   target_room_id: string (optional - specific room to use it in)
+  #   hidden: bool (default: false)
+  #   optional: bool (default: false)
+
+  # DISCOVER - Find a secret/location
+  #   id: string
+  #   type: discover
+  #   description: string
+  #   target_flag: string (flag set when discovered)
+  #   hidden: bool (default: false)
+  #   optional: bool (default: false)
+
+# Rewards (Optional)
+# ==================
+rewards: dictionary (default: {})
+  # What player receives upon quest completion
+
+  # experience: int - XP reward
+  #   Example: 150
+
+  # items: array of [item_id, quantity] - item rewards
+  #   Example:
+  #     - ["item_rusty_sword", 1]
+  #     - ["item_health_potion", 3]
+
+  # flags: dictionary - player flags to set
+  #   Example:
+  #     goblin_slayer: true
+  #     reputation_boost: 10
+
+  # currency: int - gold/money reward
+  #   Example: 25
+
+  # abilities: array - ability IDs to unlock
+  #   Example: ["ability_power_strike"]
+
+  # title: string - player title to grant
+  #   Example: "Goblin Slayer"
+
+# Dialogue (Optional)
+# ===================
+accept_dialogue: string (optional)
+  # Text shown when player accepts quest
+  # Example: "These goblins are becoming a real problem..."
+
+progress_dialogue: string (optional)
+  # Text shown when player talks to quest giver mid-quest
+  # Example: "How goes the goblin hunting?"
+
+complete_dialogue: string (optional)
+  # Text shown when player completes quest
+  # Example: "Excellent work! The roads should be safer now."
+
+fail_dialogue: string (optional)
+  # Text shown if quest is failed
+  # Example: "It's too late now, the damage is done."
+
+# Quest Behavior (Optional)
+# =========================
+auto_complete: bool (default: false)
+  # If true, quest completes automatically when objectives met
+  # If false, player must return to turn_in_npc to complete
+  # Example: false
+
+repeatable: bool (default: false)
+  # If true, quest can be done multiple times
+  # Example: false (for dailies/repeatables, set to true)
+
+cooldown: int (optional)
+  # Seconds before quest can be repeated (if repeatable = true)
+  # Example: 86400 (24 hours for daily quests)
+
+time_limit: int (optional)
+  # Seconds player has to complete quest (0 = no limit)
+  # Example: 3600 (1 hour)
+
+fail_on_timeout: bool (default: false)
+  # If true, quest fails when time_limit expires
+  # Example: true
+
+shareable: bool (default: false)
+  # If true, quest can be shared with party/group members
+  # Example: false
+
+# Optional Metadata
+# ================
+recommended_level: int (optional)
+  # Suggested player level (for UI display)
+  # Example: 3
+
+difficulty: string (optional)
+  # Quest difficulty rating
+  # Options: "trivial", "easy", "normal", "hard", "epic"
+  # Example: "normal"
+
+zone: string (optional)
+  # Geographic area where quest takes place
+  # Example: "ethereal_nexus", "dark_caves"
+
+tags: array of strings (optional)
+  # Additional tags for filtering/organization
+  # Example: ["combat", "exploration", "story"]
+
+# Database Mapping Notes
+# ======================
+# Quests themselves are NOT stored in database tables
+# They are loaded from YAML files at server start
+# Only quest PROGRESS is stored per-player in players.quest_progress (JSON)
+#
+# Progress structure:
+#   quest_id:
+#     status: "active" | "completed" | "failed"
+#     objectives:
+#       objective_id: current_count
+#     started_at: timestamp
+#     completed_at: timestamp (if completed)
+
+# Complete Example: Combat Quest
+# ==============================
+# id: goblin_threat
+# name: "The Goblin Menace"
+# description: |
+#   Goblin scouts have been spotted near the Ethereal Nexus, threatening
+#   travelers and disrupting the delicate magical balance.
+# category: main
+# giver_npc_template: wandering_merchant
+# turn_in_npc_template: wandering_merchant
+# level_requirement: 2
+# prerequisites:
+#   - wisp_investigation
+# objectives:
+#   - id: kill_scouts
+#     type: kill
+#     description: "Defeat Goblin Scouts"
+#     target_template_id: npc_goblin_scout
+#     required_count: 3
+#     hidden: false
+#     optional: false
+#   - id: collect_tokens
+#     type: collect
+#     description: "Collect Goblin Scout Tokens"
+#     target_template_id: item_goblin_token
+#     required_count: 3
+#     hidden: false
+#     optional: true
+# rewards:
+#   experience: 150
+#   items:
+#     - ["item_rusty_sword", 1]
+#     - ["item_health_potion", 3]
+#   flags:
+#     goblin_slayer: true
+#   currency: 25
+# accept_dialogue: "These goblins are becoming a real problem..."
+# progress_dialogue: "How goes the goblin hunting?"
+# complete_dialogue: "Excellent work! The roads should be safer now."
+# auto_complete: false
+
+# Complete Example: Exploration Quest
+# ===================================
+# id: explore_ancient_ruins
+# name: "Ruins Exploration"
+# description: "Explore the ancient ruins and uncover their secrets."
+# category: side
+# giver_npc_template: village_elder
+# level_requirement: 5
+# objectives:
+#   - id: find_entrance
+#     type: visit
+#     description: "Find the ruins entrance"
+#     target_room_id: room_ruins_entrance
+#   - id: discover_chamber
+#     type: discover
+#     description: "Discover the hidden chamber"
+#     target_flag: ruins_chamber_found
+#   - id: collect_artifact
+#     type: collect
+#     description: "Retrieve the ancient artifact"
+#     target_template_id: item_ancient_artifact
+#     required_count: 1
+# rewards:
+#   experience: 250
+#   title: "Ruin Explorer"
+# auto_complete: false
+
+# Complete Example: Daily Quest
+# =============================
+# id: daily_goblin_hunt
+# name: "Daily Goblin Hunt"
+# description: "Help keep the goblin population in check."
+# category: daily
+# giver_npc_template: town_guard
+# level_requirement: 1
+# repeatable: true
+# cooldown: 86400
+# objectives:
+#   - id: kill_goblins
+#     type: kill
+#     description: "Defeat goblins"
+#     target_template_id: npc_goblin_scout
+#     required_count: 5
+# rewards:
+#   experience: 50
+#   currency: 10
+# auto_complete: true

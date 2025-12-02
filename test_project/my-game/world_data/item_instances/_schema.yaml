@@ -1,0 +1,154 @@
+# Item Instance Schema Documentation
+# Reference for content creators defining specific item instances
+# Database Model: ItemInstance (backend/app/models.py)
+
+# IMPORTANT: Item instances are typically created dynamically by the game engine
+# (when NPCs drop loot, players craft items, etc.). YAML definitions are only
+# needed for special pre-placed items in the world (starting equipment, quest items).
+
+# Required Fields
+# ===============
+id: string
+  # Unique identifier for this specific item instance (UUID format recommended)
+  # Example: "instance_12345678-1234-1234-1234-123456789abc"
+  # Or named: "starting_sword_player1"
+
+template_id: string
+  # Reference to the item template this instance is based on
+  # Must match an existing item_templates.id
+  # Example: "item_rusty_sword"
+
+# Location Fields (Exactly ONE must be set)
+# =========================================
+room_id: string | null
+  # If set, item is on the ground in this room
+  # Example: "room_0_0_0"
+
+player_id: string | null
+  # If set, item is in this player's inventory
+  # Example: "player_alice"
+  # NOTE: Usually not set in YAML (managed by game engine)
+
+container_id: string | null
+  # If set, item is inside another item instance (nested containers)
+  # Example: "instance_backpack_123"
+
+# Instance State
+# ==============
+quantity: int (default: 1)
+  # Stack size for stackable items
+  # Must be <= template's max_stack_size
+  # Example: 20 (for 20 arrows)
+
+current_durability: int | null (optional)
+  # Current durability points (required if template has_durability = true)
+  # If null, defaults to template's max_durability
+  # Example: 35 (out of 50 max)
+
+# Equipment State
+# ===============
+equipped_slot: string | null (default: null)
+  # If equipped by player, which slot it's in
+  # Must match template's equipment_slot
+  # Options: "weapon", "head", "chest", "hands", "legs", "feet", "neck", "ring", "back"
+  # Example: "weapon"
+  # NOTE: Usually managed by game engine, not YAML
+
+# Custom Instance Data
+# ====================
+instance_data: dictionary (default: {})
+  # Custom properties unique to this instance
+  # Can store enchantments, modifications, quest flags, etc.
+  # Example:
+  #   enchantments:
+  #     - fire_damage: 5
+  #   quest_flag: "sword_of_destiny"
+  #   inscription: "For the brave"
+
+# Database Mapping Notes
+# ======================
+# This YAML schema maps to the ItemInstance SQLAlchemy model in backend/app/models.py
+# All fields are stored in the 'item_instances' database table
+# instance_data is stored as JSON
+
+# Common Use Cases for YAML Item Instances
+# ========================================
+# 1. Starting Equipment - Pre-placed in specific rooms for new players
+# 2. Quest Items - Specific items required for quests
+# 3. Unique World Items - One-of-a-kind items with special properties
+# 4. Pre-loaded Containers - Chests with specific contents
+
+# Complete Example: Starting Weapon in Room
+# =========================================
+# id: starting_sword_ethereal_nexus
+# template_id: item_rusty_sword
+# room_id: room_1_1_1
+# player_id: null
+# container_id: null
+# quantity: 1
+# current_durability: 50
+# equipped_slot: null
+# instance_data: {}
+
+# Complete Example: Quest Item with Special Data
+# ==============================================
+# id: sword_of_destiny_unique
+# template_id: item_legendary_sword
+# room_id: room_hidden_vault
+# player_id: null
+# container_id: null
+# quantity: 1
+# current_durability: 100
+# equipped_slot: null
+# instance_data:
+#   quest_flag: "sword_of_destiny"
+#   enchantments:
+#     holy_damage: 10
+#     regeneration: 2
+#   inscription: "Only the chosen may wield this blade"
+#   glows: true
+
+# Complete Example: Pre-stocked Container
+# =======================================
+# Container instance:
+# id: treasure_chest_cave_01
+# template_id: item_wooden_chest
+# room_id: room_dark_cave_03
+# player_id: null
+# container_id: null
+# quantity: 1
+# instance_data:
+#   locked: true
+#   key_required: "item_rusty_key"
+#
+# Items inside container:
+# id: gold_in_chest_cave_01
+# template_id: item_gold_coins
+# room_id: null
+# player_id: null
+# container_id: treasure_chest_cave_01
+# quantity: 50
+# instance_data: {}
+
+# Complete Example: Starting Equipment Set
+# ========================================
+# Multiple instances for a new player loadout
+#
+# Sword:
+# id: starting_equipment_sword
+# template_id: item_rusty_sword
+# room_id: room_starting_area
+# quantity: 1
+# current_durability: 40
+#
+# Health Potions:
+# id: starting_equipment_potions
+# template_id: item_health_potion
+# room_id: room_starting_area
+# quantity: 5
+#
+# Backpack:
+# id: starting_equipment_backpack
+# template_id: item_leather_backpack
+# room_id: room_starting_area
+# quantity: 1

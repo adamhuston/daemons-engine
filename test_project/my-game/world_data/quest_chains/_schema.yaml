@@ -1,0 +1,254 @@
+# Quest Chain Schema Documentation
+# Reference for content creators defining quest chains
+# Quest chains link multiple quests into a cohesive storyline with bonus rewards
+
+# Required Fields
+# ===============
+id: string
+  # Unique identifier for this quest chain
+  # Example: "ethereal_mystery", "dragon_slayer_saga"
+
+name: string
+  # Display name of the quest chain
+  # Example: "The Ethereal Mystery", "Dragon Slayer Saga"
+
+description: string
+  # Overview of the quest chain storyline
+  # Supports multi-line text with proper YAML formatting (use | or >)
+  # Example: "Unravel the secrets of the Ethereal Nexus..."
+
+quest_ids: array of strings
+  # List of quest IDs in this chain, in order
+  # Players must complete quests in this exact order
+  # Each ID must reference an existing quest
+  # Example:
+  #   - wisp_investigation
+  #   - goblin_threat
+  #   - ancient_evil_awakens
+
+# Chain Rewards (Optional)
+# ========================
+chain_rewards: dictionary (optional, default: {})
+  # Bonus rewards granted when ALL quests in chain are completed
+  # These are IN ADDITION to individual quest rewards
+  #
+  # Structure same as quest rewards:
+  #   experience: int - bonus XP
+  #   currency: int - bonus gold
+  #   items: array of [item_id, quantity] - bonus items
+  #   flags: dictionary - flags to set
+  #   abilities: array - abilities to unlock
+  #   title: string - title to grant
+  #
+  # Example:
+  #   experience: 100
+  #   currency: 50
+  #   items:
+  #     - ["item_legendary_sword", 1]
+  #   flags:
+  #     chain_complete: true
+  #   title: "Hero of the Nexus"
+
+# Unlock Requirements (Optional)
+# ==============================
+unlock_requirements: array (optional, default: [])
+  # Conditions that must be met before chain becomes available
+  # Similar to trigger conditions
+  #
+  # Requirement Types:
+
+  # Level requirement
+  #   type: level
+  #   min: int
+
+  # Flag requirement
+  #   type: flag
+  #   name: string (flag name)
+  #   value: any (expected value)
+
+  # Completed quest requirement
+  #   type: quest_complete
+  #   quest_id: string
+
+  # Class requirement
+  #   type: class
+  #   class_id: string
+
+  # Example:
+  #   - type: level
+  #     min: 10
+  #   - type: flag
+  #     name: tutorial_complete
+  #     value: true
+
+# Completion Flags (Optional)
+# ===========================
+completion_flags: dictionary (optional, default: {})
+  # Player flags set when chain is completed
+  # Useful for unlocking new content or tracking achievements
+  # Keys: flag names
+  # Values: flag values (bool, string, int)
+  #
+  # Example:
+  #   knows_nexus_secrets: true
+  #   hero_of_nexus: true
+  #   reputation_gain: 50
+
+# Optional Metadata
+# ================
+category: string (optional)
+  # Chain category for organization
+  # Options: "main", "side", "epic", "faction"
+  # Example: "main"
+
+recommended_level: int (optional)
+  # Suggested starting level for the chain
+  # Example: 5
+
+difficulty: string (optional)
+  # Overall difficulty rating
+  # Options: "easy", "normal", "hard", "epic"
+  # Example: "normal"
+
+zone: string (optional)
+  # Geographic area where chain takes place
+  # Example: "ethereal_nexus"
+
+estimated_duration: string (optional)
+  # Approximate time to complete chain
+  # Example: "2-3 hours", "1 week"
+
+tags: array of strings (optional)
+  # Additional tags for filtering/organization
+  # Example: ["story", "combat", "exploration"]
+
+# Chain Progression Notes
+# =======================
+# - Players must complete quests in the order specified by quest_ids
+# - First quest in chain cannot be accepted until unlock_requirements met
+# - Subsequent quests automatically become available after previous quest completed
+# - Chain rewards granted immediately upon completing final quest
+# - Completion flags set when chain is completed
+
+# Database Mapping Notes
+# ======================
+# Quest chains are loaded from YAML files at server start
+# Chain progress tracked in player.quest_progress alongside individual quests
+# Chain completion tracked by checking if all quest_ids are in player.completed_quests
+
+# Complete Example: Simple Chain
+# ==============================
+# id: ethereal_mystery
+# name: "The Ethereal Mystery"
+# description: |
+#   Unravel the secrets of the Ethereal Nexus. Strange energies
+#   have awakened ancient threats - investigate the wisps and
+#   neutralize the goblin incursion to restore peace.
+# quest_ids:
+#   - wisp_investigation
+#   - goblin_threat
+# unlock_requirements:
+#   - type: level
+#     min: 1
+# chain_rewards:
+#   experience: 100
+#   currency: 50
+#   flags:
+#     ethereal_mystery_complete: true
+# completion_flags:
+#   knows_nexus_secrets: true
+#   hero_of_nexus: true
+
+# Complete Example: Epic Quest Chain
+# ==================================
+# id: dragon_slayer_saga
+# name: "The Dragon Slayer Saga"
+# description: |
+#   An ancient dragon has awakened, threatening the realm. Gather allies,
+#   forge legendary weapons, and prepare for an epic confrontation.
+# category: epic
+# quest_ids:
+#   - dragon_sighting
+#   - forge_dragonbane
+#   - gather_allies
+#   - assault_dragon_lair
+#   - slay_the_dragon
+# unlock_requirements:
+#   - type: level
+#     min: 20
+#   - type: quest_complete
+#     quest_id: hero_training_complete
+# chain_rewards:
+#   experience: 5000
+#   currency: 1000
+#   items:
+#     - ["item_dragon_scale_armor", 1]
+#     - ["item_dragonslayer_title_scroll", 1]
+#   title: "Dragonslayer"
+#   flags:
+#     dragon_slain: true
+# completion_flags:
+#   realm_saved: true
+#   dragon_lore_master: true
+# recommended_level: 25
+# difficulty: epic
+# zone: northern_mountains
+# estimated_duration: 10-15 hours
+# tags: ["story", "combat", "epic", "dragon"]
+
+# Complete Example: Faction Quest Chain
+# =====================================
+# id: silver_sanctum_initiation
+# name: "Silver Sanctum Initiation"
+# description: |
+#   Prove yourself worthy to join the ranks of the Silver Sanctum,
+#   an order of holy warriors dedicated to protecting the innocent.
+# category: faction
+# quest_ids:
+#   - prove_your_worth
+#   - trial_of_valor
+#   - oath_of_service
+# unlock_requirements:
+#   - type: level
+#     min: 5
+#   - type: flag
+#     name: faction_reputation_silver_sanctum
+#     value: friendly
+# chain_rewards:
+#   experience: 500
+#   items:
+#     - ["item_sanctum_tabard", 1]
+#   flags:
+#     silver_sanctum_member: true
+# completion_flags:
+#   sanctum_initiate: true
+#   can_access_sanctum_vendors: true
+# recommended_level: 5
+# difficulty: normal
+# zone: sanctum_headquarters
+# tags: ["faction", "story", "paladin"]
+
+# Complete Example: Daily Chain
+# =============================
+# id: weekly_bounties
+# name: "Weekly Bounty Missions"
+# description: |
+#   Complete all weekly bounties to earn special rewards.
+# category: side
+# quest_ids:
+#   - bounty_goblins
+#   - bounty_undead
+#   - bounty_bandits
+# unlock_requirements:
+#   - type: level
+#     min: 10
+# chain_rewards:
+#   experience: 200
+#   currency: 100
+#   items:
+#     - ["item_bounty_token", 1]
+# completion_flags:
+#   weekly_bounties_complete: true
+# recommended_level: 10
+# difficulty: normal
+# tags: ["repeatable", "combat", "bounty"]

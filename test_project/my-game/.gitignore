@@ -1,0 +1,11 @@
+# Daemons game project
+*.db
+*.pyc
+__pycache__/
+.venv/
+venv/
+.env
+*.log
+htmlcov/
+.coverage
+.pytest_cache/

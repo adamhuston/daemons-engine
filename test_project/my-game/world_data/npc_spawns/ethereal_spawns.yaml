@@ -1,0 +1,39 @@
+# NPC spawn configuration for the Ethereal Nexus area
+# Defines which NPCs spawn in which rooms
+
+spawns:
+  # Ethereal wisps scattered around the nexus
+  - template_id: npc_ethereal_wisp
+    room_id: room_0_0_1
+    respawn_time: 180
+
+  - template_id: npc_ethereal_wisp
+    room_id: room_1_0_0
+    respawn_time: 180
+
+  - template_id: npc_ethereal_wisp
+    room_id: room_2_1_1
+    respawn_time: 180
+
+  # Goblin scouts patrol the outer edges
+  - template_id: npc_goblin_scout
+    room_id: room_0_2_0
+    respawn_time: 300
+
+  - template_id: npc_goblin_scout
+    room_id: room_2_0_2
+    respawn_time: 300
+
+  # Skeleton warrior guards a specific chamber
+  - template_id: npc_skeleton_warrior
+    room_id: room_1_1_2
+    respawn_time: 600
+    instance_data:
+      guard_message: "The skeletal warrior blocks your path, raising its sword menacingly."
+
+  # Wandering merchant visits the central area
+  - template_id: npc_wandering_merchant
+    room_id: room_1_1_1
+    respawn_time: 900
+    instance_data:
+      name_override: "Zephyr the Trader"

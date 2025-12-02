@@ -1,0 +1,129 @@
+# Mage Abilities
+# Arcane spells and magical effects
+
+abilities:
+  - ability_id: arcane_bolt
+    name: "Arcane Bolt"
+    description: "Fire a bolt of arcane energy at an enemy"
+    ability_type: "active"
+    ability_category: "magic"
+    costs:
+      mana: 20
+    cooldown: 1.5
+    gcd_category: "spell"
+    behavior_id: "arcane_bolt"
+    effects: []
+    target_type: "enemy"
+    target_range: 5
+    requires_target: true
+    requires_los: true
+    can_use_while_moving: true
+    required_level: 1
+    required_class: null
+    scaling:
+      intelligence: 1.3
+    keywords:
+      - ranged
+      - magic
+      - basic
+
+  - ability_id: fireball
+    name: "Fireball"
+    description: "Hurl a ball of flame that explodes in an area"
+    ability_type: "active"
+    ability_category: "magic"
+    costs:
+      mana: 50
+    cooldown: 4.0
+    gcd_category: "spell"
+    behavior_id: "fireball"
+    effects:
+      - "burn_effect"
+    target_type: "enemy"
+    target_range: 5
+    requires_target: true
+    requires_los: true
+    can_use_while_moving: false
+    required_level: 8
+    required_class: null
+    scaling:
+      intelligence: 1.6
+    keywords:
+      - aoe
+      - fire
+      - damage
+
+  - ability_id: frostbolt
+    name: "Frostbolt"
+    description: "Fire an icy projectile that slows the target"
+    ability_type: "active"
+    ability_category: "magic"
+    costs:
+      mana: 35
+    cooldown: 3.0
+    gcd_category: "spell"
+    behavior_id: "frostbolt"
+    effects:
+      - "slow_effect"
+    target_type: "enemy"
+    target_range: 5
+    requires_target: true
+    requires_los: true
+    can_use_while_moving: true
+    required_level: 5
+    required_class: null
+    scaling:
+      intelligence: 1.2
+    keywords:
+      - ranged
+      - ice
+      - crowd-control
+
+  - ability_id: mana_shield
+    name: "Mana Shield"
+    description: "Create a shield of mana to absorb damage"
+    ability_type: "active"
+    ability_category: "magic"
+    costs:
+      mana: 40
+    cooldown: 5.0
+    gcd_category: "spell"
+    behavior_id: "mana_shield"
+    effects:
+      - "shield_effect"
+    target_type: "self"
+    target_range: 0
+    requires_target: false
+    requires_los: false
+    can_use_while_moving: true
+    required_level: 10
+    required_class: null
+    scaling:
+      intelligence: 1.0
+    keywords:
+      - defensive
+      - magic
+      - protection
+
+  - ability_id: teleport
+    name: "Teleport"
+    description: "Instantly teleport to a nearby location"
+    ability_type: "active"
+    ability_category: "magic"
+    costs:
+      mana: 60
+    cooldown: 6.0
+    gcd_category: "spell"
+    behavior_id: "teleport"
+    effects: []
+    target_type: "self"
+    target_range: 3
+    requires_target: false
+    requires_los: false
+    can_use_while_moving: true
+    required_level: 15
+    required_class: null
+    keywords:
+      - utility
+      - movement
+      - escape

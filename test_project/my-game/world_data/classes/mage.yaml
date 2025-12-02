@@ -1,0 +1,65 @@
+# Mage Class
+# Master of arcane magic with powerful spells
+
+class_id: mage
+name: "Mage"
+description: "Master of arcane magic with powerful spells"
+
+base_stats:
+  strength: 8
+  dexterity: 10
+  intelligence: 14
+  vitality: 10
+
+stat_growth:
+  intelligence:
+    per_level: 1.5
+    per_milestone:
+      10: 5
+      20: 10
+  dexterity:
+    per_level: 0.5
+  strength:
+    per_level: 0.3
+  vitality:
+    per_level: 0.8
+
+starting_resources:
+  health: 80
+  mana: 150
+
+resources:
+  mana:
+    resource_id: mana
+    name: "Mana"
+    description: "Magical energy for casting spells"
+    max_amount: 150
+    regen_rate: 8.0
+    regen_type: "passive"
+    regen_modifiers:
+      intelligence: 0.2
+      vitality: 0.05
+    color: "#0088FF"
+
+available_abilities:
+  - arcane_bolt
+  - fireball
+  - frostbolt
+  - mana_shield
+  - teleport
+
+ability_slots:
+  1: 2    # 2 ability slots at level 1
+  5: 3    # 3 ability slots at level 5
+  10: 4   # 4 ability slots at level 10
+  15: 5   # 5 ability slots at level 15
+
+gcd_config:
+  spell: 1.5
+  shared: 1.0
+
+keywords:
+  - spellcaster
+  - ranged
+  - magic
+  - caster

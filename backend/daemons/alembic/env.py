@@ -73,11 +73,14 @@ async def run_async_migrations() -> None:
     and associate a connection with the context.
 
     """
-    # Update the sqlalchemy.url to use aiosqlite
+    # Update the sqlalchemy.url to use aiosqlite if needed
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = configuration["sqlalchemy.url"].replace(
-        "sqlite://", "sqlite+aiosqlite://"
-    )
+    url = configuration["sqlalchemy.url"]
+    # Only add aiosqlite if not already present
+    if "aiosqlite" not in url:
+        configuration["sqlalchemy.url"] = url.replace(
+            "sqlite://", "sqlite+aiosqlite://"
+        )
 
     connectable = async_engine_from_config(
         configuration,

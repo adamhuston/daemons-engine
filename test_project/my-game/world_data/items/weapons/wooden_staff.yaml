@@ -1,0 +1,37 @@
+# Wooden Staff - Simple magic weapon
+
+id: item_wooden_staff
+name: Wooden Staff
+description: A gnarled wooden staff carved with simple runes.
+item_type: weapon
+item_subtype: staff
+equipment_slot: weapon
+
+stat_modifiers:
+  intelligence: 2
+
+# Combat stats
+damage_min: 2
+damage_max: 5
+attack_speed: 2.8
+damage_type: magic
+
+weight: 2.0
+max_stack_size: 1
+
+has_durability: true
+max_durability: 40
+
+is_container: false
+is_consumable: false
+
+flavor_text: The wood feels warm to the touch, and the runes glow faintly when held.
+rarity: common
+value: 8
+
+flags: {}
+
+keywords:
+  - staff
+  - stick
+  - weapon

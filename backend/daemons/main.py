@@ -55,13 +55,13 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
 
     # 2) Seed players if empty (rooms/areas come from migrations)
-    async with AsyncSession(engine) as session:
+    async with AsyncSessionLocal() as session:
         result = await session.execute(select(Player).limit(1))
         if result.scalar_one_or_none() is None:
             await seed_world(session)
 
     # 3) Load world into memory
-    async with AsyncSession(engine) as session:
+    async with AsyncSessionLocal() as session:
         world = await load_world(session)
 
     # 3b) Load triggers from YAML into world objects

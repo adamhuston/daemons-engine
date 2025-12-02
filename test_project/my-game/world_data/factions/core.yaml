@@ -1,0 +1,54 @@
+# Core Factions for Phase 10.3
+# Define major factions with NPC members for reputation tracking
+
+# Silver Sanctum - Holy order dedicated to protection and order
+- name: "Silver Sanctum"
+  description: "A righteous order of paladins and clerics dedicated to protecting the innocent and maintaining order in the realm."
+  color: "#D4AF37"
+  emblem: "⚔️✨"
+  player_joinable: true
+  require_level: 3
+  npc_members:
+    - "paladin_trainer"
+    - "holy_priest"
+    - "sanctum_guard"
+    - "order_general"
+
+# Shadow Syndicate - Criminal underworld focused on profit and chaos
+- name: "Shadow Syndicate"
+  description: "A mysterious criminal organization operating in the shadows. They value cunning, profit, and freedom from authority."
+  color: "#1a1a1a"
+  emblem: "🗡️🌙"
+  player_joinable: true
+  require_level: 2
+  npc_members:
+    - "rogue_master"
+    - "shadow_assassin"
+    - "black_market_trader"
+    - "crime_boss"
+
+# Arcane Collective - Mages and scholars seeking knowledge
+- name: "Arcane Collective"
+  description: "A society of wizards, scholars, and researchers devoted to understanding and mastering magical knowledge."
+  color: "#9933FF"
+  emblem: "🔮✨"
+  player_joinable: true
+  require_level: 5
+  npc_members:
+    - "mage_instructor"
+    - "arcane_scholar"
+    - "elementalist"
+    - "spellweaver"
+
+# Primal Circle - Druids and nature worshippers
+- name: "Primal Circle"
+  description: "Guardians of nature who seek to protect the balance of the natural world and commune with beasts and plants."
+  color: "#228B22"
+  emblem: "🌿🦁"
+  player_joinable: true
+  require_level: 3
+  npc_members:
+    - "druid_elder"
+    - "nature_guardian"
+    - "beast_master"
+    - "leaf_warden"

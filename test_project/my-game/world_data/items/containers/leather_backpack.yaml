@@ -1,0 +1,35 @@
+# Leather Backpack - Weight-based container
+
+id: item_leather_backpack
+name: Leather Backpack
+description: A sturdy leather pack with reinforced straps.
+item_type: container
+item_subtype: backpack
+equipment_slot: back
+
+stat_modifiers: {}
+
+weight: 2.0
+max_stack_size: 1
+
+has_durability: true
+max_durability: 100
+
+is_container: true
+container_capacity: 50
+container_type: weight_based
+
+is_consumable: false
+
+flavor_text: The leather is soft and well-oiled, with brass buckles that gleam.
+rarity: uncommon
+value: 30
+
+# Special flags (JSON: {"quest_item": true, "no_drop": true})
+flags: {}
+
+# Keywords for searching
+keywords:
+  - backpack
+  - pack
+  - bag

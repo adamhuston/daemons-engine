@@ -1,0 +1,68 @@
+# Warrior Class
+# A master of melee combat with heavy armor and strong defense
+
+class_id: warrior
+name: "Warrior"
+description: "Master of melee combat with heavy armor and strong defense"
+
+base_stats:
+  strength: 14
+  dexterity: 10
+  intelligence: 8
+  vitality: 12
+
+stat_growth:
+  strength:
+    per_level: 1.5
+    per_milestone:
+      10: 5
+      20: 10
+  dexterity:
+    per_level: 0.5
+    per_milestone:
+      10: 2
+  intelligence:
+    per_level: 0.3
+  vitality:
+    per_level: 1.2
+    per_milestone:
+      10: 3
+
+starting_resources:
+  health: 120
+  rage: 100
+
+resources:
+  rage:
+    resource_id: rage
+    name: "Rage"
+    description: "Combat energy that builds with attacks"
+    max_amount: 100
+    regen_rate: 5.0
+    regen_type: "in_combat"
+    regen_modifiers:
+      strength: 0.1
+    color: "#FF4444"
+
+available_abilities:
+  - slash
+  - power_attack
+  - whirlwind
+  - shield_bash
+  - rally
+
+ability_slots:
+  1: 2    # 2 ability slots at level 1
+  5: 3    # 3 ability slots at level 5
+  10: 4   # 4 ability slots at level 10
+  15: 5   # 5 ability slots at level 15
+
+gcd_config:
+  melee: 1.0
+  shared: 1.0
+
+keywords:
+  - melee
+  - tank
+  - heavy-armor
+  - fighter

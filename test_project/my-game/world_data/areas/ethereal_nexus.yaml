@@ -1,0 +1,64 @@
+# The Ethereal Nexus - A mystical convergence point where time flows 4x faster
+
+id: area_ethereal_nexus
+name: The Ethereal Nexus
+description: A mystical convergence point where realities blur and time flows strangely.
+
+# Time system
+time_scale: 4.0  # Time passes 4x faster than normal
+starting_day: 1
+starting_hour: 6  # Dawn
+starting_minute: 0
+
+# Environmental properties
+biome: ethereal
+climate: mild
+ambient_lighting: prismatic
+weather_profile: stable
+
+# Gameplay properties
+danger_level: 3
+magic_intensity: extreme
+default_respawn_time: 120  # Fast respawn - mystical energy causes rapid regeneration
+
+# Atmospheric details
+ambient_sound: A gentle humming resonates through the air.
+
+# Phase 5: Area metadata
+recommended_level: 1
+theme: mystical
+area_flags:
+  safe_zone: false
+  pvp_enabled: false
+  magic_enhanced: true
+
+# Time phase flavor text
+time_phases:
+  dawn: Prismatic light filters through the mist as ethereal dawn breaks across the nexus.
+  morning: The ethereal mists glow with soft, radiant light.
+  afternoon: Shimmering energy pulses through the air, bathing everything in otherworldly luminescence.
+  dusk: The mists darken to deep purples and blues as the nexus transitions to twilight.
+  evening: Ghostly stars begin to emerge in the ethereal void above.
+  night: The nexus glows with bioluminescent energy, casting an eerie but beautiful light.
+
+# Entry points (room IDs where players can enter this area)
+entry_points:
+  - room_1_1_1
+
+# Phase 5: Area-wide triggers
+triggers:
+  # Welcome message when entering the area
+  - id: nexus_entrance_welcome
+    event: on_area_enter
+    conditions: []
+    actions:
+      - type: message_player
+        message: "You feel the strange pull of the Ethereal Nexus as you cross its boundary. Time seems to flow differently here."
+
+  # Farewell when leaving the area
+  - id: nexus_exit_farewell
+    event: on_area_exit
+    conditions: []
+    actions:
+      - type: message_player
+        message: "The ethereal energies release their hold on you as you leave the nexus behind."

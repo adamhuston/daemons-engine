@@ -1,0 +1,232 @@
+# Utility Abilities Schema
+# Defines the structure for non-combat utility abilities
+
+_schema:
+  description: "Utility ability definitions for exploration, interaction, and utility"
+  version: "1.0"
+
+ability_structure:
+  ability_id:
+    description: "Unique identifier for the ability"
+    type: "string"
+    required: true
+    pattern: "^[a-z_]+$"
+
+  name:
+    description: "Display name for UI"
+    type: "string"
+    required: true
+
+  description:
+    description: "Flavor text and ability explanation"
+    type: "string"
+    required: true
+
+  ability_type:
+    description: "Type of ability - for utilities should be 'active' or 'reactive'"
+    type: "string"
+    enum: ["active", "passive", "reactive"]
+    required: true
+
+  ability_category:
+    description: "Category of ability - for utilities should be 'utility'"
+    type: "string"
+    enum: ["melee", "ranged", "magic", "utility", "other"]
+    required: true
+
+  costs:
+    description: "Resource costs to use the ability"
+    type: "dict"
+    example: { mana: 20, stamina: 10 }
+    default: {}
+
+  cooldown:
+    description: "Cooldown duration in seconds"
+    type: "float"
+    required: true
+    example: 2.0
+
+  gcd_category:
+    description: "Global cooldown category"
+    type: "string"
+    enum: ["melee", "spell", "utility", "shared"]
+    default: "utility"
+
+  behavior_id:
+    description: "ID of the behavior function to execute"
+    type: "string"
+    required: true
+    example: "create_light"
+
+  target_type:
+    description: "What the ability targets"
+    type: "string"
+    enum: ["self", "enemy", "ally", "room"]
+    default: "self"
+
+  target_range:
+    description: "Range in rooms (0 = self, 1+ = distance)"
+    type: "int"
+    default: 0
+
+  requires_target:
+    description: "Whether ability requires an explicit target"
+    type: "bool"
+    default: false
+
+  requires_los:
+    description: "Whether ability requires line of sight to target"
+    type: "bool"
+    default: false
+
+  can_use_while_moving:
+    description: "Whether ability can be cast while moving"
+    type: "bool"
+    default: true
+
+  required_level:
+    description: "Minimum level to learn this ability"
+    type: "int"
+    default: 1
+
+  required_class:
+    description: "Restrict to specific class, or null for all classes"
+    type: ["string", "null"]
+    default: null
+
+  keywords:
+    description: "Tags for ability classification"
+    type: "list"
+    example: ["utility", "light", "support"]
+
+  metadata:
+    description: "Ability-specific configuration used by behavior"
+    type: "dict"
+    note: "Different abilities use different metadata fields"
+    examples:
+      light_ability: { light_level: 50, duration: 300.0, radius: 1 }
+      unlock_ability: { lock_difficulty: 1 }
+      detect_ability: { duration: 60.0, radius: 3 }
+      teleport_ability: { duration: null }
+
+utility_behavior_types:
+  create_light:
+    description: "Creates a light source (personal or area-wide)"
+    metadata_fields:
+      light_level:
+        type: "int"
+        range: "0-100"
+        description: "Brightness level"
+      duration:
+        type: "float"
+        description: "Duration in seconds (null = permanent)"
+      radius:
+        type: "int"
+        description: "Effect radius in rooms"
+
+  darkness:
+    description: "Creates darkness or shadow effect"
+    metadata_fields:
+      darkness_level:
+        type: "int"
+        range: "0-100"
+        description: "Darkness opacity"
+      duration:
+        type: "float"
+        description: "Duration in seconds"
+
+  unlock_door:
+    description: "Magically unlocks a locked door"
+    metadata_fields:
+      lock_difficulty:
+        type: "int"
+        description: "Required caster level to unlock"
+
+  unlock_container:
+    description: "Opens a locked or sealed container"
+    metadata_fields:
+      lock_difficulty:
+        type: "int"
+        description: "Required caster level to open"
+
+  detect_magic:
+    description: "Senses magical auras and enchantments"
+    metadata_fields:
+      duration:
+        type: "float"
+        description: "Detection duration in seconds"
+      radius:
+        type: "int"
+        description: "Detection radius in rooms"
+
+  true_sight:
+    description: "Penetrates illusions and reveals hidden objects"
+    metadata_fields:
+      duration:
+        type: "float"
+        description: "True sight duration in seconds"
+      radius:
+        type: "int"
+        description: "Vision radius in rooms"
+
+  teleport:
+    description: "Teleports caster to a known location"
+    metadata_fields:
+      duration:
+        type: ["float", "null"]
+        description: "Duration (null = instantaneous)"
+
+  create_passage:
+    description: "Opens temporary passage through walls"
+    metadata_fields:
+      duration:
+        type: "float"
+        description: "Passage duration before closing"
+
+common_patterns:
+  all_utilities:
+    - description: "Utilities typically use 'utility' as gcd_category"
+    - description: "Most utilities are 'active' type"
+    - description: "Utility abilities usually have low to moderate cooldowns (0.5-30s)"
+    - description: "Utility abilities can often be used while moving"
+    - description: "Many utilities use mana as the primary resource cost"
+
+  exploration_abilities:
+    - light, detect_magic, true_sight, create_passage
+    - Usually self-targeted
+    - Enhance player perception and mobility
+
+  interaction_abilities:
+    - unlock, open_container, teleport
+    - Require targets or destinations
+    - Enable access to new areas/content
+
+examples:
+  light_spell:
+    ability_id: light
+    name: "Light"
+    description: "Creates a magical light source around you"
+    ability_category: "utility"
+    cooldown: 0.5
+    behavior_id: "create_light"
+    target_type: "self"
+    costs: {}
+    metadata:
+      light_level: 50
+      duration: 300.0
+      radius: 1
+
+  unlock_spell:
+    ability_id: unlock
+    name: "Unlock"
+    description: "Magically unlocks a door or lock"
+    ability_category: "utility"
+    cooldown: 2.0
+    behavior_id: "unlock_door"
+    target_type: "enemy"
+    target_range: 1
+    costs: { mana: 20 }
+    requires_target: true
+    requires_los: true
+    metadata:
+      lock_difficulty: 1

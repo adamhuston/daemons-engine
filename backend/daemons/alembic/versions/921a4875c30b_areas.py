@@ -96,6 +96,8 @@ def load_areas_from_yaml():
     yaml_files = list(world_data_dir.glob("*.yaml")) + list(
         world_data_dir.glob("*.yml")
     )
+    # Filter out schema/documentation files (starting with _)
+    yaml_files = [f for f in yaml_files if not f.name.startswith("_")]
 
     if not yaml_files:
         print("No YAML files found in world_data/areas/, skipping area import")
@@ -155,6 +157,8 @@ def load_rooms_from_yaml():
     yaml_files = list(world_data_dir.glob("**/*.yaml")) + list(
         world_data_dir.glob("**/*.yml")
     )
+    # Filter out schema/documentation files (starting with _)
+    yaml_files = [f for f in yaml_files if not f.name.startswith("_")]
 
     if not yaml_files:
         print("No YAML files found in world_data/rooms/, skipping room import")

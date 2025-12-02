@@ -1,0 +1,29 @@
+# Cave Entrance - Transition from outside to darkness
+# Moderate lighting override (some natural light filters in)
+
+id: room_cave_entrance
+area_id: area_dark_caves
+name: Cave Entrance
+description: The mouth of a dark cave yawns before you. Natural light from outside filters in weakly, but you can see deeper darkness within.
+room_type: cave
+lighting_override: "40"  # Partial light from outside (40/100)
+exits:
+  north: room_cave_tunnel_1
+  south: null  # Exit to surface (not implemented yet)
+on_enter_effect: A chill emanates from the cave depths.
+on_exit_effect: null
+
+triggers:
+  - id: entrance_warning
+    event: on_enter
+    conditions:
+      - type: flag_set
+        flag: cave_warning_seen
+        expected: false
+    actions:
+      - type: message_player
+        message: "💡 The cave ahead looks very dark. You should equip a light source before venturing deeper."
+      - type: set_flag
+        flag: cave_warning_seen
+        value: true
+    max_fires: 1

@@ -125,7 +125,7 @@ HOST = os.getenv("DAEMONS_HOST", "127.0.0.1")
 PORT = int(os.getenv("DAEMONS_PORT", "8000"))
 
 # Database settings
-DATABASE_URL = os.getenv("DAEMONS_DATABASE_URL", "sqlite+aiosqlite:///./game.db")
+DATABASE_URL = os.getenv("DAEMONS_DATABASE_URL", "sqlite+aiosqlite:///./dungeon.db")
 
 # JWT settings (generate your own secret for production!)
 JWT_SECRET = os.getenv("DAEMONS_JWT_SECRET", "change-me-in-production")
@@ -145,155 +145,10 @@ BEHAVIORS_DIR = "behaviors"
     (project_dir / "config.py").write_text(config_py)
     click.echo("  Created config.py")
 
-    # Create alembic.ini
-    alembic_ini = """# Alembic configuration for Daemons game
-
-[alembic]
-script_location = %(here)s/alembic
-prepend_sys_path = .
-sqlalchemy.url = sqlite+aiosqlite:///./game.db
-
-[post_write_hooks]
-
-[loggers]
-keys = root,sqlalchemy,alembic
-
-[handlers]
-keys = console
-
-[formatters]
-keys = generic
-
-[logger_root]
-level = WARN
-handlers = console
-qualname =
-
-[logger_sqlalchemy]
-level = WARN
-handlers =
-qualname = sqlalchemy.engine
-
-[logger_alembic]
-level = INFO
-handlers =
-qualname = alembic
-
-[handler_console]
-class = StreamHandler
-args = (sys.stderr,)
-level = NOTSET
-formatter = generic
-
-[formatter_generic]
-format = %(levelname)-5.5s [%(name)s] %(message)s
-datefmt = %H:%M:%S
-"""
-    (project_dir / "alembic.ini").write_text(alembic_ini)
-    click.echo("  Created alembic.ini")
-
-    # Create alembic env.py
-    alembic_dir = project_dir / "alembic"
-    alembic_dir.mkdir(exist_ok=True)
-    (alembic_dir / "versions").mkdir(exist_ok=True)
-
-    alembic_env = '''"""Alembic migration environment."""
-
-import asyncio
-from logging.config import fileConfig
-
-from alembic import context
-from sqlalchemy import pool
-from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from daemons.models import Base
-
-config = context.config
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
-
-target_metadata = Base.metadata
-
-
-def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(
-        url=url,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-async def run_async_migrations() -> None:
-    """Run migrations in 'online' mode with async engine."""
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = configuration.get(
-        "sqlalchemy.url", ""
-    ).replace("sqlite://", "sqlite+aiosqlite://")
-
-    connectable = async_engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
-
-
-def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    asyncio.run(run_async_migrations())
-
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
-'''
-    (alembic_dir / "env.py").write_text(alembic_env)
-    click.echo("  Created alembic/env.py")
-
-    # Create script.py.mako
-    script_mako = '''"""${message}
-
-Revision ID: ${up_revision}
-Revises: ${down_revision | comma,n}
-Create Date: ${create_date}
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-${imports if imports else ""}
-
-# revision identifiers, used by Alembic.
-revision: str = ${repr(up_revision)}
-down_revision: Union[str, None] = ${repr(down_revision)}
-branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
-depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
-
-
-def upgrade() -> None:
-    ${upgrades if upgrades else "pass"}
-
-
-def downgrade() -> None:
-    ${downgrades if downgrades else "pass"}
-'''
-    (alembic_dir / "script.py.mako").write_text(script_mako)
-    click.echo("  Created alembic/script.py.mako")
+    # Note: We don't create a local alembic folder by default.
+    # The 'daemons db upgrade' command will use the package's built-in migrations.
+    # If users need custom migrations, they can run 'daemons db init-migrations' (future feature)
+    # or manually create an alembic folder.
 
     # Create .gitignore
     gitignore = """# Daemons game project
@@ -317,9 +172,12 @@ htmlcov/
     )
     click.echo("")
     click.echo("Next steps:")
-    click.echo(f"  cd {name}")
+    if name != ".":
+        click.echo(f"  cd {name}")
     click.echo("  daemons db upgrade    # Initialize the database")
     click.echo("  daemons run           # Start the server")
+    click.echo("")
+    click.echo("Note: Always run 'daemons' commands from your project directory (where main.py is located)")
     click.echo("")
     click.echo("Documentation: https://github.com/adamhuston/1126")
 
@@ -330,15 +188,24 @@ htmlcov/
 @click.option("--reload", "-r", is_flag=True, help="Enable auto-reload for development")
 @click.option("--workers", "-w", default=1, type=int, help="Number of worker processes")
 def run(host: str, port: int, reload: bool, workers: int):
-    """Start the Daemons game server."""
+    """Start the Daemons game server.
+
+    Run this command from your project directory (where main.py is located).
+    """
+    import os
+
     import uvicorn
 
-    # Check if we're in a project directory
-    if not Path("main.py").exists():
-        # Try to run the engine directly
-        click.echo("Starting Daemons server...")
+    # Check if we're in a project directory with a custom main.py
+    if Path("main.py").exists():
+        # Ensure current directory is in Python path for imports
+        cwd = os.getcwd()
+        if cwd not in sys.path:
+            sys.path.insert(0, cwd)
+
+        click.echo(f"Starting game server from {cwd}...")
         uvicorn.run(
-            "daemons.main:app",
+            "main:app",
             host=host,
             port=port,
             reload=reload,
@@ -346,13 +213,31 @@ def run(host: str, port: int, reload: bool, workers: int):
             log_level="info",
         )
     else:
-        click.echo("Starting game server...")
+        # Check if there's a project directory nearby (user might be in wrong dir)
+        possible_dirs = [d for d in Path(".").iterdir() if d.is_dir() and (d / "main.py").exists()]
+        if possible_dirs:
+            click.echo(click.style("No main.py found in current directory.", fg="yellow"))
+            click.echo("")
+            click.echo("Found project directory nearby. Try:")
+            for d in possible_dirs[:3]:  # Show up to 3
+                click.echo(f"  cd {d.name} && daemons run")
+            click.echo("")
+            # Still run the engine directly as fallback
+
+        # Run the engine directly using the installed package
+        click.echo("Starting Daemons server (standalone mode)...")
+
+        from daemons.main import app
+
+        if reload:
+            click.echo("Note: Hot reload is only supported when running from a project directory with main.py")
+
         uvicorn.run(
-            "main:app",
+            app,
             host=host,
             port=port,
-            reload=reload,
-            workers=workers if not reload else 1,
+            reload=False,  # Reload requires import string which has path issues
+            workers=workers,
             log_level="info",
         )
 
@@ -382,7 +267,7 @@ def upgrade(revision: str):
         package_dir = Path(__file__).parent
         alembic_cfg = Config()
         alembic_cfg.set_main_option("script_location", str(package_dir / "alembic"))
-        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./game.db")
+        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./dungeon.db")
 
     try:
         command.upgrade(alembic_cfg, revision)
@@ -407,7 +292,7 @@ def downgrade(revision: str):
         package_dir = Path(__file__).parent
         alembic_cfg = Config()
         alembic_cfg.set_main_option("script_location", str(package_dir / "alembic"))
-        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./game.db")
+        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./dungeon.db")
 
     try:
         command.downgrade(alembic_cfg, revision)
@@ -431,7 +316,7 @@ def current():
         package_dir = Path(__file__).parent
         alembic_cfg = Config()
         alembic_cfg.set_main_option("script_location", str(package_dir / "alembic"))
-        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./game.db")
+        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./dungeon.db")
 
     command.current(alembic_cfg)
 
@@ -450,7 +335,7 @@ def history():
         package_dir = Path(__file__).parent
         alembic_cfg = Config()
         alembic_cfg.set_main_option("script_location", str(package_dir / "alembic"))
-        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./game.db")
+        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./dungeon.db")
 
     command.history(alembic_cfg)
 

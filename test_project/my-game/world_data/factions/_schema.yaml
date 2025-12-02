@@ -1,0 +1,325 @@
+# Faction Schema Documentation
+# Reference for content creators defining factions (Phase 10.3)
+# Database Models: Faction, FactionNPCMember (backend/app/models.py)
+
+# Factions are NPC-owned organizations that players can gain reputation with.
+# They affect NPC behavior, quest availability, and provide progression systems.
+
+# File Structure
+# ==============
+# Faction files typically contain an array of faction definitions
+# Example: core.yaml contains multiple faction definitions in a list
+
+# Each Faction Entry
+# ==================
+
+# Required Fields
+# ---------------
+name: string
+  # Unique display name of the faction
+  # Must be unique across all factions
+  # Example: "Silver Sanctum", "Shadow Syndicate"
+
+description: string
+  # Detailed description of the faction's purpose and goals
+  # Supports multi-line text with proper YAML formatting (use | or >)
+  # Example: "A righteous order of paladins dedicated to protecting the innocent..."
+
+# Optional Fields
+# ---------------
+color: string (default: "#FFFFFF")
+  # Hex color code for UI display
+  # Used for faction name coloring, reputation bars, etc.
+  # Example: "#D4AF37" (gold), "#1a1a1a" (dark gray)
+
+emblem: string (optional)
+  # Emoji or text symbol representing the faction
+  # Example: "⚔️✨", "🗡️🌙", "🔮✨"
+
+player_joinable: bool (default: true)
+  # Whether players can join this faction
+  # If false, faction is NPC-only (for enemy factions, neutral groups)
+  # Example: true
+
+max_members: int | null (optional)
+  # Maximum number of players who can join this faction
+  # null = unlimited
+  # Useful for exclusive/limited factions
+  # Example: 100
+
+require_level: int (default: 1)
+  # Minimum player level to join this faction
+  # Example: 3
+
+# NPC Membership
+# ==============
+npc_members: array of strings
+  # List of NPC template IDs that belong to this faction
+  # NPCs will:
+  #   - Be friendly to faction members
+  #   - Be hostile/neutral to non-members (based on faction relations)
+  #   - Offer faction-specific dialogue/quests
+  # Example:
+  #   - paladin_trainer
+  #   - holy_priest
+  #   - sanctum_guard
+
+# Reputation System (Optional)
+# ============================
+reputation_tiers: array (optional)
+  # Custom reputation tier definitions
+  # If not specified, uses default tiers:
+  #   Hated: -10000 to -3000
+  #   Hostile: -3000 to -500
+  #   Unfriendly: -500 to 0
+  #   Neutral: 0 to 500
+  #   Friendly: 500 to 3000
+  #   Honored: 3000 to 10000
+  #   Revered: 10000 to 20000
+  #   Exalted: 20000+
+
+  # Custom tier format:
+  #   - name: string
+  #     min_reputation: int
+  #     max_reputation: int (optional, uses next tier's min)
+  #     benefits: array of strings (descriptive)
+
+  # Example:
+  #   - name: Outsider
+  #     min_reputation: -1000
+  #     max_reputation: 0
+  #   - name: Initiate
+  #     min_reputation: 0
+  #     max_reputation: 1000
+  #     benefits:
+  #       - "Access to basic faction quests"
+  #   - name: Member
+  #     min_reputation: 1000
+  #     max_reputation: 5000
+  #     benefits:
+  #       - "Access to faction vendors"
+  #       - "10% discount on faction items"
+
+# Faction Relations (Optional)
+# ============================
+allied_factions: array of strings (optional)
+  # Faction names that are allies
+  # Gaining reputation with this faction also improves standing with allies (reduced amount)
+  # Example:
+  #   - Arcane Collective
+  #   - Primal Circle
+
+enemy_factions: array of strings (optional)
+  # Faction names that are enemies
+  # Gaining reputation with this faction decreases standing with enemies
+  # Example:
+  #   - Shadow Syndicate
+  #   - Cult of Chaos
+
+neutral_factions: array of strings (optional)
+  # Factions that are neutral (no reputation spillover)
+  # Example:
+  #   - Merchant Guild
+
+# Faction Rewards (Optional)
+# ==========================
+rewards: dictionary (optional)
+  # Rewards unlocked at different reputation tiers
+  # Keys: tier names or reputation values
+  # Values: reward configurations
+
+  # Example:
+  #   Friendly:
+  #     items:
+  #       - item_faction_tabard
+  #     title: "Friend of the Sanctum"
+  #   Honored:
+  #     abilities:
+  #       - ability_sanctum_blessing
+  #     vendor_access: sanctum_armorer
+  #   Exalted:
+  #     items:
+  #       - item_legendary_sanctum_weapon
+  #     title: "Champion of Light"
+
+# Optional Metadata
+# =================
+headquarters: string (optional)
+  # Room ID where faction is headquartered
+  # Example: "room_sanctum_hall"
+
+leader_npc: string (optional)
+  # NPC template ID of faction leader
+  # Example: "npc_high_paladin"
+
+founding_lore: string (optional)
+  # Historical background/lore text
+  # Example: "Founded 500 years ago after the Great Demon War..."
+
+recruitment_quest: string (optional)
+  # Quest ID required to join faction
+  # Example: "quest_prove_worthy"
+
+# Database Mapping Notes
+# ======================
+# Factions are loaded from YAML files and stored in the 'factions' table
+# NPC membership stored in 'faction_npc_members' table (many-to-many)
+# Player reputation tracked in player.data JSON field or separate reputation table
+# created_at timestamp automatically set when faction is inserted
+
+# Complete Example: Holy Order
+# ============================
+# - name: "Silver Sanctum"
+#   description: |
+#     A righteous order of paladins and clerics dedicated to protecting
+#     the innocent and maintaining order in the realm. Founded after the
+#     Great Demon War, they stand as a beacon of hope against darkness.
+#   color: "#D4AF37"
+#   emblem: "⚔️✨"
+#   player_joinable: true
+#   require_level: 3
+#   max_members: null
+#   npc_members:
+#     - paladin_trainer
+#     - holy_priest
+#     - sanctum_guard
+#     - order_general
+#   allied_factions:
+#     - Arcane Collective
+#   enemy_factions:
+#     - Shadow Syndicate
+#     - Cult of Chaos
+#   headquarters: room_sanctum_hall
+#   leader_npc: npc_high_paladin
+#   recruitment_quest: quest_trial_of_light
+
+# Complete Example: Criminal Organization
+# =======================================
+# - name: "Shadow Syndicate"
+#   description: |
+#     A mysterious criminal organization operating in the shadows.
+#     They value cunning, profit, and freedom from authority.
+#   color: "#1a1a1a"
+#   emblem: "🗡️🌙"
+#   player_joinable: true
+#   require_level: 2
+#   npc_members:
+#     - rogue_master
+#     - shadow_assassin
+#     - black_market_trader
+#     - crime_boss
+#   allied_factions:
+#     - Thieves Guild
+#   enemy_factions:
+#     - Silver Sanctum
+#     - City Watch
+#   headquarters: room_underground_hideout
+#   leader_npc: npc_shadow_lord
+
+# Complete Example: Scholarly Order
+# =================================
+# - name: "Arcane Collective"
+#   description: |
+#     A society of wizards, scholars, and researchers devoted to
+#     understanding and mastering magical knowledge.
+#   color: "#9933FF"
+#   emblem: "🔮✨"
+#   player_joinable: true
+#   require_level: 5
+#   npc_members:
+#     - mage_instructor
+#     - arcane_scholar
+#     - elementalist
+#     - spellweaver
+#   allied_factions:
+#     - Silver Sanctum
+#   neutral_factions:
+#     - Primal Circle
+#   headquarters: room_arcane_tower
+#   leader_npc: npc_archmage
+#   reputation_tiers:
+#     - name: Outsider
+#       min_reputation: 0
+#       max_reputation: 500
+#     - name: Apprentice
+#       min_reputation: 500
+#       max_reputation: 2000
+#       benefits:
+#         - "Access to basic spell scrolls"
+#     - name: Scholar
+#       min_reputation: 2000
+#       max_reputation: 8000
+#       benefits:
+#         - "Access to advanced spells"
+#         - "Library access"
+#     - name: Master
+#       min_reputation: 8000
+#       benefits:
+#         - "Can teach at the academy"
+#         - "Research grant access"
+
+# Complete Example: Nature Druids
+# ===============================
+# - name: "Primal Circle"
+#   description: |
+#     Guardians of nature who seek to protect the balance of the
+#     natural world and commune with beasts and plants.
+#   color: "#228B22"
+#   emblem: "🌿🦁"
+#   player_joinable: true
+#   require_level: 3
+#   npc_members:
+#     - druid_elder
+#     - beast_tamer
+#     - grove_keeper
+#   enemy_factions:
+#     - Industrial Consortium
+#   headquarters: room_sacred_grove
+#   leader_npc: npc_archdruid
+#   rewards:
+#     Friendly:
+#       title: "Friend of Nature"
+#       abilities:
+#         - ability_speak_with_animals
+#     Honored:
+#       items:
+#         - item_druidic_staff
+#       vendor_access: grove_vendor
+#     Exalted:
+#       abilities:
+#         - ability_shapeshift_bear
+#       title: "Keeper of the Wild"
+
+# Array Format Example
+# ===================
+# File: factions/core.yaml
+#
+# - name: "Silver Sanctum"
+#   description: "Holy order of paladins..."
+#   color: "#D4AF37"
+#   emblem: "⚔️✨"
+#   player_joinable: true
+#   require_level: 3
+#   npc_members:
+#     - paladin_trainer
+#     - holy_priest
+#
+# - name: "Shadow Syndicate"
+#   description: "Criminal underworld..."
+#   color: "#1a1a1a"
+#   emblem: "🗡️🌙"
+#   player_joinable: true
+#   require_level: 2
+#   npc_members:
+#     - rogue_master
+#     - shadow_assassin
+#
+# - name: "Arcane Collective"
+#   description: "Society of mages..."
+#   color: "#9933FF"
+#   emblem: "🔮✨"
+#   player_joinable: true
+#   require_level: 5
+#   npc_members:
+#     - mage_instructor
+#     - arcane_scholar

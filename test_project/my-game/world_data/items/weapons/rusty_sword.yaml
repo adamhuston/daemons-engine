@@ -1,0 +1,37 @@
+# Rusty Sword - Common starting weapon
+
+id: item_rusty_sword
+name: Rusty Sword
+description: A weathered blade, its edge dulled by time and neglect.
+item_type: weapon
+item_subtype: sword
+equipment_slot: weapon
+
+stat_modifiers:
+  strength: 1
+
+# Combat stats
+damage_min: 3
+damage_max: 7
+attack_speed: 2.2
+damage_type: physical
+
+weight: 3.5
+max_stack_size: 1
+
+has_durability: true
+max_durability: 50
+
+is_container: false
+is_consumable: false
+
+flavor_text: The hilt is wrapped in cracked leather, and rust flakes off with each swing.
+rarity: common
+value: 5
+
+flags: {}
+
+keywords:
+  - sword
+  - blade
+  - weapon

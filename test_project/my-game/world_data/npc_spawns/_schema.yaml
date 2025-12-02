@@ -1,0 +1,188 @@
+# NPC Spawn Configuration Schema Documentation
+# Reference for content creators defining NPC spawn points
+# Database Model: NpcInstance (backend/app/models.py)
+
+# This file defines which NPCs spawn in which rooms when the server starts.
+# Each spawn creates an NpcInstance in the database based on an NpcTemplate.
+
+# Top-Level Structure
+# ===================
+spawns: array
+  # List of spawn configurations
+  # Each entry creates one or more NPC instances in the world
+
+# Spawn Entry Fields
+# ==================
+
+# Required Fields
+# ---------------
+template_id: string
+  # Reference to the NPC template to spawn
+  # Must match an existing npc_templates.id
+  # Example: "npc_goblin_scout"
+
+room_id: string
+  # Which room to spawn the NPC in
+  # Must match an existing rooms.id
+  # Example: "room_0_0_1"
+
+# Optional Fields
+# ---------------
+respawn_time: int (optional)
+  # How long (in seconds) before this NPC respawns after death
+  # If not specified, uses area's default_respawn_time
+  # Set to -1 to disable respawning (unique/boss NPCs)
+  # Example: 300 (5 minutes)
+
+instance_data: dictionary (optional, default: {})
+  # Custom data for this specific NPC instance
+  # Can override template properties or add unique flags
+  # Common overrides:
+  #   name_override: string - custom name for this instance
+  #   guard_message: string - message shown when guarding
+  #   level_override: int - different level than template
+  #   faction_override: string - different faction
+  #   unique_dialogue: string - reference to dialogue tree
+  # Example:
+  #   name_override: "Zephyr the Trader"
+  #   guard_message: "The guardian blocks your path!"
+
+# Advanced Options
+# ---------------
+spawn_chance: float (optional, default: 1.0)
+  # Probability this NPC spawns (0.0 to 1.0)
+  # Useful for random/rare spawns
+  # Example: 0.3 (30% chance to spawn)
+
+spawn_count: int (optional, default: 1)
+  # How many copies of this NPC to spawn
+  # Useful for groups/packs
+  # Example: 3 (spawn 3 goblins)
+
+spawn_delay: int (optional, default: 0)
+  # Delay in seconds before first spawn
+  # Useful for timed/event-based spawns
+  # Example: 60 (spawn 1 minute after server start)
+
+enabled: bool (optional, default: true)
+  # Whether this spawn is active
+  # Set to false to temporarily disable without deleting
+  # Example: false
+
+# Database Mapping Notes
+# ======================
+# Each spawn entry creates one or more NpcInstance records
+# The spawn configuration itself is not stored in the database
+# Only the resulting NpcInstance objects are persisted
+
+# Complete Example File
+# ====================
+# spawns:
+#   # Basic spawn - goblin scout in room_0_0_0
+#   - template_id: npc_goblin_scout
+#     room_id: room_0_0_0
+#     respawn_time: 300
+#
+#   # Pack spawn - 3 wolves in room_forest_01
+#   - template_id: npc_gray_wolf
+#     room_id: room_forest_01
+#     spawn_count: 3
+#     respawn_time: 240
+#
+#   # Rare spawn - 20% chance for elite mob
+#   - template_id: npc_elite_guardian
+#     room_id: room_boss_arena
+#     spawn_chance: 0.2
+#     respawn_time: 3600
+#
+#   # Unique boss - no respawn
+#   - template_id: npc_ancient_dragon
+#     room_id: room_dragon_lair
+#     respawn_time: -1
+#     instance_data:
+#       name_override: "Smaug the Terrible"
+#       unique_dialogue: "dragon_lair_conversation"
+#
+#   # Quest NPC with custom name
+#   - template_id: npc_wandering_merchant
+#     room_id: room_town_square
+#     respawn_time: 900
+#     instance_data:
+#       name_override: "Merchant Zelda"
+#       quest_giver: true
+#
+#   # Guard NPC that doesn't wander
+#   - template_id: npc_town_guard
+#     room_id: room_city_gate
+#     respawn_time: 600
+#     instance_data:
+#       guard_message: "Halt! None shall pass without the captain's permission."
+#       behavior_override:
+#         wanders: false
+#         aggro_on_sight: false
+#
+#   # Disabled spawn (commented out or set enabled: false)
+#   - template_id: npc_halloween_ghost
+#     room_id: room_graveyard
+#     enabled: false
+#     respawn_time: 120
+
+# Area-Based Organization
+# =======================
+# Best practice: Create one spawn file per area
+# File naming: {area_name}_spawns.yaml
+# Examples:
+#   - ethereal_spawns.yaml (for area_ethereal_nexus)
+#   - caves_spawns.yaml (for area_dark_caves)
+#   - town_spawns.yaml (for area_town_square)
+
+# Common Patterns
+# ==============
+
+# Pattern 1: Scattered Enemies
+# Multiple instances of same NPC type across area
+# spawns:
+#   - template_id: npc_goblin_scout
+#     room_id: room_0_0_0
+#     respawn_time: 300
+#   - template_id: npc_goblin_scout
+#     room_id: room_1_0_0
+#     respawn_time: 300
+#   - template_id: npc_goblin_scout
+#     room_id: room_2_0_0
+#     respawn_time: 300
+
+# Pattern 2: Boss Chamber
+# Single powerful NPC with long/no respawn
+# spawns:
+#   - template_id: npc_boss_troll
+#     room_id: room_boss_arena
+#     respawn_time: -1
+#     instance_data:
+#       name_override: "Grok the Terrible"
+
+# Pattern 3: Enemy Pack
+# Group of NPCs that spawn together
+# spawns:
+#   - template_id: npc_wolf
+#     room_id: room_forest_clearing
+#     spawn_count: 4
+#     respawn_time: 180
+
+# Pattern 4: Rare/Random Spawn
+# Low chance spawn for variety
+# spawns:
+#   - template_id: npc_rare_elemental
+#     room_id: room_mystical_grove
+#     spawn_chance: 0.1
+#     respawn_time: 1800
+
+# Pattern 5: Quest NPC
+# Named NPC with custom dialogue
+# spawns:
+#   - template_id: npc_village_elder
+#     room_id: room_village_hall
+#     respawn_time: -1
+#     instance_data:
+#       name_override: "Elder Willow"
+#       dialogue_tree: "village_elder_main"

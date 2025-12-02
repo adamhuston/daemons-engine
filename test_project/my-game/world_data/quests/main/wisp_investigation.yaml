@@ -1,0 +1,80 @@
+# Ethereal Wisp Investigation Quest
+# A starter quest to teach players the quest system
+
+id: wisp_investigation
+name: "Ethereal Mysteries"
+description: |
+  The Ethereal Nexus is home to strange wisps that drift through the crystalline chambers.
+  Investigate these mysterious creatures and report your findings.
+category: main
+
+# Quest giver - the wandering merchant knows about the wisps
+giver_npc_template: wandering_merchant
+turn_in_npc_template: wandering_merchant
+
+# Requirements
+level_requirement: 1
+prerequisites: []
+required_flags: {}
+required_items: []
+
+# Objectives
+objectives:
+  - id: explore_nexus
+    type: visit
+    description: "Explore the Ethereal Nexus"
+    target_room_id: "ethereal_nexus:0,0,0"
+    required_count: 1
+    hidden: false
+    optional: false
+
+  - id: find_wisps
+    type: visit
+    description: "Find the Wisp Chamber"
+    target_room_id: "ethereal_nexus:1,1,1"
+    required_count: 1
+    hidden: false
+    optional: false
+
+  - id: observe_wisp
+    type: talk
+    description: "Observe an Ethereal Wisp"
+    target_template_id: ethereal_wisp
+    required_count: 1
+    hidden: false
+    optional: false
+
+# Rewards
+rewards:
+  experience: 50
+  items:
+    - ["health_potion", 2]
+  flags:
+    wisp_knowledge: true
+  currency: 10
+
+# Dialogue
+accept_dialogue: |
+  "Ah, curious about those wisps, are you? They've been here since before
+  I started my travels. Go explore the Nexus and observe one up close.
+  Report back what you learn!"
+
+progress_dialogue: |
+  "Still investigating? The wisps tend to gather in the central chambers.
+  Look for the room with the strongest ethereal resonance."
+
+complete_dialogue: |
+  "Fascinating! Your observations confirm my suspicions—these wisps are
+  fragments of ancient magical energy. Here's your reward, traveler."
+
+# Auto-complete when objectives done (no need to return to NPC)
+auto_complete: false
+
+# Optional: Actions on quest state changes
+on_accept_actions: []
+on_complete_actions: []
+on_turn_in_actions:
+  - type: set_flag
+    params:
+      name: helped_merchant
+      value: true

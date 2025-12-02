@@ -1,0 +1,32 @@
+# Leather Cap - Light head armor
+
+id: item_leather_cap
+name: Leather Cap
+description: A simple leather cap that provides basic protection.
+item_type: armor
+item_subtype: cap
+equipment_slot: head
+
+stat_modifiers:
+  armor_class: 1
+
+weight: 1.0
+max_stack_size: 1
+
+has_durability: true
+max_durability: 30
+
+is_container: false
+is_consumable: false
+
+flavor_text: The leather is soft and well-tanned, with a comfortable fit.
+rarity: common
+value: 3
+
+flags: {}
+
+keywords:
+  - cap
+  - hat
+  - helmet
+  - head

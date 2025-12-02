@@ -1,0 +1,37 @@
+# The Temporal Rift - A tear in time where hours pass like minutes
+
+id: area_temporal_rift
+name: The Temporal Rift
+description: A tear in the fabric of time where hours pass like minutes and reality shifts unpredictably.
+
+# Time system
+time_scale: 2.0  # Time passes 2x faster than normal
+starting_day: 1
+starting_hour: 0  # Midnight
+starting_minute: 0
+
+# Environmental properties
+biome: temporal
+climate: chaotic
+ambient_lighting: distorted
+weather_profile: temporal_storm
+
+# Gameplay properties
+danger_level: 7
+magic_intensity: extreme
+default_respawn_time: 60  # Very fast respawn - temporal instability causes rapid regeneration
+
+# Atmospheric details
+ambient_sound: The ticking of a thousand unsynchronized clocks fills the air.
+
+# Time phase flavor text
+time_phases:
+  dawn: In this fractured dimension, dawn breaks in stuttering bursts of light.
+  morning: Time fractures and reforms as morning struggles to maintain coherence.
+  afternoon: The afternoon sun flickers between positions as temporal instability peaks.
+  dusk: Sunset arrives in waves, each one different from the last.
+  evening: Evening falls in layers, past and future overlapping chaotically.
+  night: In this fractured dimension, night is a kaleidoscope of past and future shadows.
+
+# Entry points
+entry_points: []  # No forsaken rooms in default seed

@@ -1,0 +1,65 @@
+# Rogue Class
+# Swift and deadly, masters of precision and evasion
+
+class_id: rogue
+name: "Rogue"
+description: "Swift and deadly, masters of precision and evasion"
+
+base_stats:
+  strength: 10
+  dexterity: 14
+  intelligence: 10
+  vitality: 10
+
+stat_growth:
+  dexterity:
+    per_level: 1.5
+    per_milestone:
+      10: 5
+      20: 10
+  intelligence:
+    per_level: 0.6
+  strength:
+    per_level: 0.6
+  vitality:
+    per_level: 0.8
+
+starting_resources:
+  health: 100
+  energy: 120
+
+resources:
+  energy:
+    resource_id: energy
+    name: "Energy"
+    description: "Physical energy for executing special maneuvers"
+    max_amount: 120
+    regen_rate: 6.0
+    regen_type: "passive"
+    regen_modifiers:
+      dexterity: 0.15
+      vitality: 0.05
+    color: "#88FF44"
+
+available_abilities:
+  - backstab
+  - quick_strike
+  - shadow_clone
+  - evasion
+  - poison_strike
+
+ability_slots:
+  1: 2    # 2 ability slots at level 1
+  5: 3    # 3 ability slots at level 5
+  10: 4   # 4 ability slots at level 10
+  15: 5   # 5 ability slots at level 15
+
+gcd_config:
+  melee: 0.8
+  shared: 1.0
+
+keywords:
+  - agile
+  - assassin
+  - thief
+  - dagger

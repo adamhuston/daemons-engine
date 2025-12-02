@@ -1,10 +1,11 @@
+import os
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
-# SQLite database URL
-DATABASE_URL = "sqlite+aiosqlite:///./dungeon.db"  # dungeon.db will live in backend/
+# SQLite database URL - use environment variable or default to dungeon.db
+DATABASE_URL = os.getenv("DAEMONS_DATABASE_URL", "sqlite+aiosqlite:///./dungeon.db")
 
 # Create async SQLAlchemy engine
 engine = create_async_engine(

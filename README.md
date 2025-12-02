@@ -94,9 +94,10 @@ my-game/
 
 ## 5. Database Setup with Alembic
 
-Initialize your game's database:
+Initialize your game's database (run from your project directory):
 
 ```bash
+cd my-game
 daemons db upgrade
 ```
 
@@ -106,7 +107,7 @@ Or use Alembic directly:
 alembic upgrade head
 ```
 
-This creates `game.db` with all tables and seeds the starter world.
+This creates `dungeon.db` with all tables and seeds the starter world.
 
 ### Common Alembic Commands
 
@@ -264,7 +265,7 @@ my-game/
 ├── alembic.ini
 ├── config.py                # Server configuration
 ├── main.py                  # Application entry point
-└── game.db                  # SQLite database
+└── dungeon.db               # SQLite database
 ```
 
 ---
@@ -317,7 +318,7 @@ pip install daemons-engine
 Reset the database:
 
 ```bash
-rm game.db          # or del game.db on Windows
+rm dungeon.db          # or del dungeon.db on Windows
 daemons db upgrade
 ```
 
@@ -374,15 +375,16 @@ source .venv/bin/activate
 ### Install Dependencies
 
 ```bash
-# Core dependencies
-pip install -r requirements.txt
+# Use the setup script (recommended - installs all dependencies and pre-commit hooks)
+python setup_dev.py
+```
 
-# Development dependencies
+Or install manually:
+
+```bash
+pip install -r requirements.txt
 pip install pytest pytest-asyncio pytest-cov pytest-timeout pytest-xdist
 pip install pre-commit ruff black isort mypy safety
-
-# Or use the setup script
-python setup_dev.py
 ```
 
 ### Run the Backend
