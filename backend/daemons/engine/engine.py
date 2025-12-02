@@ -5,6 +5,7 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from ..input_sanitization import sanitize_command
 from .behaviors import BehaviorContext, BehaviorResult, get_behavior_instances
 from .systems import (
     CombatSystem,
@@ -3537,6 +3538,13 @@ class WorldEngine:
                     )
                     await self._dispatch_events([room_event])
 
+                # Trigger NPC behaviors for player appearing in the room
+                # (e.g., aggressive NPCs will attack)
+                if room:
+                    asyncio.create_task(
+                        self._trigger_npc_player_enter(room.id, player_id)
+                    )
+
         return q
 
     def unregister_player(self, player_id: PlayerId) -> None:
@@ -3831,8 +3839,13 @@ class WorldEngine:
         Parse a raw command string and return logical events.
 
         Uses the CommandRouter to dispatch to appropriate handlers.
+        Phase 16.5: Input is sanitized to prevent exploits and crashes.
         """
-        raw = command.strip()
+        # Phase 16.5: Sanitize command input
+        raw, was_sanitized = sanitize_command(command)
+        if was_sanitized:
+            logger.debug(f"Command from {player_id} was sanitized")
+
         if not raw:
             return []
 

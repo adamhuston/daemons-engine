@@ -1478,12 +1478,192 @@ Before adding big systems, make the core loop solid.
 
 ---
 
+### Phase π - PyPI Distribution ✅
+
+**Goals**: Make the engine easily installable via pip and provide CLI commands for running the server and client.
+
+**Package Refactoring** ✅
+- ✅ Restructured codebase for PyPI compatibility
+- ✅ Created proper package structure with `pyproject.toml`
+- ✅ Published to PyPI as `daemons-engine`
+- ✅ Easy installation: `pip install daemons-engine`
+
+**CLI Commands** ✅
+- ✅ `daemons server` - Start the game server
+- ✅ `daemons client` - Launch the game client
+- ✅ Unified entry point for all engine functionality
+
+---
+
 ### Phase 15 - Player quality of life ⬜
 In-game documentation: listing all commands, player role, etc
 Stub client tweaks
 
-### Phase 16 - Cybersecurity Audit ⬜
-Ensure the engine server and database are protected from malicious actors, especially with regards to text sent to the server from the client
+
+### Phase 16 - Cybersecurity Audit and Hardening ⬜
+
+**Goals**: Harden the engine against common web attacks, ensure secure authentication, and protect against malicious input from clients.
+
+**Status**: 🔄 In Progress (16.1, 16.2, 16.3 Complete)
+
+**Existing Strengths**:
+- ✅ SQLAlchemy ORM (parameterized queries prevent SQL injection)
+- ✅ Argon2 password hashing (OWASP recommended)
+- ✅ JWT with refresh token rotation
+- ✅ Role-based access control
+- ✅ Path traversal protection in FileManager
+- ✅ Safe YAML loading (yaml.safe_load)
+- ✅ Security event logging (SecurityEvent table)
+
+#### Phase 16.1 - Rate Limiting ✅
+
+**Purpose**: Prevent brute-force attacks and API abuse
+
+- ✅ Integrated `slowapi` library for HTTP rate limiting
+- ✅ Rate limit auth endpoints:
+    - ✅ `POST /auth/login` - 5 attempts per minute per IP
+    - ✅ `POST /auth/register` - 3 attempts per minute per IP
+    - ✅ `POST /auth/refresh` - 10 attempts per minute per token
+    - ✅ `POST /auth/logout` - 10 attempts per minute per IP
+- ✅ Rate limit WebSocket messages:
+    - ✅ Commands per second limit (30/sec)
+    - ✅ Chat message throttling (5/sec)
+- ✅ Created `rate_limit.py` module with:
+    - ✅ `WebSocketRateLimiter` class for connection-based throttling
+    - ✅ Sliding window algorithm for accurate rate tracking
+    - ✅ Configurable limits via `RATE_LIMITS` dictionary
+- ✅ Return `429 Too Many Requests` with `Retry-After` header
+- ✅ X-Forwarded-For header support for reverse proxy setups
+
+#### Phase 16.2 - Account Lockout ✅
+
+**Purpose**: Prevent credential stuffing and brute-force password attacks
+
+- ✅ Add `failed_login_attempts` column to `UserAccount`
+- ✅ Add `locked_until` timestamp column to `UserAccount`
+- ✅ Created Alembic migration `n6o7p8q9r0s1_phase16_2_account_lockout.py`
+- ✅ Implement lockout logic in `AuthSystem.login()`:
+    - ✅ Lock account after 5 failed attempts (`MAX_FAILED_LOGIN_ATTEMPTS`)
+    - ✅ 15-minute lockout duration (`LOCKOUT_DURATION_SECONDS`)
+    - ✅ Reset counter on successful login
+    - ✅ Auto-unlock when lockout expires
+- ✅ Log lockout events to `SecurityEvent` table:
+    - ✅ Added `ACCOUNT_LOCKED` event type
+    - ✅ Added `ACCOUNT_UNLOCKED` event type
+- ✅ Admin endpoint `POST /admin/unlock-account` to unlock accounts manually
+- ⏭️ CAPTCHA integration skipped (can be added later if needed)
+
+#### Phase 16.3 - JWT Hardening ✅
+
+**Purpose**: Secure token handling and prevent token-based attacks
+
+- ✅ Production mode SECRET_KEY enforcement:
+    - ✅ `DAEMONS_ENV=production` triggers production mode
+    - ✅ Startup error if `JWT_SECRET_KEY` not set in production
+    - ✅ Helpful error message with key generation command
+- ✅ CLI `--production` flag for `daemons run`:
+    - ✅ Sets `DAEMONS_ENV=production` automatically
+    - ✅ Prompts user to generate secret key if not set
+    - ✅ Option to set key for current session interactively
+    - ✅ Shows commands for PowerShell, Bash, and .env file
+- ✅ Add token claims validation:
+    - ✅ `iss` (issuer) claim: configurable via `JWT_ISSUER` env var
+    - ✅ `aud` (audience) claim: configurable via `JWT_AUDIENCE` env var
+    - ✅ `exp` validation with 30-second clock skew tolerance (`CLOCK_SKEW_TOLERANCE_SECONDS`)
+    - ✅ Required claims: `iat`, `exp`, `sub`
+- ✅ Move token from URL query string to header for authenticated WebSocket:
+    - ✅ `Sec-WebSocket-Protocol: access_token, <token>` header support
+    - ✅ Query string still works (deprecated, logs warning)
+    - ✅ Server responds with `access_token` subprotocol
+- ⏭️ Token binding (fingerprint) - Deferred (optional, adds complexity)
+- ⏭️ Token revocation list - Deferred (existing refresh token revocation sufficient)
+
+#### Phase 16.4 - WebSocket Security ✅
+
+**Purpose**: Harden WebSocket connections against abuse and attacks
+
+- ✅ Add message size limits:
+    - ✅ Configure `max_size` parameter (64KB default, configurable via `WS_MAX_MESSAGE_SIZE`)
+    - ✅ Reject oversized messages gracefully with informative error response
+- ✅ Implement origin validation:
+    - ✅ Check `Origin` header against allowed list
+    - ✅ Configurable allowed origins via `WS_ALLOWED_ORIGINS` environment variable
+    - ✅ Wildcard pattern support (e.g., `*.example.com`)
+    - ✅ Can be disabled via `WS_ORIGIN_VALIDATION_ENABLED=false`
+- ✅ Connection limits:
+    - ✅ Max connections per IP (default 10, configurable via `WS_MAX_CONNECTIONS_PER_IP`)
+    - ✅ Max connections per account (default 3, configurable via `WS_MAX_CONNECTIONS_PER_ACCOUNT`)
+    - ✅ Automatic cleanup on disconnect
+- ✅ Message validation:
+    - ✅ JSON schema validation for incoming messages
+    - ✅ Command text length limit (500 chars)
+    - ✅ Control character filtering
+    - ✅ Reject malformed payloads early with informative errors
+- ✅ Add heartbeat/ping-pong for connection health:
+    - ✅ `HeartbeatManager` tracks connection health
+    - ✅ Configurable interval and timeout
+    - ✅ Clients can send `{"type": "ping"}`, server responds with `{"type": "pong"}`
+- ✅ Unified `WebSocketSecurityManager` coordinates all features
+- ✅ Comprehensive unit tests (56 tests)
+
+#### Phase 16.5 - Input Sanitization ✅
+
+**Purpose**: Protect against exploits, code injections, and server crashes from malformed input
+
+- ✅ Command input validation:
+    - ✅ Maximum command length (500 chars, configurable)
+    - ✅ Strip control characters (null bytes, escape sequences, C1 controls)
+    - ✅ Remove bidirectional text overrides (RTL/LTR exploits)
+    - ✅ Remove invisible/zero-width characters
+    - ✅ Normalize Unicode whitespace
+    - ✅ Limit combining marks (Zalgo text prevention)
+- ✅ Chat/text sanitization:
+    - ✅ Prevent Unicode exploits (RTL override, zero-width chars)
+    - ✅ Limit combining marks to prevent visual disruption
+    - ✅ Maximum chat length (1000 chars)
+    - ✅ Preserve emoji and normal punctuation
+- ✅ Player name validation:
+    - ✅ Alphanumeric + spaces, hyphens, apostrophes only
+    - ✅ Length limits (2-24 characters)
+    - ✅ Must start with letter, no consecutive special chars
+    - ✅ Homoglyph/confusable character normalization (Cyrillic, Greek, fullwidth)
+    - ✅ Remove invisible characters that could hide content
+- ✅ Integrated into:
+    - ✅ `engine.handle_command()` - all commands sanitized
+    - ✅ `POST /characters` - character names validated
+- ✅ Comprehensive unit tests (65 tests)
+- ⏭️ YAML content validation - Deferred (admin content, covered by schema validation)
+- ⏭️ Profanity filter - Deferred (game design decision, not security)
+
+#### Phase 16.6 - Legacy Endpoint Deprecation ✅
+
+**Purpose**: Remove security risks from deprecated authentication paths
+
+- ✅ Add deprecation warnings to `/ws/game?player_id=`:
+    - ✅ Log warning on each connection (with metrics tracking)
+    - ✅ Send deprecation warning message to clients on connect
+- ✅ Implement sunset timeline via `WS_LEGACY_DEPRECATION_PHASE`:
+    - ✅ Phase 1 (WARN): Warnings only, normal operation
+    - ✅ Phase 2 (THROTTLE): Heavy rate limits (10 cmd/min, 5 chat/min)
+    - ✅ Phase 3 (DISABLED): Endpoint completely disabled
+- ✅ Document migration path in deprecation message (points to `/ws/game/auth`)
+- ✅ Add feature flag `WS_LEGACY_AUTH_ENABLED` to disable legacy auth
+- ✅ Stricter connection limits for legacy (3/IP vs 10/IP for authenticated)
+- ✅ Created `legacy_deprecation.py` with:
+    - ✅ `LegacyDeprecationConfig` - env-based configuration
+    - ✅ `LegacyDeprecationManager` - connection tracking and validation
+    - ✅ `DeprecationPhase` enum (WARN, THROTTLE, DISABLED)
+- ✅ Integrated into `main.py` legacy WebSocket endpoint
+- ✅ Comprehensive unit tests (43 tests)
+
+### Security Testing & Validation
+
+- [ ] Run `bandit` static analysis on codebase
+- [ ] Run `safety check` for dependency vulnerabilities
+- [ ] Add security checks to CI/CD pipeline
+- [ ] Consider OWASP ZAP automated scanning
+- [ ] Document security practices in SECURITY.md
+
 
 ### Phase 17 - Knobs and Levers: comprehensive In-game commands and API Routes documentation
 User-focused documentation for in-game commands and API routes for development

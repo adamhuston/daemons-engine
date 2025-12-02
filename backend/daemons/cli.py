@@ -187,14 +187,76 @@ htmlcov/
 @click.option("--port", "-p", default=8000, type=int, help="Port to bind to")
 @click.option("--reload", "-r", is_flag=True, help="Enable auto-reload for development")
 @click.option("--workers", "-w", default=1, type=int, help="Number of worker processes")
-def run(host: str, port: int, reload: bool, workers: int):
+@click.option("--production", is_flag=True, help="Run in production mode (requires JWT_SECRET_KEY)")
+def run(host: str, port: int, reload: bool, workers: int, production: bool):
     """Start the Daemons game server.
 
     Run this command from your project directory (where main.py is located).
+
+    For production deployments, use --production flag which enforces
+    secure JWT secret key configuration.
     """
     import os
+    import secrets
 
     import uvicorn
+
+    # Handle production mode
+    if production:
+        os.environ["DAEMONS_ENV"] = "production"
+        click.echo(click.style("🔒 Production mode enabled", fg="yellow", bold=True))
+
+        # Check if JWT_SECRET_KEY is already set
+        existing_key = os.environ.get("JWT_SECRET_KEY")
+        if not existing_key or existing_key == "dev-secret-key-change-in-production":
+            click.echo("")
+            click.echo(click.style("⚠️  JWT_SECRET_KEY not set!", fg="red", bold=True))
+            click.echo("")
+            click.echo("A secure secret key is required for production.")
+            click.echo("This key is used to sign authentication tokens.")
+            click.echo("")
+
+            # Generate a suggested key
+            suggested_key = secrets.token_hex(32)
+
+            if click.confirm("Would you like to generate a new secret key?", default=True):
+                click.echo("")
+                click.echo("Generated secret key:")
+                click.echo(click.style(f"  {suggested_key}", fg="green"))
+                click.echo("")
+                click.echo("To use this key, set the environment variable before running:")
+                click.echo("")
+                click.echo(click.style("  PowerShell:", fg="cyan"))
+                click.echo(f'    $env:JWT_SECRET_KEY = "{suggested_key}"')
+                click.echo("")
+                click.echo(click.style("  Bash/Linux:", fg="cyan"))
+                click.echo(f'    export JWT_SECRET_KEY="{suggested_key}"')
+                click.echo("")
+                click.echo(click.style("  Or add to your .env file:", fg="cyan"))
+                click.echo(f'    JWT_SECRET_KEY={suggested_key}')
+                click.echo("")
+
+                if click.confirm("Set this key for the current session and continue?", default=True):
+                    os.environ["JWT_SECRET_KEY"] = suggested_key
+                    click.echo(click.style("✓ Secret key set for this session", fg="green"))
+                    click.echo("")
+                else:
+                    click.echo("")
+                    click.echo("Server startup cancelled. Set JWT_SECRET_KEY and try again.")
+                    sys.exit(1)
+            else:
+                click.echo("")
+                click.echo("Generate a key manually with:")
+                click.echo('  python -c "import secrets; print(secrets.token_hex(32))"')
+                click.echo("")
+                click.echo("Then set it as an environment variable before running.")
+                sys.exit(1)
+        else:
+            click.echo(click.style("✓ JWT_SECRET_KEY is configured", fg="green"))
+
+        # Warn about reload in production
+        if reload:
+            click.echo(click.style("⚠️  Warning: --reload is not recommended in production", fg="yellow"))
 
     # Check if we're in a project directory with a custom main.py
     if Path("main.py").exists():

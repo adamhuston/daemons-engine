@@ -24,13 +24,35 @@ from daemons.models import Player, RefreshToken, SecurityEvent, UserAccount
 # Configuration
 # ============================================================================
 
-# Secret key for JWT signing (should be set via environment variable in production)
+# Phase 16.3: Production mode detection
+# Set DAEMONS_ENV=production in production deployments
+PRODUCTION_MODE = os.environ.get("DAEMONS_ENV", "development").lower() == "production"
+
+# Secret key for JWT signing (REQUIRED in production)
 SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
+if PRODUCTION_MODE and SECRET_KEY == "dev-secret-key-change-in-production":
+    raise RuntimeError(
+        "SECURITY ERROR: JWT_SECRET_KEY environment variable must be set in production mode. "
+        "Generate a secure key with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+
 ALGORITHM = "HS256"
+
+# Phase 16.3: JWT issuer and audience claims
+JWT_ISSUER = os.environ.get("JWT_ISSUER", "daemons-engine")
+JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "daemons-client")
+
+# Phase 16.3: Clock skew tolerance (seconds) for token expiration
+# Allows for small time differences between server and client clocks
+CLOCK_SKEW_TOLERANCE_SECONDS = 30
 
 # Token expiration times (user requested 1hr access tokens)
 ACCESS_TOKEN_EXPIRE_SECONDS = 60 * 60  # 1 hour
 REFRESH_TOKEN_EXPIRE_SECONDS = 60 * 60 * 24 * 7  # 7 days
+
+# Phase 16.2: Account lockout configuration
+MAX_FAILED_LOGIN_ATTEMPTS = 5  # Lock after this many failed attempts
+LOCKOUT_DURATION_SECONDS = 60 * 15  # 15 minutes lockout
 
 
 # ============================================================================
@@ -126,6 +148,9 @@ class SecurityEventType(str, Enum):
     ROLE_CHANGED = "role_changed"
     CHARACTER_CREATED = "character_created"
     CHARACTER_DELETED = "character_deleted"
+    # Phase 16.2: Account lockout events
+    ACCOUNT_LOCKED = "account_locked"
+    ACCOUNT_UNLOCKED = "account_unlocked"
 
 
 # ============================================================================
@@ -168,6 +193,8 @@ def create_access_token(
       - type: "access"
       - exp: expiration timestamp
       - iat: issued at timestamp
+      - iss: issuer (Phase 16.3)
+      - aud: audience (Phase 16.3)
     """
     now = time.time()
     expire = now + (expires_delta or ACCESS_TOKEN_EXPIRE_SECONDS)
@@ -178,6 +205,8 @@ def create_access_token(
         "type": "access",
         "iat": now,
         "exp": expire,
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
     }
 
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -201,17 +230,36 @@ def verify_access_token(token: str) -> dict | None:
     """
     Verify a JWT access token and extract claims.
 
+    Phase 16.3 hardening:
+    - Validates issuer (iss) claim
+    - Validates audience (aud) claim
+    - Applies clock skew tolerance for expiration
+
     Returns: {"user_id": str, "role": str, "exp": float} or None if invalid
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # Phase 16.3: Validate issuer and audience claims
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+            issuer=JWT_ISSUER,
+            audience=JWT_AUDIENCE,
+            options={
+                "require_iat": True,
+                "require_exp": True,
+                "require_sub": True,
+            },
+        )
 
         # Check it's an access token
         if payload.get("type") != "access":
             return None
 
-        # Check expiration
-        if payload.get("exp", 0) < time.time():
+        # Phase 16.3: Check expiration with clock skew tolerance
+        exp_time = payload.get("exp", 0)
+        current_time = time.time()
+        if exp_time + CLOCK_SKEW_TOLERANCE_SECONDS < current_time:
             return None
 
         return {
@@ -331,6 +379,53 @@ class AuthSystem:
             )
             return result.scalar_one_or_none()
 
+    async def unlock_account(
+        self,
+        account_id: str,
+        admin_account_id: str,
+        ip_address: str | None = None,
+    ) -> tuple[bool, str]:
+        """
+        Manually unlock a locked account (admin action).
+
+        Returns:
+            - If successful: (True, "")
+            - If failed: (False, error_message)
+        """
+        async with self.db_session_factory() as session:
+            # Find account
+            result = await session.execute(
+                select(UserAccount).where(UserAccount.id == account_id)
+            )
+            account = result.scalar_one_or_none()
+
+            if not account:
+                return False, "Account not found"
+
+            if not account.locked_until:
+                return False, "Account is not locked"
+
+            # Unlock the account
+            await session.execute(
+                update(UserAccount)
+                .where(UserAccount.id == account_id)
+                .values(locked_until=None, failed_login_attempts=0)
+            )
+
+            # Log the unlock event
+            await self._log_event_internal(
+                session,
+                SecurityEventType.ACCOUNT_UNLOCKED,
+                account_id,
+                ip_address,
+                None,
+                {"unlocked_by": admin_account_id},
+            )
+
+            await session.commit()
+
+            return True, ""
+
     # ========================================================================
     # Authentication
     # ========================================================================
@@ -356,8 +451,54 @@ class AuthSystem:
             )
             account = result.scalar_one_or_none()
 
+            now = time.time()
+
+            # Phase 16.2: Check if account is locked
+            if account and account.locked_until:
+                if now < account.locked_until:
+                    # Account is still locked
+                    remaining = int(account.locked_until - now)
+                    await self._log_event_internal(
+                        session,
+                        SecurityEventType.LOGIN_FAILURE,
+                        account.id,
+                        ip_address,
+                        user_agent,
+                        {"reason": "account_locked", "remaining_seconds": remaining},
+                    )
+                    await session.commit()
+                    return None, None, f"Account is locked. Try again in {remaining // 60} minutes."
+                else:
+                    # Lockout has expired, reset lockout state
+                    await session.execute(
+                        update(UserAccount)
+                        .where(UserAccount.id == account.id)
+                        .values(locked_until=None, failed_login_attempts=0)
+                    )
+
             # Check account exists and password is correct
             if not account or not verify_password(password, account.password_hash):
+                # Phase 16.2: Increment failed login attempts
+                if account:
+                    new_attempts = account.failed_login_attempts + 1
+                    lock_time = None
+                    if new_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
+                        lock_time = now + LOCKOUT_DURATION_SECONDS
+                        # Log account lockout event
+                        await self._log_event_internal(
+                            session,
+                            SecurityEventType.ACCOUNT_LOCKED,
+                            account.id,
+                            ip_address,
+                            user_agent,
+                            {"failed_attempts": new_attempts, "lockout_duration": LOCKOUT_DURATION_SECONDS},
+                        )
+                    await session.execute(
+                        update(UserAccount)
+                        .where(UserAccount.id == account.id)
+                        .values(failed_login_attempts=new_attempts, locked_until=lock_time)
+                    )
+
                 # Log failed login
                 await self._log_event_internal(
                     session,
@@ -388,7 +529,6 @@ class AuthSystem:
             token_id, refresh_token = create_refresh_token(account.id)
 
             # Store refresh token
-            now = time.time()
             db_token = RefreshToken(
                 id=token_id,
                 account_id=account.id,
@@ -400,11 +540,11 @@ class AuthSystem:
             )
             session.add(db_token)
 
-            # Update last login
+            # Update last login and reset failed login attempts on success
             await session.execute(
                 update(UserAccount)
                 .where(UserAccount.id == account.id)
-                .values(last_login=now)
+                .values(last_login=now, failed_login_attempts=0, locked_until=None)
             )
 
             # Log successful login

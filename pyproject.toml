@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "daemons-engine"
-version = "0.1.14"
+version = "0.1.15"
 description = "A modern MUD engine - headless game engine for real-time, text-based multiplayer worlds"
 readme = "README.md"
 license = "MIT"
@@ -45,6 +45,7 @@ dependencies = [
     "python-jose[cryptography]>=3.4.0",
     "PyYAML>=6.0.3",
     "SQLAlchemy>=2.0.44",
+    "slowapi>=0.1.9",
     "structlog>=25.3.0",
     "uvicorn[standard]>=0.38.0",
     "websockets>=15.0.1",

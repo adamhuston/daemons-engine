@@ -1,439 +1,182 @@
-# Daemons Engine — Quickstart Guide
+# Daemons Engine
 
-Build your own real-time MUD/RPG game using the Daemons engine.
+A Python framework for building text-based multiplayer RPGs with real-time WebSocket communication.
 
----
-
-## Prerequisites
-
-- **Python 3.11+** — [Download](https://www.python.org/downloads/)
-- **A terminal** — PowerShell (Windows), Terminal (macOS), or bash (Linux)
+>  **Pre-Release Beta**  API subject to change. Not recommended for production use.
+>  **Latest Roadmap Release:**  Phase 16 - Cybersecurity upgrades, including input validation and production mode
 
 ---
 
-## 1. Create Your Game Project
+## Quickstart
+
+### Prerequisites
+
+- Python 3.11 or higher
+- pip (Python package manager)
+
+### Step 1: Create Project Directory
 
 ```bash
 mkdir my-game
 cd my-game
 ```
 
----
-
-## 2. Create a Virtual Environment
-
-### Windows (PowerShell)
+### Step 2: Create Virtual Environment
 
 ```powershell
+# Windows
 python -m venv .venv
 .\.venv\Scripts\Activate
 ```
 
-### macOS / Linux
-
 ```bash
+# macOS/Linux
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-> **Tip:** You should see `(.venv)` in your terminal prompt when activated.
-
----
-
-## 3. Install the Daemons Engine
+### Step 3: Install Daemons Engine
 
 ```bash
 pip install daemons-engine
 ```
 
-This installs the engine and all its dependencies (FastAPI, SQLAlchemy, Alembic, etc.).
-
-### Verify Installation
+### Step 4: Initialize Your Game
 
 ```bash
-python -c "import daemons; print(daemons.__version__)"
+daemons init <new_game>
 ```
 
----
+This creates:
+- `world_data/`  YAML content (rooms, NPCs, items)
+- `config.py`  Server configuration
+- `main.py`  Application entry point
+- `alembic.ini`  Database migration config
+- `alembic/`  Migration scripts
 
-## 4. Initialize Your Game
-
-Create the initial project structure:
+### Step 5: Set Up Database
 
 ```bash
-daemons init my-game
-```
-
-Or initialize in the current directory:
-
-```bash
-daemons init .
-```
-
-This scaffolds your project with all starter content:
-
-```
-my-game/
-├── world_data/          # Your game content (YAML files)
-│   ├── areas/           # Area definitions
-│   ├── rooms/           # Room definitions
-│   ├── items/           # Item templates
-│   ├── npcs/            # NPC templates
-│   ├── classes/         # Character classes
-│   ├── abilities/       # Class abilities
-│   ├── quests/          # Quest definitions
-│   └── ...              # And more!
-├── behaviors/           # Custom NPC behaviors (Python)
-├── alembic/             # Database migrations
-├── alembic.ini          # Alembic configuration
-├── config.py            # Game configuration
-└── main.py              # Entry point
-```
-
----
-
-## 5. Database Setup with Alembic
-
-Initialize your game's database (run from your project directory):
-
-```bash
-cd my-game
+cd <new_game>
 daemons db upgrade
 ```
 
-Or use Alembic directly:
+### Step 6: Run the Server
+From `/<new_game>`...
 
 ```bash
-alembic upgrade head
+# Development (auto-reload on code changes)
+daemons run --reload
+
+# Production (requires JWT secret key)
+daemons run --production
 ```
 
-This creates `dungeon.db` with all tables and seeds the starter world.
+The `--production` flag enables security hardening:
+- Requires `JWT_SECRET_KEY` environment variable
+- Enforces JWT issuer/audience validation
+- Runs without auto-reload
 
-### Common Alembic Commands
-
-```bash
-# Check current migration status
-alembic current
-
-# View migration history
-alembic history
-
-# Upgrade to latest
-alembic upgrade head
-
-# Downgrade one revision
-alembic downgrade -1
-
-# Create a new migration (after model changes)
-alembic revision --autogenerate -m "description of changes"
-```
-
----
-
-## 6. Run the Server
-
-```bash
-daemons run
-```
-
-Or use uvicorn directly:
-
-```bash
-uvicorn main:app --reload --log-level info
-```
+If `JWT_SECRET_KEY` is not set, you'll be prompted to generate one.
 
 You should see:
 
 ```
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process
-INFO:     Started server process
 INFO:     Application startup complete.
 ```
 
-### Server Options
+### Step 7: Connect a Client
 
-```bash
-# Different port
-daemons run --port 8080
-
-# Bind to all interfaces (for LAN access)
-daemons run --host 0.0.0.0
-
-# Production mode (no reload, multiple workers)
-uvicorn main:app --workers 4
-```
-
-### API Documentation
-
-With the server running, visit:
-- **Swagger UI:** http://127.0.0.1:8000/docs
-- **ReDoc:** http://127.0.0.1:8000/redoc
-
----
-
-## 7. Connect a Client
-
-### Option A: Use the Reference Client
-
-Install and run the Flet-based debug client:
+**Option A: Reference Client**
 
 ```bash
 pip install flet
 daemons client
 ```
 
-### Option B: Build Your Own
+**Option B: Build Your Own**
 
-Connect via WebSocket to `ws://127.0.0.1:8000/ws/game/auth`. See [protocol.md](https://github.com/adamhuston/1126/blob/main/documentation/protocol.md) for message formats.
+Connect via WebSocket to `ws://127.0.0.1:8000/ws/game/auth`.
 
-### Test Credentials
-
-The server seeds two test accounts on first run:
+**Test Credentials:**
 - Username: `testplayer1` / Password: `testpass1`
 - Username: `testplayer2` / Password: `testpass2`
 
 ---
 
-## 8. Create Game Content
+## Create Game Content
 
 All content is defined in YAML files under `world_data/`.
 
-### Example: Create a Room
-
-`world_data/rooms/tavern.yaml`:
+### Example Room (`world_data/rooms/tavern.yaml`)
 
 ```yaml
 id: tavern_main
 name: "The Rusty Tankard"
 description: |
-  A cozy tavern with a crackling fireplace. The smell of
-  roasted meat and ale fills the air.
+  A cozy tavern with a crackling fireplace.
 room_type: indoor
 area_id: starter_town
 exits:
   north: town_square
-  up: tavern_rooms
 ```
 
-### Example: Create an NPC
-
-`world_data/npcs/barkeeper.yaml`:
+### Example NPC (`world_data/npcs/barkeeper.yaml`)
 
 ```yaml
 id: npc_barkeeper
 name: "Greta the Barkeeper"
-description: "A stout woman with a warm smile and keen eyes."
+description: "A stout woman with a warm smile."
 level: 5
 behaviors:
   - merchant
-  - friendly
-dialogue_id: barkeeper_dialogue
 spawn_room: tavern_main
 ```
 
-### Hot Reload
-
-Content changes are picked up automatically when using `--reload`, or trigger manually:
-
-```bash
-# In-game (as admin)
-reload items
-reload npcs
-reload rooms
-```
-
 ---
 
-## 9. Project Structure
+## Project Structure
 
 ```
 my-game/
-├── world_data/              # Your game content
-│   ├── areas/               # World areas
-│   ├── rooms/               # Room definitions
-│   ├── items/               # Items and equipment
-│   │   ├── weapons/
-│   │   ├── armor/
-│   │   └── consumables/
-│   ├── npcs/                # NPC templates
-│   ├── quests/              # Quest definitions
-│   ├── dialogues/           # NPC dialogue trees
-│   └── triggers/            # Room/area triggers
-├── behaviors/               # Custom Python behaviors
-├── alembic/                 # Database migrations
-├── alembic.ini
-├── config.py                # Server configuration
-├── main.py                  # Application entry point
-└── dungeon.db               # SQLite database
+ world_data/              # Your game content
+    rooms/               # Room definitions
+    items/               # Items and equipment
+    npcs/                # NPC templates
+    quests/              # Quest definitions
+    dialogues/           # NPC dialogue trees
+ alembic/                 # Database migrations
+ config.py                # Server configuration
+ main.py                  # Application entry point
+ dungeon.db               # SQLite database
 ```
 
 ---
 
-## 10. Quick Reference
-
-### Essential Commands
+## Quick Reference
 
 | Task | Command |
 |------|---------|
-| Install engine | `pip install daemons-engine` |
 | Initialize project | `daemons init` |
 | Run migrations | `daemons db upgrade` |
-| Start server | `daemons run` |
 | Start server (dev) | `daemons run --reload` |
+| Start server (prod) | `daemons run --production` |
 | Run client | `daemons client` |
-
-### Useful URLs (Server Running)
 
 | URL | Description |
 |-----|-------------|
 | http://127.0.0.1:8000/docs | Swagger API docs |
 | http://127.0.0.1:8000/redoc | ReDoc API docs |
-| ws://127.0.0.1:8000/ws/game/auth | WebSocket game endpoint |
 
 ---
 
-## Troubleshooting
+## Documentation
 
-### "Module not found" errors
-
-Make sure your virtual environment is activated:
-
-```powershell
-# Windows
-.\.venv\Scripts\Activate
-
-# macOS/Linux
-source .venv/bin/activate
-```
-
-Then reinstall:
-
-```bash
-pip install daemons-engine
-```
-
-### Database errors
-
-Reset the database:
-
-```bash
-rm dungeon.db          # or del dungeon.db on Windows
-daemons db upgrade
-```
-
-### Port already in use
-
-Use a different port:
-
-```bash
-daemons run --port 8080
-```
-
-### Client can't connect
-
-1. Ensure the server is running
-2. Check `config.py` for the correct host/port
-3. Verify firewall isn't blocking localhost connections
+Coming soon
 
 ---
 
-## Next Steps
+## License
 
-- **Browse example content:** [world_data examples](https://github.com/adamhuston/1126/tree/main/backend/daemons/world_data)
-- **Read the architecture:** [ARCHITECTURE.md](https://github.com/adamhuston/1126/blob/main/documentation/ARCHITECTURE.md)
-- **Understand the protocol:** [protocol.md](https://github.com/adamhuston/1126/blob/main/documentation/protocol.md)
-- **See the roadmap:** [roadmap.md](https://github.com/adamhuston/1126/blob/main/documentation/roadmap.md)
-
----
-
-## Engine Development
-
-If you want to contribute to the Daemons engine itself:
-
-### Clone the Repository
-
-```bash
-git clone https://github.com/adamhuston/1126.git daemons-engine
-cd daemons-engine
-```
-
-### Create Virtual Environment
-
-```powershell
-# Windows
-python -m venv .venv
-.\.venv\Scripts\Activate
-```
-
-```bash
-# macOS/Linux
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### Install Dependencies
-
-```bash
-# Use the setup script (recommended - installs all dependencies and pre-commit hooks)
-python setup_dev.py
-```
-
-Or install manually:
-
-```bash
-pip install -r requirements.txt
-pip install pytest pytest-asyncio pytest-cov pytest-timeout pytest-xdist
-pip install pre-commit ruff black isort mypy safety
-```
-
-### Run the Backend
-
-```bash
-cd backend
-alembic upgrade head
-uvicorn app.main:app --reload
-```
-
-### Run Tests
-
-```bash
-cd backend
-
-# All tests
-pytest
-
-# With coverage
-pytest --cov=app --cov-report=html
-
-# By category
-pytest -m unit          # Unit tests
-pytest -m systems       # System tests
-pytest -m integration   # Integration tests
-pytest -m abilities     # Ability tests
-pytest -m api           # API tests
-```
-
-### Code Quality
-
-```bash
-# Install pre-commit hooks
-pre-commit install
-
-# Run all linters
-pre-commit run --all-files
-
-# Individual tools
-ruff check backend/ --fix
-black backend/
-isort backend/
-mypy backend/daemons/
-```
-
-### Run the Reference Client
-
-```bash
-daemons client
-```
-
----
+MIT License  see [LICENSE](LICENSE) for details.

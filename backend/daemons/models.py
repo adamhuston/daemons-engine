@@ -629,6 +629,14 @@ class UserAccount(Base):
         String, nullable=True
     )  # Admin who banned the account
 
+    # Phase 16.2: Account lockout
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )  # Count of consecutive failed login attempts
+    locked_until: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )  # Unix timestamp when lockout expires (None = not locked)
+
 
 class RefreshToken(Base):
     """

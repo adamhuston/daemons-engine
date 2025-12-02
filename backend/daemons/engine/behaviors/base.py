@@ -299,7 +299,7 @@ class BehaviorScript(ABC):
     @abstractmethod
     def get_behavior_id(self) -> str:
         """Return the unique identifier for this behavior."""
-        return self.name
+        ...
 
     # --- Lifecycle Hooks ---
 
@@ -462,6 +462,10 @@ def behavior(
         cls.description = description
         cls.priority = priority
         cls.defaults = defaults or {}
+
+        # Add get_behavior_id implementation if not already defined
+        if "get_behavior_id" not in cls.__dict__:
+            cls.get_behavior_id = lambda self: name  # type: ignore[method-assign]
 
         # Register the behavior
         if name in _BEHAVIOR_REGISTRY:

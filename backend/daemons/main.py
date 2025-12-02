@@ -17,6 +17,7 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel, Field
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,9 +32,24 @@ from .engine.loader import (
     restore_player_quest_progress,
 )
 from .engine.systems.auth import AuthSystem, verify_access_token
+from .input_sanitization import sanitize_player_name
+from .legacy_deprecation import (
+    legacy_deprecation_manager,
+)
 from .metrics import init_metrics
 from .models import Base, Player, PlayerInventory
+from .rate_limit import (
+    RATE_LIMITS,
+    is_chat_command,
+    limiter,
+    rate_limit_exceeded_handler,
+    ws_rate_limiter,
+)
 from .routes.admin import router as admin_router
+from .websocket_security import (
+    get_client_ip_from_websocket,
+    ws_security_manager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +229,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Register rate limiter and exception handler (Phase 16.1)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
 # Register admin routes (Phase 8)
 app.include_router(admin_router)
 
@@ -382,6 +402,7 @@ class RegisterResponse(BaseModel):
 
 
 @app.post("/auth/register", response_model=RegisterResponse)
+@limiter.limit(RATE_LIMITS["auth_register"])
 async def register(
     request: RegisterRequest,
     req: Request,
@@ -431,6 +452,7 @@ class LoginResponse(BaseModel):
 
 
 @app.post("/auth/login", response_model=LoginResponse)
+@limiter.limit(RATE_LIMITS["auth_login"])
 async def login(
     request: LoginRequest,
     req: Request,
@@ -487,6 +509,7 @@ class RefreshResponse(BaseModel):
 
 
 @app.post("/auth/refresh", response_model=RefreshResponse)
+@limiter.limit(RATE_LIMITS["auth_refresh"])
 async def refresh_token(
     request: RefreshRequest,
     req: Request,
@@ -528,6 +551,7 @@ class LogoutRequest(BaseModel):
 
 
 @app.post("/auth/logout")
+@limiter.limit(RATE_LIMITS["auth_logout"])
 async def logout(
     request: LogoutRequest,
     req: Request,
@@ -645,6 +669,7 @@ async def create_character(
     Create a new character for the authenticated account.
 
     The character starts in the default spawn room.
+    Phase 16.5: Character names are sanitized and validated.
     """
     # Parse Bearer token
     if not authorization.startswith("Bearer "):
@@ -662,8 +687,16 @@ async def create_character(
 
     user_id = claims["user_id"]
 
-    # Check if name is already taken
-    result = await session.execute(select(Player).where(Player.name == request.name))
+    # Phase 16.5: Sanitize and validate character name
+    sanitized_name, is_valid, error_msg = sanitize_player_name(request.name)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg or "Invalid character name",
+        )
+
+    # Check if name is already taken (using sanitized name)
+    result = await session.execute(select(Player).where(Player.name == sanitized_name))
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -678,13 +711,13 @@ async def create_character(
             detail="Maximum number of characters reached (3)",
         )
 
-    # Create new character
+    # Create new character (using sanitized name)
     start_room_id = "room_1_1_1"  # Default spawn location
     character_id = str(uuid.uuid4())
 
     character = Player(
         id=character_id,
-        name=request.name,
+        name=sanitized_name,
         current_room_id=start_room_id,
         character_class=request.character_class,
         account_id=user_id,
@@ -881,6 +914,69 @@ async def delete_character(
     await session.commit()
 
     return {"message": "Character deleted", "character_id": character_id}
+
+
+# ---------- Admin Endpoints (Phase 16.2) ----------
+
+
+class UnlockAccountRequest(BaseModel):
+    """Request to unlock a locked account."""
+
+    account_id: str = Field(..., description="ID of the account to unlock")
+
+
+@app.post("/admin/unlock-account")
+async def unlock_account(
+    request: UnlockAccountRequest,
+    req: Request,
+    authorization: str = Header(..., description="Bearer <access_token>"),
+    auth_system: AuthSystem = Depends(get_auth_system),
+):
+    """
+    Unlock a locked account (admin only).
+
+    Requires admin role. Clears the lockout state and resets failed login attempts.
+    """
+    # Parse and verify admin token
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = authorization[7:]
+    claims = verify_access_token(token)
+    if not claims:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Check admin role
+    if claims.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required",
+        )
+
+    ip_address = req.client.host if req.client else None
+    admin_account_id = claims["user_id"]
+
+    success, error = await auth_system.unlock_account(
+        account_id=request.account_id,
+        admin_account_id=admin_account_id,
+        ip_address=ip_address,
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error,
+        )
+
+    return {"message": "Account unlocked successfully", "account_id": request.account_id}
 
 
 # ---------- Character Selection Mode Helper ----------
@@ -1192,20 +1288,66 @@ async def _handle_character_selection(
 @app.websocket("/ws/game/auth")
 async def game_ws_auth(
     websocket: WebSocket,
-    token: str = Query(..., description="Access token from /auth/login"),
+    token: str | None = Query(None, description="Access token (deprecated, use Sec-WebSocket-Protocol header)"),
 ) -> None:
     """
     Authenticated WebSocket endpoint (Phase 7).
 
-    - client connects: /ws/game/auth?token=<access_token>
+    Phase 16.3: Token should be passed via Sec-WebSocket-Protocol header:
+    - Header format: Sec-WebSocket-Protocol: access_token, <your_token>
+    - Query string still supported but deprecated: /ws/game/auth?token=<token>
+
+    Phase 16.4: Security hardening:
+    - Origin validation (configurable allowed origins)
+    - Connection limits per IP and account
+    - Message size limits (64KB default)
+    - Message schema validation
+    - Heartbeat/ping-pong for connection health
+
     - client sends: {"type": "command", "text": "look"}
     - server sends: events like {"type": "message", "player_id": "...", "text": "..."}
 
     The token is verified and the user's active character is loaded.
     Supports returning to character selection via the 'quit' command.
     """
+    # Phase 16.4: Get client IP for connection limiting
+    client_ip = get_client_ip_from_websocket(websocket)
+    connection_id = str(uuid.uuid4())  # Unique ID for this connection
+
+    # Phase 16.4: Validate connection before accepting (origin and IP limit)
+    valid, error = await ws_security_manager.validate_connection(
+        websocket, client_ip, account_id=None  # Account checked after auth
+    )
+    if not valid:
+        logger.warning(f"WebSocket connection rejected: {error} (IP: {client_ip})")
+        await websocket.close(code=4003, reason=error)
+        return
+
+    # Phase 16.3: Extract token from Sec-WebSocket-Protocol header first
+    # Format: "access_token, <actual_token>"
+    ws_protocols = websocket.headers.get("sec-websocket-protocol", "")
+    header_token = None
+    subprotocol = None
+
+    if ws_protocols:
+        protocols = [p.strip() for p in ws_protocols.split(",")]
+        if len(protocols) >= 2 and protocols[0] == "access_token":
+            header_token = protocols[1]
+            subprotocol = "access_token"
+
+    # Prefer header token, fall back to query string
+    effective_token = header_token or token
+
+    if not effective_token:
+        await websocket.close(code=4001, reason="No token provided. Use Sec-WebSocket-Protocol header or token query param")
+        return
+
+    # Log deprecation warning if using query string
+    if token and not header_token:
+        logger.warning("WebSocket connection using deprecated query string token. Migrate to Sec-WebSocket-Protocol header.")
+
     # Verify token first (before accepting connection)
-    claims = verify_access_token(token)
+    claims = verify_access_token(effective_token)
     if not claims:
         await websocket.close(code=4001, reason="Invalid or expired token")
         return
@@ -1213,8 +1355,22 @@ async def game_ws_auth(
     user_id = claims["user_id"]
     user_role = claims["role"]
 
-    await websocket.accept()
-    logger.info("Authenticated WebSocket connection attempt for user %s", user_id)
+    # Phase 16.4: Check account connection limit
+    valid, error = ws_security_manager.connection_limiter.check_account_limit(user_id)
+    if not valid:
+        logger.warning(f"WebSocket connection rejected: {error} (user: {user_id})")
+        await websocket.close(code=4003, reason=error)
+        return
+
+    # Accept connection with subprotocol if token was in header
+    if subprotocol:
+        await websocket.accept(subprotocol=subprotocol)
+    else:
+        await websocket.accept()
+
+    # Phase 16.4: Register connection for tracking after acceptance
+    ws_security_manager.register_connection(connection_id, client_ip, user_id)
+    logger.info("Authenticated WebSocket connection for user %s (connection: %s)", user_id, connection_id)
 
     # Ensure engine exists
     try:
@@ -1375,7 +1531,9 @@ async def game_ws_auth(
             # Broadcast disconnect message to other players
             await engine.player_disconnect(player_id)
             engine.unregister_player(player_id)
-            logger.info("Player %s disconnected", player_id)
+            # Phase 16.4: Cleanup security tracking on disconnect
+            ws_security_manager.cleanup_connection(connection_id)
+            logger.info("Player %s disconnected (connection: %s)", player_id, connection_id)
 
         # If player used 'quit' command, loop back to character selection
         if quit_flag["quit"]:
@@ -1384,6 +1542,9 @@ async def game_ws_auth(
             )
             # Clear active character so they go through selection again
             await auth_system.clear_active_character(user_id)
+            # Re-register a new connection for the next character
+            connection_id = str(uuid.uuid4())
+            ws_security_manager.register_connection(connection_id, client_ip, user_id)
             continue
         else:
             # Real disconnect - exit the loop
@@ -1425,14 +1586,55 @@ async def _ws_receiver_auth(
     """
     Receives messages from authenticated client and forwards commands.
     Sets auth_info on context for permission checks.
+    Includes rate limiting for commands and chat (Phase 16.1).
+    Phase 16.4: Adds message size and schema validation.
     """
     try:
         while True:
-            data = await websocket.receive_json()
+            # Phase 16.4: Receive raw text for size validation first
+            raw_message = await websocket.receive_text()
+
+            # Phase 16.4: Validate message (size, JSON, schema)
+            valid, data, error = ws_security_manager.validate_message(raw_message)
+            if not valid:
+                logger.warning("Invalid message from player %s: %s", player_id, error)
+                await websocket.send_json({
+                    "type": "error",
+                    "error": "invalid_message",
+                    "message": error,
+                })
+                continue
+
             logger.info("Received WS message from player %s: %s", player_id, data)
             msg_type = data.get("type")
+
+            # Phase 16.4: Handle ping messages for heartbeat
+            if msg_type == "ping":
+                await websocket.send_json({
+                    "type": "pong",
+                    "timestamp": data.get("timestamp"),
+                })
+                continue
+
             if msg_type == "command":
                 text = data.get("text", "")
+
+                # Rate limit check (Phase 16.1)
+                # Check chat rate limit for chat commands, command rate limit otherwise
+                if is_chat_command(text):
+                    allowed, error_msg = ws_rate_limiter.check_chat_rate(player_id)
+                else:
+                    allowed, error_msg = ws_rate_limiter.check_command_rate(player_id)
+
+                if not allowed:
+                    # Send rate limit error to client
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": "rate_limit",
+                        "message": error_msg,
+                    })
+                    continue
+
                 # Set auth info on context before processing command
                 engine.ctx.auth_info = auth_info
                 await engine.submit_command(player_id, text)
@@ -1440,9 +1642,10 @@ async def _ws_receiver_auth(
                 logger.debug("Ignoring unknown WS message type: %s", msg_type)
     except WebSocketDisconnect:
         logger.info("WebSocketDisconnect for player %s", player_id)
-        pass
+        ws_rate_limiter.disconnect(player_id)
     except Exception as exc:
         logger.exception("Error in _ws_receiver_auth for player %s: %s", player_id, exc)
+        ws_rate_limiter.disconnect(player_id)
 
 
 # Legacy WebSocket endpoint (deprecated - kept for backward compatibility)
@@ -1459,31 +1662,79 @@ async def game_ws(
 
     Use /ws/game/auth with a token instead for authenticated connections.
 
+    Phase 16.4: Security hardening applied but with relaxed origin validation
+    for backward compatibility.
+
+    Phase 16.6: Added deprecation warnings and feature flag to disable legacy auth.
+    - Sends deprecation warning on connect
+    - Configurable via WS_LEGACY_AUTH_ENABLED environment variable
+    - Supports sunset phases: warn, throttle, disabled
+
     - client connects: /ws/game?player_id=...
     - client sends: {"type": "command", "text": "look"}
     - server sends: events like {"type": "message", "player_id": "...", "text": "..."}
 
     This is single-process, multi-player: one WorldEngine shared by all connections.
     """
+    # Phase 16.4: Get client IP for connection limiting
+    client_ip = get_client_ip_from_websocket(websocket)
+    connection_id = str(uuid.uuid4())
+
+    # Phase 16.6: Check if legacy auth is enabled and validate connection
+    valid, error = legacy_deprecation_manager.validate_connection(client_ip)
+    if not valid:
+        logger.warning(
+            "Legacy WebSocket connection rejected (Phase 16.6): %s (IP: %s, player: %s)",
+            error, client_ip, player_id
+        )
+        await websocket.close(code=4010, reason=error)
+        return
+
+    # Phase 16.4: Check IP connection limit only (no account for legacy)
+    valid, error = ws_security_manager.connection_limiter.check_ip_limit(client_ip)
+    if not valid:
+        logger.warning(f"Legacy WebSocket connection rejected: {error} (IP: {client_ip})")
+        await websocket.close(code=4003, reason=error)
+        return
+
     await websocket.accept()
-    logger.info("WebSocket connection attempt for player %s", player_id)
+
+    # Phase 16.4: Register connection after acceptance
+    ws_security_manager.register_connection(connection_id, client_ip)
+
+    # Phase 16.6: Register with deprecation manager and log
+    legacy_deprecation_manager.register_connection(client_ip, player_id)
+
+    # Phase 16.6: Send deprecation warning to client
+    if legacy_deprecation_manager.should_send_warning():
+        try:
+            await websocket.send_json(legacy_deprecation_manager.get_deprecation_message())
+        except Exception as e:
+            logger.warning("Failed to send deprecation warning: %s", e)
+
     # Ensure engine exists
     try:
         engine = get_world_engine()
         if engine is None:
             logger.error("World engine not initialized")
+            ws_security_manager.cleanup_connection(connection_id)
+            legacy_deprecation_manager.unregister_connection(client_ip, player_id)
             await websocket.close(
                 code=1011, reason="Engine is None. World engine not ready"
             )
             return
     except RuntimeError:
         logger.error("World engine not initialized")
+        ws_security_manager.cleanup_connection(connection_id)
+        legacy_deprecation_manager.unregister_connection(client_ip, player_id)
         await websocket.close(code=1011, reason="Runtime Error: World engine not ready")
         return
 
     # Basic validation: ensure this player exists in the in-memory world
     if player_id not in engine.world.players:
         logger.info("WS connection rejected for unknown player %s", player_id)
+        ws_security_manager.cleanup_connection(connection_id)
+        legacy_deprecation_manager.unregister_connection(client_ip, player_id)
         await websocket.close(code=1008, reason="Unknown player")
         return
 
@@ -1508,6 +1759,10 @@ async def game_ws(
         # Broadcast disconnect message to other players
         await engine.player_disconnect(player_id)
         engine.unregister_player(player_id)
+        # Phase 16.4: Cleanup security tracking
+        ws_security_manager.cleanup_connection(connection_id)
+        # Phase 16.6: Cleanup deprecation tracking
+        legacy_deprecation_manager.unregister_connection(client_ip, player_id)
         logger.info("Player %s disconnected", player_id)
 
 
@@ -1518,14 +1773,57 @@ async def _ws_receiver(
 ) -> None:
     """
     Receives messages from the client and forwards commands to the engine.
+    Includes rate limiting for commands and chat (Phase 16.1).
+    Phase 16.4: Adds message validation.
+
+    NOTE: This is the legacy endpoint handler. Use _ws_receiver_auth for new connections.
     """
     try:
         while True:
-            data = await websocket.receive_json()
+            # Phase 16.4: Receive raw text for validation
+            raw_message = await websocket.receive_text()
+
+            # Phase 16.4: Validate message
+            valid, data, error = ws_security_manager.validate_message(raw_message)
+            if not valid:
+                logger.warning("Invalid message from player %s: %s", player_id, error)
+                await websocket.send_json({
+                    "type": "error",
+                    "error": "invalid_message",
+                    "message": error,
+                })
+                continue
+
             logger.info("Received WS message from player %s: %s", player_id, data)
             msg_type = data.get("type")
+
+            # Phase 16.4: Handle ping messages
+            if msg_type == "ping":
+                await websocket.send_json({
+                    "type": "pong",
+                    "timestamp": data.get("timestamp"),
+                })
+                continue
+
             if msg_type == "command":
                 text = data.get("text", "")
+
+                # Rate limit check (Phase 16.1)
+                # Check chat rate limit for chat commands, command rate limit otherwise
+                if is_chat_command(text):
+                    allowed, error_msg = ws_rate_limiter.check_chat_rate(player_id)
+                else:
+                    allowed, error_msg = ws_rate_limiter.check_command_rate(player_id)
+
+                if not allowed:
+                    # Send rate limit error to client
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": "rate_limit",
+                        "message": error_msg,
+                    })
+                    continue
+
                 await engine.submit_command(player_id, text)
             else:
                 # Unknown message types can be ignored or handled later
@@ -1533,9 +1831,10 @@ async def _ws_receiver(
     except WebSocketDisconnect:
         # Normal disconnect; let game_ws handle cleanup
         logger.info("WebSocketDisconnect for player %s", player_id)
-        pass
+        ws_rate_limiter.disconnect(player_id)
     except Exception as exc:
         logger.exception("Error in _ws_receiver for player %s: %s", player_id, exc)
+        ws_rate_limiter.disconnect(player_id)
 
 
 async def _ws_sender(
