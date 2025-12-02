@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "daemons-engine"
-version = "0.1.0"
+version = "0.1.1"
 description = "A modern MUD engine - headless game engine for real-time, text-based multiplayer worlds"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [
-    {name = "Adam Huston", email = "adam@example.com"}
+    {name = "Adam Huston", email = "adamjhuston@gmail.com"}
 ]
 keywords = ["mud", "game-engine", "rpg", "multiplayer", "websocket", "fastapi"]
 classifiers = [
@@ -18,7 +19,6 @@ classifiers = [
     "Environment :: Console",
     "Framework :: FastAPI",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -80,15 +80,18 @@ Issues = "https://github.com/adamhuston/1126/issues"
 [tool.setuptools.packages.find]
 where = ["backend"]
 include = ["daemons*"]
+exclude = ["*.__pycache__*"]
 
 [tool.setuptools.package-data]
 daemons = [
-    "templates/**/*",
     "alembic/*",
-    "alembic/**/*",
+    "alembic/versions/*.py",
     "world_data/**/*",
     "client/fonts/**/*",
 ]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__", "*.pyc", "*.pyo"]
 
 [tool.ruff]
 target-version = "py311"
