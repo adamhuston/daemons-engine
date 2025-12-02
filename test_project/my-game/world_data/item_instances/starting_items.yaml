@@ -1,8 +1,0 @@
-# Items given to new players on creation
-items:
-  - template_id: item_rusty_sword
-    quantity: 1
-    current_durability: 50
-
-  - template_id: item_health_potion
-    quantity: 3
