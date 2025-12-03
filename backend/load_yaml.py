@@ -28,6 +28,9 @@ async def load_data():
             yaml_files = list(areas_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
+                # Skip schema files
+                if yaml_file.name.startswith("_"):
+                    continue
                 with open(yaml_file, encoding="utf-8") as f:
                     area_data = yaml.safe_load(f)
 
@@ -68,6 +71,9 @@ async def load_data():
             yaml_files = list(rooms_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
+                # Skip schema files
+                if yaml_file.name.startswith("_"):
+                    continue
                 with open(yaml_file, encoding="utf-8") as f:
                     room_data = yaml.safe_load(f)
 
@@ -105,6 +111,9 @@ async def load_data():
             yaml_files = list(items_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
+                # Skip schema files
+                if yaml_file.name.startswith("_"):
+                    continue
                 with open(yaml_file, encoding="utf-8") as f:
                     item_data = yaml.safe_load(f)
 
@@ -155,6 +164,9 @@ async def load_data():
             yaml_files = list(item_instances_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
+                # Skip schema files
+                if yaml_file.name.startswith("_"):
+                    continue
                 with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
 
@@ -189,6 +201,9 @@ async def load_data():
             yaml_files = list(npcs_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
+                # Skip schema files
+                if yaml_file.name.startswith("_"):
+                    continue
                 with open(yaml_file, encoding="utf-8") as f:
                     npc_data = yaml.safe_load(f)
 
@@ -252,6 +267,9 @@ async def load_data():
             yaml_files = list(npc_spawns_dir.glob("**/*.yaml"))
             loaded = 0
             for yaml_file in yaml_files:
+                # Skip schema files
+                if yaml_file.name.startswith("_"):
+                    continue
                 with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
 

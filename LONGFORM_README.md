@@ -162,7 +162,7 @@ cd backend
 python -m alembic upgrade head
 
 # Start the server
-uvicorn app.main:app --reload
+uvicorn daemons.main:app --reload
 ```
 
 ### Running Tests

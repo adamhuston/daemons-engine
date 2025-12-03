@@ -405,8 +405,8 @@ class RegisterResponse(BaseModel):
 @app.post("/auth/register", response_model=RegisterResponse)
 @limiter.limit(RATE_LIMITS["auth_register"])
 async def register(
-    request: RegisterRequest,
-    req: Request,
+    request: Request,
+    body: RegisterRequest,
     response: Response,
     auth_system: AuthSystem = Depends(get_auth_system),
 ):
@@ -415,12 +415,12 @@ async def register(
 
     Returns the user ID on success.
     """
-    ip_address = req.client.host if req.client else None
+    ip_address = request.client.host if request.client else None
 
     account, error = await auth_system.create_account(
-        username=request.username,
-        password=request.password,
-        email=request.email,
+        username=body.username,
+        password=body.password,
+        email=body.email,
         ip_address=ip_address,
     )
 
@@ -514,8 +514,8 @@ class RefreshResponse(BaseModel):
 @app.post("/auth/refresh", response_model=RefreshResponse)
 @limiter.limit(RATE_LIMITS["auth_refresh"])
 async def refresh_token(
-    request: RefreshRequest,
-    req: Request,
+    request: Request,
+    body: RefreshRequest,
     response: Response,
     user_agent: str | None = Header(None),
     auth_system: AuthSystem = Depends(get_auth_system),
@@ -526,10 +526,10 @@ async def refresh_token(
     This implements token rotation - the old refresh token is invalidated
     and a new one is returned.
     """
-    ip_address = req.client.host if req.client else None
+    ip_address = request.client.host if request.client else None
 
     result = await auth_system.refresh_access_token(
-        refresh_token=request.refresh_token,
+        refresh_token=body.refresh_token,
         ip_address=ip_address,
         user_agent=user_agent,
     )
@@ -557,8 +557,8 @@ class LogoutRequest(BaseModel):
 @app.post("/auth/logout")
 @limiter.limit(RATE_LIMITS["auth_logout"])
 async def logout(
-    request: LogoutRequest,
-    req: Request,
+    request: Request,
+    body: LogoutRequest,
     response: Response,
     user_agent: str | None = Header(None),
     auth_system: AuthSystem = Depends(get_auth_system),
@@ -569,10 +569,10 @@ async def logout(
     This invalidates the session for the device that sent the request.
     To logout from all devices, use /auth/logout-all.
     """
-    ip_address = req.client.host if req.client else None
+    ip_address = request.client.host if request.client else None
 
     success = await auth_system.logout(
-        refresh_token=request.refresh_token,
+        refresh_token=body.refresh_token,
         ip_address=ip_address,
         user_agent=user_agent,
     )

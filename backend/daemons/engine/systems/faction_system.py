@@ -180,7 +180,7 @@ class FactionSystem:
             # Load all YAML files
             faction_definitions = []
             for yaml_file in sorted(factions_path.glob("*.yaml")):
-                with open(yaml_file) as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
                     if data:
                         faction_definitions.extend(
