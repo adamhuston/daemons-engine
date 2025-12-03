@@ -5,6 +5,10 @@ __pycache__/
 *.so
 .Python
 
+# Node
+*/node_modules/
+npm-debug.log*
+
 # Virtual environments
 .venv/
 venv/
