@@ -1,9 +1,3 @@
-/**
- * Electron Main Process Entry Point
- *
- * Handles window creation, file system access, and IPC communication
- * with the renderer process.
- */
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 
