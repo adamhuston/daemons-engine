@@ -31,7 +31,6 @@ coverage.xml
 *.db
 *.db-shm
 *.db-wal
-backend/world_data/
 
 # IDEs
 .vscode/
