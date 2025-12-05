@@ -1,18 +1,17 @@
-# Bioluminescent Cave Chamber - Naturally lit underground room
-# Demonstrates lighting_override providing light in a dark area
-
 id: room_cave_chamber
 area_id: area_dark_caves
 name: Bioluminescent Chamber
-description: A vast underground chamber where glowing fungi coat the walls and ceiling, casting an eerie blue-green light throughout the space.
+description: >-
+  A vast underground chamber where glowing fungi coat the walls and ceiling, casting an eerie blue-green light
+  throughout the space.
 room_type: cave
-lighting_override: "65"  # Well-lit by fungi (65/100)
+lighting_override: '65'
 exits:
   south: room_cave_tunnel_1
   north: room_deep_cave
+  up: dark_caves_room_1764960397085
 on_enter_effect: The bioluminescent fungi pulse with a gentle rhythm.
 on_exit_effect: The blue-green glow fades behind you.
-
 triggers:
   - id: chamber_discovery
     event: on_enter
@@ -22,7 +21,7 @@ triggers:
         expected: false
     actions:
       - type: message_player
-        message: "✨ You discover a natural wonder - glowing fungi illuminate this entire chamber with an otherworldly light!"
+        message: ✨ You discover a natural wonder - glowing fungi illuminate this entire chamber with an otherworldly light!
       - type: set_flag
         flag: found_glow_chamber
         value: true

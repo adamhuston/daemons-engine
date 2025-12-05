@@ -9,11 +9,15 @@ const YamlEditor = React.lazy(() =>
 const RoomBuilder = React.lazy(() =>
   import('./components/RoomBuilder').then((mod) => ({ default: mod.RoomBuilder }))
 );
+const RoomPropertiesPanel = React.lazy(() =>
+  import('./components/RoomBuilder/RoomPropertiesPanel').then((mod) => ({ default: mod.RoomPropertiesPanel }))
+);
 import { StatusBar } from './components/StatusBar';
 import { MenuBar, EditorView } from './components/MenuBar';
 import { useWorkspace } from './hooks/useWorkspace';
 import { useSchema } from './hooks/useSchema';
 import { useRoomBuilder } from './hooks/useRoomBuilder';
+import type { RoomNode } from '../shared/types';
 import './styles/App.css';
 
 const { Sider, Content, Footer } = Layout;
@@ -39,12 +43,23 @@ function App() {
     connections,
     zLevels,
     updateRoomPosition,
+    updateRoomProperties,
+    createRoom,
+    deleteRoom,
     addConnection,
     removeConnection,
+    removeExit,
   } = useRoomBuilder(worldDataPath);
+
+  // Selected room for properties panel
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const selectedRoom = rooms.find((r) => r.id === selectedRoomId) || null;
 
   // Current view mode (YAML editor or Room Builder)
   const [currentView, setCurrentView] = useState<EditorView>('yaml');
+
+  // Room property change tracking
+  const [roomIsDirty, setRoomIsDirty] = useState(false);
 
   const handleFileSelect = useCallback((filePath: string) => {
     selectFile(filePath);
@@ -116,20 +131,72 @@ function App() {
               />
             </Suspense>
           ) : currentView === 'room-builder' ? (
-            <Suspense fallback={<div className="editor-loading">Loading Room Builder…</div>}>
-              <RoomBuilder
-                rooms={rooms}
-                connections={connections}
-                zLevels={zLevels}
-                onRoomSelect={(roomId) => {
-                  // Find the room file and open it in YAML editor
-                  console.log('Selected room:', roomId);
-                }}
-                onRoomMove={updateRoomPosition}
-                onConnectionCreate={addConnection}
-                onConnectionDelete={removeConnection}
-              />
-            </Suspense>
+            <Layout style={{ height: '100%' }}>
+              <Content style={{ flex: 1, minWidth: 0 }}>
+                <Suspense fallback={<div className="editor-loading">Loading Room Builder…</div>}>
+                  <RoomBuilder
+                    rooms={rooms}
+                    connections={connections}
+                    zLevels={zLevels}
+                    activeRoomId={selectedRoomId}
+                    onRoomSelect={(roomId) => {
+                      setSelectedRoomId(roomId);
+                      setRoomIsDirty(false);
+                    }}
+                    onRoomMove={updateRoomPosition}
+                    onRoomCreate={async (roomData, position, sourceRoomId) => {
+                      return await createRoom(
+                        {
+                          id: roomData.id,
+                          name: roomData.name,
+                          description: roomData.description,
+                          room_type: roomData.room_type,
+                          area_id: roomData.area_id,
+                          z_level: roomData.z_level,
+                        },
+                        position,
+                        sourceRoomId
+                      );
+                    }}
+                    onConnectionCreate={addConnection}
+                    onConnectionDelete={removeConnection}
+                    onRemoveExit={removeExit}
+                  />
+                </Suspense>
+              </Content>
+              <Sider
+                width={300}
+                style={{ background: 'var(--color-bg-secondary)' }}
+              >
+                <Suspense fallback={<div className="editor-loading">Loading…</div>}>
+                  <RoomPropertiesPanel
+                    selectedRoom={selectedRoom}
+                    onSave={async (roomId, updates) => {
+                      const success = await updateRoomProperties(roomId, updates);
+                      if (success) {
+                        setRoomIsDirty(false);
+                      }
+                    }}
+                    onDelete={async (roomId) => {
+                      const success = await deleteRoom(roomId);
+                      if (success) {
+                        setSelectedRoomId(null);
+                      }
+                    }}
+                    onExitClick={(direction, targetId) => {
+                      setSelectedRoomId(targetId);
+                    }}
+                    onAddExit={(roomId, direction, targetId) => {
+                      addConnection(roomId, targetId, direction);
+                    }}
+                    onRemoveExit={async (roomId, direction) => {
+                      await removeExit(roomId, direction);
+                    }}
+                    isDirty={roomIsDirty}
+                  />
+                </Suspense>
+              </Sider>
+            </Layout>
           ) : (
             <div className="empty-state">
               <h2>Daemonswright Content Studio</h2>

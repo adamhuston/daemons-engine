@@ -1,0 +1,8 @@
+id: dark_caves_room_1764960397085
+name: Cliffside Balcony
+description: A small campsight above the entrance of the cave.
+room_type: chamber
+area_id: area_dark_caves
+z_level: 1
+exits:
+  down: room_cave_entrance

@@ -18,12 +18,19 @@ import ReactFlow, {
   Connection,
   NodeTypes,
   ReactFlowInstance,
+  MarkerType,
+  EdgeChange,
+  reconnectEdge,
+  ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Select, Button, Tooltip } from 'antd';
-import { UndoOutlined, RedoOutlined } from '@ant-design/icons';
+import { Select, Button, Tooltip, Modal, Form, Input, Popover, Space } from 'antd';
+import { UndoOutlined, RedoOutlined, PlusOutlined, SwapOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { RoomNode, RoomConnection } from '../../../shared/types';
 import { RoomNodeComponent } from './RoomNode';
+
+// Grid size in pixels - rooms snap to this grid
+const GRID_SIZE = 150;
 
 // History entry for undo/redo
 interface HistoryEntry {
@@ -35,10 +42,21 @@ interface RoomBuilderProps {
   rooms: RoomNode[];
   connections: RoomConnection[];
   zLevels: number[];
+  activeRoomId: string | null;
   onRoomSelect: (roomId: string) => void;
   onRoomMove: (roomId: string, position: { x: number; y: number }) => void;
-  onConnectionCreate: (source: string, target: string, direction: string) => void;
-  onConnectionDelete: (connectionId: string) => void;
+  onRoomCreate: (roomData: {
+    id: string;
+    name: string;
+    description: string;
+    room_type: string;
+    area_id: string;
+    z_level: number;
+  }, position: { x: number; y: number }, sourceRoomId?: string) => Promise<boolean>;
+  onConnectionCreate: (source: string, target: string, direction: string) => Promise<boolean>;
+  onConnectionDelete: (connectionId: string) => Promise<boolean>;
+  onConnectionUpdate?: (oldConnectionId: string, newSource: string, newTarget: string, direction: string) => Promise<boolean>;
+  onRemoveExit: (roomId: string, direction: string) => Promise<boolean>;
 }
 
 // Custom node types
@@ -50,10 +68,14 @@ export function RoomBuilder({
   rooms,
   connections,
   zLevels,
+  activeRoomId,
   onRoomSelect,
   onRoomMove,
+  onRoomCreate,
   onConnectionCreate,
   onConnectionDelete,
+  onConnectionUpdate,
+  onRemoveExit,
 }: RoomBuilderProps) {
   // Get unique areas from rooms
   const areas = useMemo(() => {
@@ -70,12 +92,64 @@ export function RoomBuilder({
   // Layer visibility - which z-levels are visible and their opacity
   const [activeLayer, setActiveLayer] = useState<number | 'all'>('all');
 
+  // Create room modal state
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createPosition, setCreatePosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [createFromExit, setCreateFromExit] = useState<{ sourceRoomId: string; direction: string } | null>(null);
+  const [createForm] = Form.useForm();
+  const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+
+  // Selected edge state for edge editing
+  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+  const [edgePopoverOpen, setEdgePopoverOpen] = useState(false);
+  const [edgePopoverPosition, setEdgePopoverPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Handler for creating a room from an exit plus button
+  const handleCreateFromExit = useCallback((sourceRoomId: string, direction: string, position: { x: number; y: number }) => {
+    if (!selectedArea) return;
+    
+    setCreateFromExit({ sourceRoomId, direction });
+    setCreatePosition(position);
+    
+    // Generate a unique room ID
+    const timestamp = Date.now();
+    const areaName = selectedArea.replace('area_', '');
+    const defaultId = `${areaName}_room_${timestamp}`;
+    
+    createForm.setFieldsValue({
+      id: defaultId,
+      name: 'New Room',
+      description: '',
+      room_type: 'chamber',
+      area_id: selectedArea,
+      z_level: direction === 'up' ? (activeLayer === 'all' ? 1 : (activeLayer as number) + 1) 
+             : direction === 'down' ? (activeLayer === 'all' ? -1 : (activeLayer as number) - 1)
+             : (activeLayer === 'all' ? 0 : activeLayer),
+    });
+    
+    setCreateModalOpen(true);
+  }, [selectedArea, activeLayer, createForm]);
+
   // Auto-select first area when areas load
   useEffect(() => {
     if (areas.length > 0 && selectedArea === null) {
       setSelectedArea(areas[0]);
     }
   }, [areas, selectedArea]);
+
+  // Fit view to show all rooms when area or layer changes
+  useEffect(() => {
+    if (reactFlowInstance.current && selectedArea) {
+      // Small delay to let nodes update before fitting
+      const timer = setTimeout(() => {
+        reactFlowInstance.current?.fitView({
+          padding: 0.2,
+          duration: 300,
+        });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedArea, activeLayer]);
 
   // Filter rooms and connections by selected area
   const filteredRooms = useMemo(() => {
@@ -121,18 +195,22 @@ export function RoomBuilder({
       filteredRooms.map((room) => {
         const opacity = getLayerOpacity(room.z_level);
         const isActive = isOnActiveLayer(room.z_level);
+        const isActiveRoom = room.id === activeRoomId;
         return {
           id: room.id,
           type: 'room',
           position: room.position,
           data: {
             label: room.name,
-            room_id: room.room_id,
+            room_id: room.id,
             room_type: room.room_type,
             description: room.description,
             z_level: room.z_level,
             opacity,
             isActive,
+            isActiveRoom,
+            exits: room.exits,
+            onCreateFromExit: handleCreateFromExit,
           },
           style: { 
             opacity,
@@ -143,14 +221,22 @@ export function RoomBuilder({
           connectable: isActive,
         };
       }),
-    [filteredRooms, getLayerOpacity, isOnActiveLayer]
+    [filteredRooms, getLayerOpacity, isOnActiveLayer, handleCreateFromExit, activeRoomId]
   );
 
-  // Convert connections to React Flow edges with styling based on direction
+  // Check if a connection is bidirectional (by looking it up in connections array)
+  const isConnectionBidirectional = useCallback((edgeId: string) => {
+    const conn = connections.find((c) => c.id === edgeId);
+    return conn?.bidirectional === true;
+  }, [connections]);
+
+  // Convert connections to React Flow edges with smooth curves and arrowheads
   const initialEdges: Edge[] = useMemo(
     () =>
       filteredConnections.map((conn) => {
         const isVertical = conn.sourceHandle === 'up' || conn.sourceHandle === 'down';
+        // Use the bidirectional flag set by buildConnections
+        const isBidirectional = conn.bidirectional === true;
         // Find source room to get its opacity
         const sourceRoom = filteredRooms.find((r) => r.id === conn.source);
         const targetRoom = filteredRooms.find((r) => r.id === conn.target);
@@ -158,24 +244,43 @@ export function RoomBuilder({
           getLayerOpacity(sourceRoom?.z_level ?? 0),
           getLayerOpacity(targetRoom?.z_level ?? 0)
         );
+        const strokeColor = isVertical ? '#faad14' : '#52c41a';
+        const isSelected = selectedEdge?.id === conn.id;
+        
         return {
           id: conn.id,
           source: conn.source,
           target: conn.target,
           sourceHandle: conn.sourceHandle,
           targetHandle: conn.targetHandle,
-          type: 'straight', // Straight lines instead of curved
+          type: 'bezier', // Bezier curves for smooth S-curves
           animated: isVertical,
+          selected: isSelected,
           style: {
-            stroke: isVertical ? '#faad14' : '#52c41a', // Yellow for up/down, green for cardinal
-            strokeWidth: 2,
+            stroke: isSelected ? '#1890ff' : strokeColor,
+            strokeWidth: isSelected ? 3 : 2,
             opacity: edgeOpacity,
+            cursor: 'pointer',
           },
-          labelStyle: { fontSize: 10, opacity: edgeOpacity },
-          label: isVertical ? conn.sourceHandle : undefined,
+          // Arrowhead on target end to show direction of travel
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isSelected ? '#1890ff' : strokeColor,
+            width: 20,
+            height: 20,
+          },
+          // For bidirectional exits, also show arrow at source
+          ...(isBidirectional && {
+            markerStart: {
+              type: MarkerType.ArrowClosed,
+              color: isSelected ? '#1890ff' : strokeColor,
+              width: 20,
+              height: 20,
+            },
+          }),
         };
       }),
-    [filteredConnections, filteredRooms, getLayerOpacity]
+    [filteredConnections, filteredRooms, getLayerOpacity, selectedEdge]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -253,6 +358,14 @@ export function RoomBuilder({
     setEdges(initialEdges);
   }, [initialEdges, setEdges]);
 
+  // Validate connections - allow connections between different nodes
+  const isValidConnection = useCallback((connection: Connection) => {
+    // Don't allow self-connections
+    if (connection.source === connection.target) return false;
+    // Allow all other connections
+    return true;
+  }, []);
+
   // Handle new connections
   const onConnect = useCallback(
     (params: Connection) => {
@@ -268,9 +381,107 @@ export function RoomBuilder({
   // Handle node click
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      setSelectedEdge(null);
+      setEdgePopoverOpen(false);
       onRoomSelect(node.id);
     },
     [onRoomSelect]
+  );
+
+  // Handle edge click - show context menu for editing
+  const onEdgeClick = useCallback(
+    (event: React.MouseEvent, edge: Edge) => {
+      event.stopPropagation();
+      setSelectedEdge(edge);
+      setEdgePopoverPosition({ x: event.clientX, y: event.clientY });
+      setEdgePopoverOpen(true);
+    },
+    []
+  );
+
+  // Handle pane click to deselect edge
+  const onPaneClickDeselect = useCallback(() => {
+    setSelectedEdge(null);
+    setEdgePopoverOpen(false);
+  }, []);
+
+  // Toggle bidirectional exit
+  const handleToggleBidirectional = useCallback(async () => {
+    if (!selectedEdge) return;
+    
+    // Look up the connection to check its bidirectional status
+    const conn = connections.find((c) => c.id === selectedEdge.id);
+    const isBidirectional = conn?.bidirectional === true;
+    
+    if (isBidirectional) {
+      // To make unidirectional, we need to remove the reverse exit from the target room
+      // The reverse exit goes from target to source in the opposite direction
+      const oppositeDir: Record<string, string> = {
+        north: 'south',
+        south: 'north',
+        east: 'west',
+        west: 'east',
+        up: 'down',
+        down: 'up',
+      };
+      const reverseDirection = oppositeDir[selectedEdge.sourceHandle || 'north'] || 'south';
+      // Call onRemoveExit to remove just the reverse exit (from target room)
+      await onRemoveExit(selectedEdge.target, reverseDirection);
+    } else {
+      // Create the reverse connection to make it bidirectional
+      const oppositeDir: Record<string, string> = {
+        north: 'south',
+        south: 'north',
+        east: 'west',
+        west: 'east',
+        up: 'down',
+        down: 'up',
+      };
+      const reverseDirection = oppositeDir[selectedEdge.sourceHandle || 'north'] || 'south';
+      await onConnectionCreate(selectedEdge.target, selectedEdge.source, reverseDirection);
+    }
+    
+    setEdgePopoverOpen(false);
+    setSelectedEdge(null);
+  }, [selectedEdge, connections, onConnectionCreate, onRemoveExit]);
+
+  // Delete edge
+  const handleDeleteEdge = useCallback(async () => {
+    if (!selectedEdge) return;
+    
+    await onConnectionDelete(selectedEdge.id);
+    setEdgePopoverOpen(false);
+    setSelectedEdge(null);
+  }, [selectedEdge, onConnectionDelete]);
+
+  // Handle edge reconnection (drag edge to new node)
+  const onReconnect = useCallback(
+    async (oldEdge: Edge, newConnection: Connection) => {
+      if (!newConnection.source || !newConnection.target || !newConnection.sourceHandle) return;
+      
+      saveToHistory();
+      
+      // Delete the old connection and create new one
+      if (onConnectionUpdate) {
+        await onConnectionUpdate(
+          oldEdge.id,
+          newConnection.source,
+          newConnection.target,
+          newConnection.sourceHandle
+        );
+      } else {
+        // Fallback: delete old and create new
+        await onConnectionDelete(oldEdge.id);
+        await onConnectionCreate(
+          newConnection.source,
+          newConnection.target,
+          newConnection.sourceHandle
+        );
+      }
+      
+      setEdges((eds) => reconnectEdge(oldEdge, newConnection, eds));
+    },
+    [onConnectionUpdate, onConnectionDelete, onConnectionCreate, setEdges, saveToHistory]
   );
 
   // Handle node drag start (save state before drag)
@@ -278,13 +489,134 @@ export function RoomBuilder({
     saveToHistory();
   }, [saveToHistory]);
 
-  // Handle node drag end
+  // Handle node drag end - snap to grid and notify parent
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      onRoomMove(node.id, node.position);
+      // Snap position to grid
+      const snappedX = Math.round(node.position.x / GRID_SIZE) * GRID_SIZE;
+      const snappedY = Math.round(node.position.y / GRID_SIZE) * GRID_SIZE;
+      const snappedPosition = { x: snappedX, y: snappedY };
+      
+      // Update node position to snapped value
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === node.id ? { ...n, position: snappedPosition } : n
+        )
+      );
+      
+      onRoomMove(node.id, snappedPosition);
     },
-    [onRoomMove]
+    [onRoomMove, setNodes]
   );
+
+  // Handle double-click on canvas to create new room
+  const onPaneClick = useCallback((event: React.MouseEvent) => {
+    // Only handle double-click
+    if (event.detail !== 2) return;
+    if (!reactFlowInstance.current) return;
+    if (!selectedArea) return;
+    
+    // Get canvas position from screen coordinates
+    const bounds = (event.target as HTMLElement).getBoundingClientRect();
+    const position = reactFlowInstance.current.screenToFlowPosition({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    });
+    
+    // Snap to grid
+    const snappedX = Math.round(position.x / GRID_SIZE) * GRID_SIZE;
+    const snappedY = Math.round(position.y / GRID_SIZE) * GRID_SIZE;
+    
+    setCreatePosition({ x: snappedX, y: snappedY });
+    
+    // Generate a unique room ID
+    const timestamp = Date.now();
+    const areaName = selectedArea.replace('area_', '');
+    const defaultId = `${areaName}_room_${timestamp}`;
+    
+    createForm.setFieldsValue({
+      id: defaultId,
+      name: 'New Room',
+      description: '',
+      room_type: 'chamber',
+      area_id: selectedArea,
+      z_level: activeLayer === 'all' ? 0 : activeLayer,
+    });
+    
+    setCreateModalOpen(true);
+  }, [selectedArea, activeLayer, createForm]);
+
+  // Handle create room form submission
+  const handleCreateRoom = useCallback(async () => {
+    try {
+      const values = await createForm.validateFields();
+      // Pass sourceRoomId so the new room is created in the same folder
+      const sourceRoomId = createFromExit?.sourceRoomId;
+      const success = await onRoomCreate(values, createPosition, sourceRoomId);
+      if (success) {
+        // If we created from an exit, also create the connection
+        if (createFromExit) {
+          await onConnectionCreate(
+            createFromExit.sourceRoomId,
+            values.id,
+            createFromExit.direction
+          );
+        }
+        setCreateModalOpen(false);
+        setCreateFromExit(null);
+        createForm.resetFields();
+      }
+    } catch (err) {
+      console.error('Create room validation failed:', err);
+    }
+  }, [createForm, createPosition, onRoomCreate, createFromExit, onConnectionCreate]);
+
+  // Handle modal cancel
+  const handleCreateModalCancel = useCallback(() => {
+    setCreateModalOpen(false);
+    setCreateFromExit(null);
+    createForm.resetFields();
+  }, [createForm]);
+
+  // Handle create from toolbar button
+  const handleCreateButtonClick = useCallback(() => {
+    if (!selectedArea) return;
+    
+    // Clear any exit creation state
+    setCreateFromExit(null);
+    
+    // Place at center of current view
+    if (reactFlowInstance.current) {
+      const { x, y, zoom } = reactFlowInstance.current.getViewport();
+      // Get the center of the visible area
+      const centerX = -x / zoom + 400;
+      const centerY = -y / zoom + 300;
+      
+      // Snap to grid
+      const snappedX = Math.round(centerX / GRID_SIZE) * GRID_SIZE;
+      const snappedY = Math.round(centerY / GRID_SIZE) * GRID_SIZE;
+      
+      setCreatePosition({ x: snappedX, y: snappedY });
+    } else {
+      setCreatePosition({ x: 0, y: 0 });
+    }
+    
+    // Generate a unique room ID
+    const timestamp = Date.now();
+    const areaName = selectedArea.replace('area_', '');
+    const defaultId = `${areaName}_room_${timestamp}`;
+    
+    createForm.setFieldsValue({
+      id: defaultId,
+      name: 'New Room',
+      description: '',
+      room_type: 'chamber',
+      area_id: selectedArea,
+      z_level: activeLayer === 'all' ? 0 : activeLayer,
+    });
+    
+    setCreateModalOpen(true);
+  }, [selectedArea, activeLayer, createForm]);
 
   return (
     <div className="room-builder">
@@ -320,6 +652,16 @@ export function RoomBuilder({
           {filteredRooms.length} room{filteredRooms.length !== 1 ? 's' : ''}
         </span>
         <div className="toolbar-spacer" />
+        <Tooltip title="Create Room (Double-click canvas)">
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleCreateButtonClick}
+            disabled={!selectedArea}
+          >
+            New Room
+          </Button>
+        </Tooltip>
         <Tooltip title="Undo (Ctrl+Z)">
           <Button
             type="text"
@@ -343,15 +685,136 @@ export function RoomBuilder({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={isValidConnection}
         onNodeClick={onNodeClick}
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
+        onPaneClick={(e) => { onPaneClick(e); onPaneClickDeselect(); }}
+        onEdgeClick={onEdgeClick}
+        onReconnect={onReconnect}
+        onInit={(instance) => { reactFlowInstance.current = instance; }}
         nodeTypes={nodeTypes}
+        snapToGrid={true}
+        snapGrid={[GRID_SIZE, GRID_SIZE]}
+        connectionMode={ConnectionMode.Loose}
         fitView
       >
         <Controls />
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+        <Background variant={BackgroundVariant.Dots} gap={GRID_SIZE} size={2} />
       </ReactFlow>
+
+      {/* Edge Context Menu Popover */}
+      {edgePopoverOpen && selectedEdge && (
+        <div
+          className="edge-context-menu"
+          style={{
+            position: 'fixed',
+            left: edgePopoverPosition.x,
+            top: edgePopoverPosition.y,
+            zIndex: 1000,
+            background: 'var(--color-bg-secondary, #1f1f1f)',
+            border: '1px solid var(--color-border, #434343)',
+            borderRadius: 6,
+            padding: 8,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+          }}
+        >
+          <Space direction="vertical" size="small">
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
+              Exit: {selectedEdge.sourceHandle} → {rooms.find(r => r.id === selectedEdge.target)?.name || selectedEdge.target}
+            </div>
+            <Button
+              size="small"
+              icon={<SwapOutlined />}
+              onClick={handleToggleBidirectional}
+              block
+            >
+              {isConnectionBidirectional(selectedEdge.id) 
+                ? 'Make One-Way' 
+                : 'Make Two-Way'}
+            </Button>
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={handleDeleteEdge}
+              block
+            >
+              Delete Exit
+            </Button>
+          </Space>
+        </div>
+      )}
+
+      {/* Create Room Modal */}
+      <Modal
+        title={createFromExit 
+          ? `Create Room (${createFromExit.direction} from ${createFromExit.sourceRoomId})`
+          : "Create New Room"
+        }
+        open={createModalOpen}
+        onOk={handleCreateRoom}
+        onCancel={handleCreateModalCancel}
+        okText="Create"
+      >
+        <Form form={createForm} layout="vertical">
+          <Form.Item
+            name="id"
+            label="Room ID"
+            rules={[{ required: true, message: 'Room ID is required' }]}
+          >
+            <Input placeholder="unique_room_id" />
+          </Form.Item>
+          <Form.Item
+            name="name"
+            label="Name"
+            rules={[{ required: true, message: 'Name is required' }]}
+          >
+            <Input placeholder="Room Name" />
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label="Description"
+          >
+            <Input.TextArea rows={3} placeholder="A brief description of the room..." />
+          </Form.Item>
+          <Form.Item
+            name="room_type"
+            label="Room Type"
+            rules={[{ required: true }]}
+          >
+            <Select
+              options={[
+                { value: 'ethereal', label: 'Ethereal' },
+                { value: 'forest', label: 'Forest' },
+                { value: 'cave', label: 'Cave' },
+                { value: 'urban', label: 'Urban' },
+                { value: 'chamber', label: 'Chamber' },
+                { value: 'corridor', label: 'Corridor' },
+                { value: 'outdoor', label: 'Outdoor' },
+                { value: 'indoor', label: 'Indoor' },
+                { value: 'dungeon', label: 'Dungeon' },
+                { value: 'shop', label: 'Shop' },
+                { value: 'inn', label: 'Inn' },
+                { value: 'temple', label: 'Temple' },
+                { value: 'water', label: 'Water' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="area_id" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="z_level" hidden>
+            <Input type="number" />
+          </Form.Item>
+        </Form>
+        {createFromExit && (
+          <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+            This will also create an exit from <strong>{createFromExit.sourceRoomId}</strong> to the new room.
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
+

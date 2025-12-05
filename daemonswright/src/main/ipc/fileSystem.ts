@@ -55,9 +55,13 @@ export function registerFileSystemHandlers(): void {
     }
   });
 
-  // Write file content
+  // Write file content (creates parent directories if needed)
   ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string) => {
     try {
+      // Ensure parent directory exists
+      const dirPath = path.dirname(filePath);
+      await fs.mkdir(dirPath, { recursive: true });
+      
       await fs.writeFile(filePath, content, 'utf-8');
       return true;
     } catch (error) {

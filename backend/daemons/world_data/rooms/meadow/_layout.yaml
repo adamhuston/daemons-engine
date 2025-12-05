@@ -1,0 +1,24 @@
+version: 1
+grid_size: 150
+rooms:
+  room_meadow_center:
+    x: 10
+    'y': 0
+    z: 0
+  room_meadow_east:
+    x: 11
+    'y': 0
+    z: 0
+  room_meadow_north:
+    x: 10
+    'y': -1
+    z: 0
+  room_meadow_south:
+    x: 10
+    'y': 1
+    z: 0
+  room_meadow_west:
+    x: 9
+    'y': 0
+    z: 0
+layer_names: {}

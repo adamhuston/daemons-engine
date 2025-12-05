@@ -15,67 +15,138 @@ daemons-studio  # launches content editor
 
 ---
 
-### **Phase 1: Core Editor (3-4 weeks)**
+### **Phase 1: Core Editor (3-4 weeks)** ✅ COMPLETE
 **Goal:** Working YAML editor with schema validation
 
 **Critical Path:**
-- [ ] Electron + React + TypeScript project boilerplate
-- [ ] Basic UI shell (file tree, editor panel, status bar)
-- [ ] Local schema parser (read `world_data/*/_schema.yaml` directly)
-- [ ] Zod validator generation from schemas
-- [ ] Monaco YAML editor integration
-- [ ] Schema-aware IntelliSense (auto-complete fields/values)
-- [ ] Real-time validation as you type
-- [ ] Save/load YAML files to disk
-- [ ] File watcher (detect external changes)
-- [ ] Settings persistence (last opened folder, window state)
+- [x] Electron + React + TypeScript project boilerplate
+- [x] Basic UI shell (file tree, editor panel, status bar)
+- [x] Local schema parser (read `world_data/*/_schema.yaml` directly)
+- [x] Zod validator generation from schemas
+- [x] Monaco YAML editor integration
+- [x] Schema-aware IntelliSense (auto-complete fields/values)
+- [x] Real-time validation as you type
+- [x] Save/load YAML files to disk
+- [x] File watcher (detect external changes)
+- [x] Settings persistence (last opened folder, window state)
 
-**Success Criteria:**
+**Success Criteria:** ✅ All met
 - Can open a `world_data/` folder
 - Edit any YAML file with auto-complete and validation
 - Changes save to disk immediately
 
 ---
 
-### **Phase 2: Room Builder (2-3 weeks)**
-**Goal:** Visual room editing
+### **Phase 2: Room Builder (2-3 weeks)** 🔄 IN PROGRESS
+**Goal:** Visual room editing with full CRUD operations
 
-**Critical Path:**
-- [ ] React Flow canvas integration
-- [ ] Load rooms from YAML → canvas nodes
-- [ ] Visual room node creation (drag-and-drop)
-- [ ] Exit connections (click-drag between rooms)
-- [ ] Room property editor (sidebar panel)
-- [ ] Bidirectional sync (canvas ↔ YAML files)
-- [ ] Undo/redo for all operations
+> **Reference:** See `daemonswright_userexperience.md` for complete UX specification
+
+**Data Architecture:**
+- Rooms stored in `world_data/rooms/{area}/*.yaml`
+- Layout positions stored in `world_data/rooms/{area}/_layout.yaml` (CMS-only)
+- NPCs reference rooms via `npc_spawns/*.yaml`
+- Items reference rooms via `item_instances/*.yaml`
+
+
+**Layout System:**
+- [ ] Grid-based coordinate system (X=east/west, Y=north/south, Z=up/down)
+- [ ] Per-area `_layout.yaml` files with room positions
+- [ ] Grid snapping when moving rooms
+- [x] Auto-layout generation for areas without `_layout.yaml` *(uses BFS from exits + isometric projection for coordinate IDs)*
+
+**Canvas & Navigation:**
+- [x] React Flow canvas integration
+- [x] Pan and zoom controls
+- [x] Layer tabs derived from unique Z values *(area filter + layer selector)*
+- [x] Layer stacking visualization (diagonal offset per Z-level) *(isometric projection)*
+- [x] Active layer highlighting (dim non-active layers) *(opacity-based, non-active layers at 25%)*
+
+**Room Operations:**
+- [x] Load rooms from YAML → canvas nodes
+- [ ] Create room: click canvas → enter ID → create YAML + layout entry
+- [ ] Delete room: remove YAML file + layout entry + update exit references
+- [x] Move room: drag on canvas *(positions update in memory, not persisted to `_layout.yaml` yet)*
+- [ ] Room properties panel (name, description, room_type, etc.)
+- [ ] Bidirectional sync (canvas ↔ YAML files) *(read works, write not implemented)*
+
+**Exit Operations:**
+- [x] Display exits as edges between room nodes *(styled by direction: yellow for up/down, green for cardinal)*
+- [x] Create exit: drag from directional handle to destination room *(connection callback exists)*
+- [ ] Bidirectional exit prompt on creation
+- [ ] Delete exit: click edge → delete from room YAML(s)
+- [ ] Vertical exits (up/down) with layer creation prompt
+
+**Room Contents Display:**
+- [ ] Scan `npc_spawns/*.yaml` for NPCs in each room
+- [ ] Scan `item_instances/*.yaml` for items in each room
+- [ ] Display content badges on room nodes (👤 NPC count, 📦 item count)
+- [ ] Contents list in properties panel when room selected
+
+**Core Features:**
+- [x] Undo/redo for all operations *(history-based with Ctrl+Z/Ctrl+Shift+Z)*
 - [ ] Copy/paste rooms
-- [ ] Canvas state persistence (zoom, pan, selection)
+- [ ] Canvas state persistence (zoom, pan, active layer)
+- [x] File watcher for external YAML changes *(implemented in useFileWatcher hook)*
 
 **Success Criteria:**
-- Can create and connect rooms visually
-- Changes sync bidirectionally with YAML
-- Undo/redo works reliably
+- [x] Room canvas shows all rooms in an area with grid layout
+- [ ] Rooms snap to grid when dragged *(free drag currently, no snap)*
+- [x] Layer tabs appear based on room Z values
+- [ ] Creating exit by dragging updates source room YAML *(UI works, YAML write not implemented)*
+- [ ] Creating room creates both YAML file and `_layout.yaml` entry
+- [ ] NPC/item badges appear on rooms (from spawn/instance files)
+- [x] Undo/redo works for all room operations
+
 
 ---
 
-### **Phase 3: Visual Tools (3-4 weeks)**
-**Goal:** Extend visual editing to other content types
+### **Phase 3: Visual Tools & Entity Editors (3-4 weeks)**
+**Goal:** Extend visual editing to other content types and complete Room Builder
 
-**Critical Path:**
-- [ ] Quest designer (node graph with React Flow)
-- [ ] Dialogue tree editor (reuses quest graph architecture)
+> **Reference:** See `daemonswright_userexperience.md` for complete UX specification
+
+**Room Builder - Content Placement:**
+- [ ] Palette panel (left sidebar) with NPC/item browser
+
+- [ ] Search/filter NPCs and items
+- [ ] Drag-to-place: drop NPC → add to `npc_spawns/*.yaml`
+- [ ] Drag-to-place: drop item → add to `item_instances/*.yaml`
+- [ ] Remove content from room (update spawn/instance file)
+- [ ] Quick-create NPC/item from room context menu
+
+**Entity Editor (Form-Based):**
+- [ ] Auto-generated forms from `_schema.yaml` definitions
+- [ ] Toggle between Form view and YAML view
+- [ ] Real-time schema validation in both views
+- [ ] Entity types:
+  - [ ] NPC Templates (`npcs/*.yaml`)
+  - [ ] Item Templates (`items/*.yaml`)
+  - [ ] Abilities (`abilities/*.yaml`)
+  - [ ] Classes (`classes/*.yaml`)
+  - [ ] Factions (`factions/*.yaml`)
+  - [ ] Triggers (`triggers/*.yaml`)
+- [ ] Cross-reference links (e.g., NPC → Dialogue)
+- [ ] Jump to Entity Editor from Room Builder content badge
+
+**Graph Designers (React Flow):**
+- [ ] Quest designer (quest chains as flowcharts)
+- [ ] Dialogue tree editor (branching conversation nodes)
 - [ ] Trigger builder (visual condition/action flow)
-- [ ] Form-based editors for simple content types:
-  - [ ] Items (weapons, armor, consumables)
-  - [ ] NPCs (templates)
-  - [ ] Abilities/Classes
+- [ ] Reusable node graph architecture for all three
+
+**Validation & Navigation:**
 - [ ] Reference validation (detect broken links locally)
 - [ ] "Jump to definition" for referenced content
+- [ ] Error panel showing all validation issues
 
 **Success Criteria:**
+- Can place NPCs/items in rooms from palette
+- Entity Editor generates valid YAML from forms
 - Quest chains visualized as flowcharts
 - Dialogue trees show branching structure
-- Form editors for content that doesn't need visualization
+- Clicking content badge opens Entity Editor
+
 
 ---
 
@@ -157,22 +228,56 @@ Phase 4: Server Connection (optional) + Packaging
 
 ## Success Metrics
 
-**Phase 1 Complete When:**
-- Opening `world_data/` shows file tree
-- Editing `rooms/ethereal/room_1_1_1.yaml` shows IntelliSense
-- Invalid YAML shows red squiggles with error messages
+**Phase 1 Complete When:** ✅
+- [x] Opening `world_data/` shows file tree
+- [x] Editing `rooms/ethereal/room_1_1_1.yaml` shows IntelliSense
+- [x] Invalid YAML shows red squiggles with error messages
 
-**Phase 2 Complete When:**
-- Room canvas shows all rooms in an area
-- Dragging creates new rooms with YAML files
-- Canvas state persists between sessions
+**Phase 2 Complete When:** 🔄 Partial
+- [x] Room canvas shows all rooms in an area with grid layout
+- [ ] Rooms snap to grid when dragged
+- [x] Layer tabs appear based on room Z values
+- [ ] Creating exit by dragging updates source room YAML
+- [ ] Creating room creates both YAML file and `_layout.yaml` entry
+- [ ] NPC/item badges appear on rooms (from spawn/instance files)
+- [x] Undo/redo works for all room operations
 
 **Phase 3 Complete When:**
-- Quest chains render as flowcharts
-- Clicking a node opens the quest in editor
-- Form editors generate valid YAML
+- [ ] Dragging NPC from palette to room updates spawn file
+- [ ] Entity Editor forms generate valid YAML
+- [ ] Quest chains render as flowcharts
+- [ ] Clicking room content badge opens Entity Editor
+- [ ] Reference validation catches broken links
 
 **Phase 4 Complete When:**
-- `daemons-studio` launches from command line
-- Saving triggers hot-reload on connected server
-- Packages build for Windows/Mac/Linux
+- [ ] `daemons-studio` launches from command line
+- [ ] Saving triggers hot-reload on connected server
+- [ ] Packages build for Windows/Mac/Linux
+
+---
+
+## Phase 2 Remaining Work Summary
+
+The Room Builder has a solid foundation with read-only visualization working well. The remaining work focuses on **write operations** and **grid snapping**:
+
+### High Priority (Core Editing)
+1. **Grid snapping** - Snap room positions to grid coordinates on drag
+2. **`_layout.yaml` persistence** - Save room positions to layout files
+3. **Room properties panel** - Sidebar form for editing room fields
+4. **Write room changes to YAML** - Bidirectional sync (currently read-only)
+5. **Create room** - Click canvas → modal → create YAML + layout entry
+6. **Delete room** - Remove YAML file, update exits that referenced it
+
+### Medium Priority (Exit Editing)
+7. **Write exit changes to YAML** - Currently visual only
+8. **Bidirectional exit prompt** - Ask to create return exit
+9. **Delete exit** - Click edge to remove from YAML
+10. **Vertical exit layer creation** - Prompt to create room on new layer
+
+### Lower Priority (Content Display)
+11. **Scan spawn/instance files** - Load NPC/item placements per room
+12. **Content badges** - Show 👤/📦 counts on room nodes
+13. **Canvas state persistence** - Remember zoom/pan/active layer
+14. **Copy/paste rooms** - Duplicate rooms with new IDs
+
+

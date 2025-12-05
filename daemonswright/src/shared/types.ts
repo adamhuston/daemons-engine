@@ -98,6 +98,7 @@ export interface RoomNode {
   z_level: number;
   exits: Record<string, string>;
   position: { x: number; y: number };
+  filePath?: string; // Original file path where the room was loaded from
 }
 
 export interface RoomConnection {
@@ -106,6 +107,7 @@ export interface RoomConnection {
   target: string;
   sourceHandle: string; // direction (north, south, etc.)
   targetHandle: string;
+  bidirectional?: boolean; // true if both rooms have exits to each other
 }
 
 // Editor state

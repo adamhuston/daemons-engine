@@ -1,0 +1,24 @@
+version: 1
+grid_size: 150
+rooms:
+  dark_caves_room_1764960397085:
+    x: 0
+    'y': -0.0
+    z: 1
+  room_cave_chamber:
+    x: -1
+    'y': 0
+    z: 0
+  room_cave_entrance:
+    x: -1
+    'y': 2
+    z: 0
+  room_cave_tunnel_1:
+    x: -1
+    'y': 1
+    z: 0
+  room_deep_cave:
+    x: -1
+    'y': -1
+    z: 0
+layer_names: {}

@@ -3,11 +3,16 @@
  *
  * Loads room YAML files from the workspace and converts them to
  * React Flow nodes and edges for the Room Builder canvas.
+ * Also manages layout persistence via _layout.yaml files.
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import yaml from 'js-yaml';
 import type { RoomNode, RoomConnection } from '../../shared/types';
+import { useLayout, type RoomPosition, type AreaLayout } from './useLayout';
+
+// Grid size constant - must match RoomBuilder component
+const GRID_SIZE = 150;
 
 interface RoomYaml {
   id: string;
@@ -26,9 +31,13 @@ interface UseRoomBuilderResult {
   isLoading: boolean;
   error: string | null;
   loadRooms: () => Promise<void>;
-  updateRoomPosition: (roomId: string, position: { x: number; y: number }) => void;
-  addConnection: (source: string, target: string, direction: string) => void;
-  removeConnection: (connectionId: string) => void;
+  updateRoomPosition: (roomId: string, position: { x: number; y: number }) => Promise<void>;
+  updateRoomProperties: (roomId: string, updates: Partial<RoomYaml>) => Promise<boolean>;
+  createRoom: (roomData: RoomYaml, position: { x: number; y: number }, sourceRoomId?: string) => Promise<boolean>;
+  deleteRoom: (roomId: string) => Promise<boolean>;
+  addConnection: (source: string, target: string, direction: string) => Promise<boolean>;
+  removeConnection: (connectionId: string) => Promise<boolean>;
+  removeExit: (roomId: string, direction: string) => Promise<boolean>;
 }
 
 // Direction to offset mapping for positioning exits
@@ -65,6 +74,28 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
   const [connections, setConnections] = useState<RoomConnection[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Layout management
+  const { layouts, updateRoomPosition: updateLayoutPosition, loadLayout, saveLayout } = useLayout(worldDataPath);
+
+  // Helper to get the area folder path from a room's file path
+  const getAreaPathFromRoom = useCallback((room: RoomNode): string | null => {
+    // If we have a stored file path, derive area path from it
+    if (room.filePath) {
+      // filePath is like: /path/to/rooms/caves/room_cave_chamber.yaml
+      // We want: /path/to/rooms/caves
+      const lastSlash = room.filePath.lastIndexOf('/');
+      if (lastSlash > 0) {
+        return room.filePath.substring(0, lastSlash);
+      }
+    }
+    // Fall back to deriving from area_id (for newly created rooms)
+    if (worldDataPath && room.area_id) {
+      const areaName = room.area_id.replace('area_', '');
+      return `${worldDataPath}/rooms/${areaName}`;
+    }
+    return null;
+  }, [worldDataPath]);
 
   // Load all room files from the workspace
   const loadRooms = useCallback(async () => {
@@ -79,6 +110,7 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
 
       const loadedRooms: RoomNode[] = [];
       const roomExits: Map<string, Record<string, string>> = new Map();
+      const roomAreaPaths: Map<string, string> = new Map(); // Track which area each room belongs to
 
       // Parse all room files
       for (const filePath of roomFiles) {
@@ -90,6 +122,12 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
             // Extract z_level from coordinate ID or use explicit field
             const coords = extractCoordinates(parsed.id);
             const zLevel = parsed.z_level ?? coords?.z ?? 0;
+            
+            // Determine area path from file path (e.g., /path/rooms/caves/room.yaml -> /path/rooms/caves)
+            const pathParts = filePath.split('/');
+            pathParts.pop(); // Remove filename
+            const areaPath = pathParts.join('/');
+            roomAreaPaths.set(parsed.id, areaPath);
 
             loadedRooms.push({
               id: parsed.id,
@@ -101,6 +139,7 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
               z_level: zLevel,
               exits: parsed.exits || {},
               position: { x: 0, y: 0 }, // Will be calculated
+              filePath, // Store the original file path
             });
 
             if (parsed.exits) {
@@ -112,11 +151,56 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
         }
       }
 
-      // Calculate positions using a simple layout algorithm
-      const positionedRooms = calculateRoomPositions(loadedRooms, roomExits);
+      // Calculate positions using layout files first, then fall back to auto-layout
+      const positionedRooms = await calculateRoomPositionsWithLayouts(
+        loadedRooms,
+        roomExits,
+        roomAreaPaths,
+        layouts,
+        loadLayout
+      );
 
       // Build connections from exits
       const builtConnections = buildConnections(roomExits);
+
+      // Save initial layout files for areas that don't have one
+      // Group rooms by area path and check if layout exists
+      const roomsByAreaPath = new Map<string, RoomNode[]>();
+      for (const room of positionedRooms) {
+        const areaPath = roomAreaPaths.get(room.id);
+        if (areaPath) {
+          if (!roomsByAreaPath.has(areaPath)) {
+            roomsByAreaPath.set(areaPath, []);
+          }
+          roomsByAreaPath.get(areaPath)!.push(room);
+        }
+      }
+      
+      // Create layout files for areas that don't have them
+      for (const [areaPath, areaRooms] of roomsByAreaPath.entries()) {
+        const existingLayout = layouts.get(areaPath);
+        if (!existingLayout) {
+          // Create a new layout with the calculated positions
+          const newLayout: AreaLayout = {
+            version: 1,
+            grid_size: GRID_SIZE,
+            rooms: {},
+            layer_names: {},
+          };
+          
+          for (const room of areaRooms) {
+            newLayout.rooms[room.id] = {
+              x: Math.round(room.position.x / GRID_SIZE),
+              y: Math.round(room.position.y / GRID_SIZE),
+              z: room.z_level,
+            };
+          }
+          
+          // Save the layout file
+          await saveLayout(areaPath, newLayout);
+          console.log(`Created initial layout file for ${areaPath}`);
+        }
+      }
 
       setRooms(positionedRooms);
       setConnections(builtConnections);
@@ -126,7 +210,7 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
     } finally {
       setIsLoading(false);
     }
-  }, [worldDataPath]);
+  }, [worldDataPath, layouts, loadLayout, saveLayout]);
 
   // Auto-load rooms when worldDataPath changes
   useEffect(() => {
@@ -135,32 +219,491 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
     }
   }, [worldDataPath, loadRooms]);
 
-  // Update a room's position (called after drag)
-  const updateRoomPosition = useCallback((roomId: string, position: { x: number; y: number }) => {
+  // Update a room's position (called after drag) - persists to layout file
+  const updateRoomPosition = useCallback(async (roomId: string, position: { x: number; y: number }) => {
+    // Update local state immediately
     setRooms((prev) =>
       prev.map((room) => (room.id === roomId ? { ...room, position } : room))
     );
-  }, []);
+    
+    // Find the room to get its area path and z_level
+    const room = rooms.find((r) => r.id === roomId);
+    if (room) {
+      // Get area path from the room's actual file path
+      const areaPath = getAreaPathFromRoom(room);
+      if (!areaPath) return;
+      
+      // Convert pixel position to grid coordinates
+      const gridPosition: RoomPosition = {
+        x: Math.round(position.x / GRID_SIZE),
+        y: Math.round(position.y / GRID_SIZE),
+        z: room.z_level,
+      };
+      
+      // Save to layout file
+      await updateLayoutPosition(areaPath, roomId, gridPosition);
+    }
+  }, [rooms, getAreaPathFromRoom, updateLayoutPosition]);
 
-  // Add a new connection
-  const addConnection = useCallback((source: string, target: string, direction: string) => {
-    const id = `${source}-${direction}-${target}`;
-    setConnections((prev) => [
-      ...prev,
-      {
-        id,
-        source,
-        target,
-        sourceHandle: direction,
-        targetHandle: oppositeDirection[direction] || 'any',
-      },
-    ]);
-  }, []);
+  // Get the file path for a room - prefer stored filePath, fall back to deriving from area_id
+  const getRoomFilePath = useCallback((room: RoomNode): string | null => {
+    // Use stored file path if available (most reliable)
+    if (room.filePath) {
+      return room.filePath;
+    }
+    
+    // Fall back to deriving from area_id (for newly created rooms)
+    if (!worldDataPath || !room.area_id) return null;
+    const areaName = room.area_id.replace('area_', '');
+    return `${worldDataPath}/rooms/${areaName}/${room.id}.yaml`;
+  }, [worldDataPath]);
 
-  // Remove a connection
-  const removeConnection = useCallback((connectionId: string) => {
-    setConnections((prev) => prev.filter((c) => c.id !== connectionId));
-  }, []);
+  // Update room properties and save to YAML file
+  const updateRoomProperties = useCallback(async (roomId: string, updates: Partial<RoomYaml>): Promise<boolean> => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (!room) {
+      console.error('Room not found:', roomId);
+      return false;
+    }
+    
+    const filePath = getRoomFilePath(room);
+    if (!filePath) {
+      console.error('Could not get file path for room:', roomId);
+      return false;
+    }
+    
+    try {
+      // Try to read current file content, or create new if it doesn't exist
+      let parsed: RoomYaml;
+      try {
+        const content = await window.daemonswright.fs.readFile(filePath);
+        parsed = yaml.load(content) as RoomYaml;
+      } catch (readErr) {
+        // File doesn't exist, create from room state
+        console.warn('Room file not found, creating:', filePath);
+        parsed = {
+          id: room.id,
+          name: room.name,
+          description: room.description || '',
+          room_type: room.room_type || 'chamber',
+          area_id: room.area_id || '',
+          exits: room.exits || {},
+        };
+      }
+      
+      // Merge updates
+      const updated: RoomYaml = {
+        ...parsed,
+        ...updates,
+        id: roomId, // Never change the ID
+      };
+      
+      // Write back to file
+      const newContent = yaml.dump(updated, {
+        indent: 2,
+        lineWidth: 120,
+        noRefs: true,
+      });
+      
+      await window.daemonswright.fs.writeFile(filePath, newContent);
+      
+      // Update local state
+      setRooms((prev) =>
+        prev.map((r) =>
+          r.id === roomId
+            ? {
+                ...r,
+                name: updates.name ?? r.name,
+                description: updates.description ?? r.description,
+                room_type: updates.room_type ?? r.room_type,
+              }
+            : r
+        )
+      );
+      
+      return true;
+    } catch (err) {
+      console.error('Failed to save room:', err);
+      return false;
+    }
+  }, [rooms, getRoomFilePath]);
+
+  // Create a new room
+  // If sourceRoomId is provided, the new room will be created in the same folder as the source room
+  const createRoom = useCallback(async (
+    roomData: RoomYaml, 
+    position: { x: number; y: number },
+    sourceRoomId?: string
+  ): Promise<boolean> => {
+    if (!worldDataPath) return false;
+    
+    let areaPath: string;
+    let filePath: string;
+    
+    // If we have a source room, use its folder
+    if (sourceRoomId) {
+      const sourceRoom = rooms.find((r) => r.id === sourceRoomId);
+      if (sourceRoom?.filePath) {
+        // Get the folder from the source room's file path
+        const lastSlash = sourceRoom.filePath.lastIndexOf('/');
+        areaPath = sourceRoom.filePath.substring(0, lastSlash);
+        filePath = `${areaPath}/${roomData.id}.yaml`;
+      } else {
+        // Fall back to deriving from area_id
+        const areaName = (roomData.area_id || 'unknown').replace('area_', '');
+        areaPath = `${worldDataPath}/rooms/${areaName}`;
+        filePath = `${areaPath}/${roomData.id}.yaml`;
+      }
+    } else {
+      // No source room - derive from area_id
+      const areaName = (roomData.area_id || 'unknown').replace('area_', '');
+      areaPath = `${worldDataPath}/rooms/${areaName}`;
+      filePath = `${areaPath}/${roomData.id}.yaml`;
+    }
+    
+    try {
+      // Create the YAML content
+      const content = yaml.dump(roomData, {
+        indent: 2,
+        lineWidth: 120,
+        noRefs: true,
+      });
+      
+      // Write the file
+      await window.daemonswright.fs.writeFile(filePath, content);
+      
+      // Add to layout
+      const gridPosition: RoomPosition = {
+        x: Math.round(position.x / GRID_SIZE),
+        y: Math.round(position.y / GRID_SIZE),
+        z: roomData.z_level ?? 0,
+      };
+      await updateLayoutPosition(areaPath, roomData.id, gridPosition);
+      
+      // Add to local state
+      const newRoom: RoomNode = {
+        id: roomData.id,
+        room_id: roomData.id,
+        name: roomData.name,
+        description: roomData.description,
+        room_type: roomData.room_type,
+        area_id: roomData.area_id,
+        z_level: roomData.z_level ?? 0,
+        exits: roomData.exits || {},
+        position,
+        filePath, // Store the file path we used to create it
+      };
+      
+      setRooms((prev) => [...prev, newRoom]);
+      
+      return true;
+    } catch (err) {
+      console.error('Failed to create room:', err);
+      return false;
+    }
+  }, [worldDataPath, rooms, updateLayoutPosition]);
+
+  // Delete a room
+  const deleteRoom = useCallback(async (roomId: string): Promise<boolean> => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (!room) return false;
+    
+    const filePath = getRoomFilePath(room);
+    if (!filePath) return false;
+    
+    try {
+      // Delete the file
+      await window.daemonswright.fs.deleteFile(filePath);
+      
+      // Remove from local state
+      setRooms((prev) => prev.filter((r) => r.id !== roomId));
+      
+      // Remove connections to/from this room
+      setConnections((prev) =>
+        prev.filter((c) => c.source !== roomId && c.target !== roomId)
+      );
+      
+      // TODO: Update other rooms' exits that point to this room
+      
+      return true;
+    } catch (err) {
+      console.error('Failed to delete room:', err);
+      return false;
+    }
+  }, [rooms, getRoomFilePath]);
+
+  // Add a new connection and save to room YAML
+  const addConnection = useCallback(async (source: string, target: string, direction: string): Promise<boolean> => {
+    const sourceRoom = rooms.find((r) => r.id === source);
+    if (!sourceRoom) {
+      console.error('Source room not found:', source);
+      return false;
+    }
+    
+    const filePath = getRoomFilePath(sourceRoom);
+    if (!filePath) {
+      console.error('Could not get file path for room:', source);
+      return false;
+    }
+    
+    try {
+      // Read current file content
+      let content: string;
+      try {
+        content = await window.daemonswright.fs.readFile(filePath);
+      } catch (readErr) {
+        // File might not exist yet - create it with the connection
+        console.warn('Room file not found, creating new:', filePath);
+        const newRoom: RoomYaml = {
+          id: sourceRoom.id,
+          name: sourceRoom.name,
+          description: sourceRoom.description || '',
+          room_type: sourceRoom.room_type || 'chamber',
+          area_id: sourceRoom.area_id || '',
+          exits: { [direction]: target },
+        };
+        const newContent = yaml.dump(newRoom, {
+          indent: 2,
+          lineWidth: 120,
+          noRefs: true,
+        });
+        await window.daemonswright.fs.writeFile(filePath, newContent);
+        
+        // Update room's exits in state and rebuild connections
+        setRooms((prev) => {
+          const updatedRooms = prev.map((r) =>
+            r.id === source
+              ? { ...r, exits: { ...r.exits, [direction]: target } }
+              : r
+          );
+          
+          // Rebuild connections from updated room exits
+          const updatedRoomExits = new Map<string, Record<string, string>>();
+          updatedRooms.forEach((r) => {
+            if (r.exits && Object.keys(r.exits).length > 0) {
+              updatedRoomExits.set(r.id, r.exits);
+            }
+          });
+          const newConnections = buildConnections(updatedRoomExits);
+          setConnections(newConnections);
+          
+          return updatedRooms;
+        });
+        
+        return true;
+      }
+      
+      const parsed = yaml.load(content) as RoomYaml;
+      
+      // Add the exit
+      const updatedExits = {
+        ...(parsed.exits || {}),
+        [direction]: target,
+      };
+      
+      const updated: RoomYaml = {
+        ...parsed,
+        exits: updatedExits,
+      };
+      
+      // Write back to file
+      const newContent = yaml.dump(updated, {
+        indent: 2,
+        lineWidth: 120,
+        noRefs: true,
+      });
+      
+      await window.daemonswright.fs.writeFile(filePath, newContent);
+      
+      // Update local state
+      const id = `${source}-${direction}-${target}`;
+      // Update room's exits in state first
+      setRooms((prev) => {
+        const updatedRooms = prev.map((r) =>
+          r.id === source
+            ? { ...r, exits: { ...r.exits, [direction]: target } }
+            : r
+        );
+        
+        // Rebuild connections from updated room exits to properly detect bidirectional
+        const updatedRoomExits = new Map<string, Record<string, string>>();
+        updatedRooms.forEach((r) => {
+          if (r.exits && Object.keys(r.exits).length > 0) {
+            updatedRoomExits.set(r.id, r.exits);
+          }
+        });
+        const newConnections = buildConnections(updatedRoomExits);
+        setConnections(newConnections);
+        
+        return updatedRooms;
+      });
+      
+      return true;
+    } catch (err) {
+      console.error('Failed to add connection:', err);
+      return false;
+    }
+  }, [rooms, getRoomFilePath]);
+
+  // Remove a connection and save to room YAML
+  const removeConnection = useCallback(async (connectionId: string): Promise<boolean> => {
+    // Parse connection ID to get source and direction
+    const conn = connections.find((c) => c.id === connectionId);
+    if (!conn) {
+      console.error('Connection not found:', connectionId);
+      return false;
+    }
+    
+    const sourceRoom = rooms.find((r) => r.id === conn.source);
+    if (!sourceRoom) {
+      console.error('Source room not found for connection:', conn.source);
+      // Still remove from local state
+      setConnections((prev) => prev.filter((c) => c.id !== connectionId));
+      return true;
+    }
+    
+    const filePath = getRoomFilePath(sourceRoom);
+    if (!filePath) {
+      console.error('Could not get file path for room:', conn.source);
+      return false;
+    }
+    
+    try {
+      // Read current file content
+      let content: string;
+      try {
+        content = await window.daemonswright.fs.readFile(filePath);
+      } catch (readErr) {
+        console.warn('Room file not found when removing connection:', filePath);
+        // Just update local state
+        setConnections((prev) => prev.filter((c) => c.id !== connectionId));
+        setRooms((prev) =>
+          prev.map((r) => {
+            if (r.id === conn.source) {
+              const newExits = { ...r.exits };
+              delete newExits[conn.sourceHandle];
+              return { ...r, exits: newExits };
+            }
+            return r;
+          })
+        );
+        return true;
+      }
+      
+      const parsed = yaml.load(content) as RoomYaml;
+      
+      // Remove the exit
+      const updatedExits = { ...(parsed.exits || {}) };
+      delete updatedExits[conn.sourceHandle];
+      
+      const updated: RoomYaml = {
+        ...parsed,
+        exits: Object.keys(updatedExits).length > 0 ? updatedExits : undefined,
+      };
+      
+      // Write back to file
+      const newContent = yaml.dump(updated, {
+        indent: 2,
+        lineWidth: 120,
+        noRefs: true,
+      });
+      
+      await window.daemonswright.fs.writeFile(filePath, newContent);
+      
+      // Update local state
+      setConnections((prev) => prev.filter((c) => c.id !== connectionId));
+      
+      // Update room's exits in state
+      setRooms((prev) =>
+        prev.map((r) => {
+          if (r.id === conn.source) {
+            const newExits = { ...r.exits };
+            delete newExits[conn.sourceHandle];
+            return { ...r, exits: newExits };
+          }
+          return r;
+        })
+      );
+      
+      return true;
+    } catch (err) {
+      console.error('Failed to remove connection:', err);
+      return false;
+    }
+  }, [connections, rooms, getRoomFilePath]);
+
+  // Remove a specific exit from a room (used for toggling bidirectional to unidirectional)
+  const removeExit = useCallback(async (roomId: string, direction: string): Promise<boolean> => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (!room) {
+      console.error('Room not found:', roomId);
+      return false;
+    }
+    
+    const filePath = getRoomFilePath(room);
+    if (!filePath) {
+      console.error('Could not get file path for room:', roomId);
+      return false;
+    }
+    
+    try {
+      // Read current file content
+      const content = await window.daemonswright.fs.readFile(filePath);
+      const parsed = yaml.load(content) as RoomYaml;
+      
+      // Remove the exit
+      const updatedExits = { ...(parsed.exits || {}) };
+      delete updatedExits[direction];
+      
+      const updated: RoomYaml = {
+        ...parsed,
+        exits: Object.keys(updatedExits).length > 0 ? updatedExits : undefined,
+      };
+      
+      // Write back to file
+      const newContent = yaml.dump(updated, {
+        indent: 2,
+        lineWidth: 120,
+        noRefs: true,
+      });
+      
+      await window.daemonswright.fs.writeFile(filePath, newContent);
+      
+      // Update room's exits in state
+      setRooms((prev) =>
+        prev.map((r) => {
+          if (r.id === roomId) {
+            const newExits = { ...r.exits };
+            delete newExits[direction];
+            return { ...r, exits: newExits };
+          }
+          return r;
+        })
+      );
+      
+      // Rebuild connections from updated room exits
+      const updatedRoomExits = new Map<string, Record<string, string>>();
+      rooms.forEach((r) => {
+        if (r.id === roomId) {
+          // Use updated exits without the removed direction
+          const exits = { ...r.exits };
+          delete exits[direction];
+          if (Object.keys(exits).length > 0) {
+            updatedRoomExits.set(r.id, exits);
+          }
+        } else if (r.exits && Object.keys(r.exits).length > 0) {
+          updatedRoomExits.set(r.id, r.exits);
+        }
+      });
+      const newConnections = buildConnections(updatedRoomExits);
+      setConnections(newConnections);
+      
+      return true;
+    } catch (err) {
+      console.error('Failed to remove exit:', err);
+      return false;
+    }
+  }, [rooms, getRoomFilePath]);
 
   // Compute unique z-levels from rooms
   const zLevels = useMemo(() => {
@@ -176,8 +719,12 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
     error,
     loadRooms,
     updateRoomPosition,
+    updateRoomProperties,
+    createRoom,
+    deleteRoom,
     addConnection,
     removeConnection,
+    removeExit,
   };
 }
 
@@ -227,7 +774,69 @@ function toIsometric(x: number, y: number, z: number, gridSize: number): { x: nu
   return { x: isoX, y: isoY };
 }
 
-// Simple force-directed-ish layout based on exits
+// Calculate room positions using layout files first, then fall back to auto-layout
+async function calculateRoomPositionsWithLayouts(
+  rooms: RoomNode[],
+  roomExits: Map<string, Record<string, string>>,
+  roomAreaPaths: Map<string, string>,
+  layouts: Map<string, AreaLayout>,
+  loadLayout: (areaPath: string) => Promise<AreaLayout | null>
+): Promise<RoomNode[]> {
+  const positioned = new Map<string, { x: number; y: number }>();
+  
+  // Group rooms by area path
+  const roomsByAreaPath = new Map<string, RoomNode[]>();
+  for (const room of rooms) {
+    const areaPath = roomAreaPaths.get(room.id) || '';
+    if (!roomsByAreaPath.has(areaPath)) {
+      roomsByAreaPath.set(areaPath, []);
+    }
+    roomsByAreaPath.get(areaPath)!.push(room);
+  }
+  
+  // Process each area
+  for (const [areaPath, areaRooms] of roomsByAreaPath.entries()) {
+    // Try to load layout for this area
+    let layout = layouts.get(areaPath);
+    if (!layout && areaPath) {
+      layout = await loadLayout(areaPath) ?? undefined;
+    }
+    
+    // If we have a layout, use it for rooms that have positions
+    if (layout) {
+      for (const room of areaRooms) {
+        const layoutPos = layout.rooms[room.id];
+        if (layoutPos) {
+          // Convert grid coordinates to pixel positions
+          const gridSize = layout.grid_size ?? GRID_SIZE;
+          positioned.set(room.id, {
+            x: layoutPos.x * gridSize,
+            y: layoutPos.y * gridSize,
+          });
+        }
+      }
+    }
+  }
+  
+  // For rooms without layout positions, use auto-layout
+  const unpositionedRooms = rooms.filter((r) => !positioned.has(r.id));
+  if (unpositionedRooms.length > 0) {
+    const autoPositioned = calculateRoomPositions(unpositionedRooms, roomExits);
+    for (const room of autoPositioned) {
+      if (!positioned.has(room.id)) {
+        positioned.set(room.id, room.position);
+      }
+    }
+  }
+  
+  // Apply positions to all rooms
+  return rooms.map((room) => ({
+    ...room,
+    position: positioned.get(room.id) || { x: 0, y: 0 },
+  }));
+}
+
+// Simple force-directed-ish layout based on exits (fallback when no layout file)
 function calculateRoomPositions(
   rooms: RoomNode[],
   roomExits: Map<string, Record<string, string>>
@@ -333,27 +942,47 @@ function calculateRoomPositions(
 // Build connections from exits map
 function buildConnections(roomExits: Map<string, Record<string, string>>): RoomConnection[] {
   const connections: RoomConnection[] = [];
-  const seen = new Set<string>();
+  // Track edges we've already created (using sorted room IDs + direction pair as key)
+  const processedPairs = new Set<string>();
 
   for (const [sourceId, exits] of roomExits.entries()) {
     for (const [direction, targetId] of Object.entries(exits)) {
       // Skip null exits
       if (!targetId) continue;
       
-      // Create unique key to avoid duplicates
-      const key = [sourceId, targetId].sort().join('-');
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      // Target handle is the opposite direction with '-in' suffix
+      // Create a canonical key for this pair of rooms (sorted IDs)
+      const [first, second] = [sourceId, targetId].sort();
+      const pairKey = `${first}--${second}`;
+      
+      // If we've already created an edge for this pair, skip
+      if (processedPairs.has(pairKey)) continue;
+      
+      // Check if the target room has a reverse exit back to source
+      const targetExits = roomExits.get(targetId);
+      const reverseDirection = oppositeDirection[direction];
+      const isBidirectional = targetExits && 
+        Object.entries(targetExits).some(([dir, dest]) => 
+          dest === sourceId && dir === reverseDirection
+        );
+      
+      // Mark this pair as processed
+      processedPairs.add(pairKey);
+      
+      // Target handle is the opposite direction (handles now work as both source and target)
       const opposite = oppositeDirection[direction] || direction;
       
+      // Use a consistent ID (source is always the "first" room alphabetically for bidirectional)
+      const id = isBidirectional 
+        ? `${first}-${second}-bidirectional`
+        : `${sourceId}-${direction}-${targetId}`;
+      
       connections.push({
-        id: `${sourceId}-${direction}-${targetId}`,
+        id,
         source: sourceId,
         target: targetId,
         sourceHandle: direction,
-        targetHandle: `${opposite}-in`,
+        targetHandle: opposite,
+        bidirectional: isBidirectional,
       });
     }
   }
