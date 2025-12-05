@@ -11,8 +11,9 @@ starting_hour: 12
 starting_minute: 0
 
 # Environmental properties
-biome: underground
-climate: cool
+
+biome: 1
+climate: mild
 ambient_lighting: dim  # Low base light (20 in AMBIENT_LIGHTING_VALUES)
 weather_profile: stable
 

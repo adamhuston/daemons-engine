@@ -14,6 +14,8 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
+export type EditorView = 'yaml' | 'room-builder' | 'quest-designer';
+
 interface MenuBarProps {
   onOpenFolder: () => void;
   onSave: () => void;
@@ -21,6 +23,8 @@ interface MenuBarProps {
   onConnect?: () => void;
   onReload?: () => void;
   isConnected?: boolean;
+  currentView?: EditorView;
+  onViewChange?: (view: EditorView) => void;
 }
 
 export function MenuBar({
@@ -30,6 +34,8 @@ export function MenuBar({
   onConnect,
   onReload,
   isConnected = false,
+  currentView = 'yaml',
+  onViewChange,
 }: MenuBarProps) {
   const fileMenuItems: MenuProps['items'] = [
     {
@@ -68,14 +74,19 @@ export function MenuBar({
     {
       key: 'yaml',
       label: 'YAML Editor',
+      onClick: () => onViewChange?.('yaml'),
+      style: currentView === 'yaml' ? { fontWeight: 'bold' } : undefined,
     },
     {
       key: 'room-builder',
       label: 'Room Builder',
+      onClick: () => onViewChange?.('room-builder'),
+      style: currentView === 'room-builder' ? { fontWeight: 'bold' } : undefined,
     },
     {
       key: 'quest-designer',
       label: 'Quest Designer',
+      disabled: true, // Not implemented yet
     },
   ];
 

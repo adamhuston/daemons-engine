@@ -138,36 +138,62 @@
 .room-builder {
   height: 100%;
   width: 100%;
-}
-
-.room-node {
-  background: var(--color-bg-secondary);
-  border-radius: 4px;
-}
-
-.room-node.selected {
-  box-shadow: 0 0 0 2px var(--color-accent);
-}
-
-.room-node-content {
   display: flex;
   flex-direction: column;
+}
+
+.room-builder-toolbar {
+  height: 40px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 8px;
+  padding: 0 12px;
+  gap: 12px;
 }
 
-.room-emoji {
-  font-size: 20px;
-}
-
-.room-label {
+.room-count {
   font-size: 12px;
-  font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
 }
 
-.room-id {
-  font-size: 10px;
-  color: var(--color-text-secondary);
+.toolbar-spacer {
+  flex: 1;
+}
+
+.room-builder .react-flow {
+  flex: 1;
+}
+
+/* Isometric room nodes */
+.room-node-iso {
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.room-node-iso:hover {
+  transform: scale(1.05);
+}
+
+.room-node-iso.selected {
+  z-index: 10;
+}
+
+/* Make React Flow edges more visible */
+.react-flow__edge-path {
+  stroke-width: 2px !important;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }

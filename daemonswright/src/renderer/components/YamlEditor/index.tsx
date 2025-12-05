@@ -6,9 +6,9 @@
  */
 
 import Editor, { Monaco } from '@monaco-editor/react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useMemo } from 'react';
 import type { editor } from 'monaco-editor';
-import type { SchemaDefinition, ValidationError } from '../../shared/types';
+import type { SchemaDefinition, ValidationError } from '../../../shared/types';
 
 interface YamlEditorProps {
   filePath: string;
@@ -27,6 +27,14 @@ export function YamlEditor({
 }: YamlEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
+
+  // Infer content type from file path (moved up so it can be used in effects)
+  const contentType = useMemo(() => 
+    filePath.split(/[/\\]/).find((segment) =>
+      ['rooms', 'items', 'npcs', 'quests', 'abilities', 'classes', 'areas', 'dialogues', 'triggers', 'factions'].includes(segment)
+    ),
+    [filePath]
+  );
 
   // Handle editor mount
   const handleEditorMount = useCallback(
@@ -47,6 +55,48 @@ export function YamlEditor({
     []
   );
 
+  // Register completion provider for enum values from schema
+  useEffect(() => {
+    if (!monacoRef.current || !contentType || !schemas[contentType]) return;
+
+    const schema = schemas[contentType];
+    const monaco = monacoRef.current;
+
+    const provider = monaco.languages.registerCompletionItemProvider('yaml', {
+      triggerCharacters: [' ', ':'],
+      provideCompletionItems: (model: editor.ITextModel, position: { lineNumber: number; column: number }) => {
+        const lineContent = model.getLineContent(position.lineNumber);
+        // Check if we're after a field name (e.g., "biome: ")
+        const fieldMatch = lineContent.match(/^(\w+):\s*/);
+        if (!fieldMatch) return { suggestions: [] };
+
+        const fieldName = fieldMatch[1];
+        const field = schema.fields?.[fieldName];
+        if (!field?.enum) return { suggestions: [] };
+
+        const word = model.getWordUntilPosition(position);
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn,
+        };
+
+        const suggestions = field.enum.map((value: string) => ({
+          label: value,
+          kind: monaco.languages.CompletionItemKind.EnumMember,
+          insertText: value,
+          range,
+          detail: `${fieldName} option`,
+        }));
+
+        return { suggestions };
+      },
+    });
+
+    return () => provider.dispose();
+  }, [contentType, schemas]);
+
   // Update validation markers when errors change
   useEffect(() => {
     if (!monacoRef.current || !editorRef.current) return;
@@ -65,11 +115,6 @@ export function YamlEditor({
 
     monacoRef.current.editor.setModelMarkers(model, 'yaml-validation', markers);
   }, [validationErrors]);
-
-  // Infer content type from file path
-  const contentType = filePath.split(/[/\\]/).find((segment) =>
-    ['rooms', 'items', 'npcs', 'quests', 'abilities', 'classes', 'areas', 'dialogues', 'triggers', 'factions'].includes(segment)
-  );
 
   return (
     <div className="yaml-editor">

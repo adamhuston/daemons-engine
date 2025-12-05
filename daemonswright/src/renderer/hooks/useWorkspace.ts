@@ -28,28 +28,59 @@ export function useWorkspace() {
     isDirty: false,
   });
 
-  // Open folder dialog
-  const openFolder = useCallback(async () => {
+  // Helper to open a folder by path (used for both dialog and restore)
+  const openFolderByPath = useCallback(async (folderPath: string) => {
     try {
-      const path = await window.daemonswright.fs.openFolder();
-      if (path) {
-        const files = await window.daemonswright.fs.listDirectory(path);
-        setState((prev) => ({
-          ...prev,
-          worldDataPath: path,
-          files,
-          selectedFile: null,
-          fileContent: '',
-          isDirty: false,
-        }));
+      if (!window.daemonswright?.fs) return;
+      const files = await window.daemonswright.fs.listDirectory(folderPath);
+      setState((prev) => ({
+        ...prev,
+        worldDataPath: folderPath,
+        files,
+        selectedFile: null,
+        fileContent: '',
+        isDirty: false,
+      }));
 
-        // Start watching the directory
-        await window.daemonswright.fs.watchDirectory(path);
-      }
+      // Save to recent folders
+      await window.daemonswright.settings?.addRecentFolder(folderPath);
+
+      // Start watching the directory
+      await window.daemonswright.fs.watchDirectory(folderPath);
     } catch (error) {
       console.error('Failed to open folder:', error);
     }
   }, []);
+
+  // Open folder dialog
+  const openFolder = useCallback(async () => {
+    try {
+      if (!window.daemonswright?.fs) {
+        throw new Error('Filesystem API not available (not running in Electron preload)');
+      }
+      const path = await window.daemonswright.fs.openFolder();
+      if (path) {
+        await openFolderByPath(path);
+      }
+    } catch (error) {
+      console.error('Failed to open folder:', error);
+    }
+  }, [openFolderByPath]);
+
+  // Restore last opened folder on mount
+  useEffect(() => {
+    const restoreLastFolder = async () => {
+      try {
+        const lastFolder = await window.daemonswright?.settings?.getLastFolder();
+        if (lastFolder) {
+          await openFolderByPath(lastFolder);
+        }
+      } catch (error) {
+        console.error('Failed to restore last folder:', error);
+      }
+    };
+    restoreLastFolder();
+  }, [openFolderByPath]);
 
   // Select a file
   const selectFile = useCallback(async (filePath: string) => {
@@ -112,12 +143,23 @@ export function useWorkspace() {
       refreshFiles();
     };
 
-    window.daemonswright.fs.onFileChange(handleFileChange);
+    let unsubscribe: (() => void) | null = null;
+    try {
+      if (window.daemonswright && window.daemonswright.fs && typeof window.daemonswright.fs.onFileChange === 'function') {
+        const maybeUnsub = window.daemonswright.fs.onFileChange(handleFileChange) as unknown;
+        if (typeof maybeUnsub === 'function') {
+          unsubscribe = maybeUnsub as () => void;
+        }
+      }
+    } catch (err) {
+      console.warn('File change listener not available:', err);
+    }
 
     return () => {
-      // Cleanup watcher on unmount
-      if (state.worldDataPath) {
-        window.daemonswright.fs.unwatchDirectory(state.worldDataPath);
+      // Cleanup listener and watcher on unmount
+      if (unsubscribe) unsubscribe();
+      if (state.worldDataPath && window.daemonswright && window.daemonswright.fs && typeof window.daemonswright.fs.unwatchDirectory === 'function') {
+        window.daemonswright.fs.unwatchDirectory(state.worldDataPath).catch(() => {});
       }
     };
   }, [state.worldDataPath, refreshFiles]);

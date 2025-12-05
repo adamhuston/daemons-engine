@@ -2,13 +2,12 @@
 <html>
   <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Daemonswright</title>
-    <style>
-      body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #1e1e1e; color: #fff; }
-      h1 { text-align: center; }
-    </style>
   </head>
   <body>
-    <h1>Hello World - Daemonswright</h1>
+    <div id="root"></div>
+    <!-- Vite will resolve this to /src/renderer/main.tsx when root is src/ -->
+    <script type="module" src="/renderer/main.tsx"></script>
   </body>
 </html>

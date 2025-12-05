@@ -29,6 +29,15 @@ area_id: string | null (optional)
   # If null, room exists independently (not recommended for new rooms)
   # Example: "area_ethereal_nexus"
 
+# Vertical Layer (Optional)
+# =========================
+z_level: integer (default: 0)
+  # Vertical layer for multi-level dungeons/buildings
+  # Used by Room Builder for layer visualization
+  # 0 = ground floor, positive = upper floors, negative = basement/underground
+  # For rooms with coordinate IDs (room_X_Y_Z), this is auto-extracted from Z
+  # Example: -1 (basement), 0 (ground), 1 (first floor), 2 (second floor)
+
 # Exit Connections (All Optional)
 # ===============================
 exits: dictionary (optional)

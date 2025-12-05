@@ -23,19 +23,13 @@ export function useSchema(worldDataPath: string | null) {
     isLoading: false,
   });
 
-  // Load schemas when world data path changes
-  useEffect(() => {
-    if (worldDataPath) {
-      loadSchemas(worldDataPath);
-    }
-  }, [worldDataPath]);
-
   // Load all schemas from world_data directory
   const loadSchemas = useCallback(async (path: string) => {
     setState((prev) => ({ ...prev, isLoading: true }));
 
     try {
       const schemas = await window.daemonswright.schema.loadSchemas(path);
+      console.log('[useSchema] Loaded schemas:', Object.keys(schemas));
       setState((prev) => ({
         ...prev,
         schemas,
@@ -46,6 +40,13 @@ export function useSchema(worldDataPath: string | null) {
       setState((prev) => ({ ...prev, isLoading: false }));
     }
   }, []);
+
+  // Load schemas when world data path changes
+  useEffect(() => {
+    if (worldDataPath) {
+      loadSchemas(worldDataPath);
+    }
+  }, [worldDataPath, loadSchemas]);
 
   // Validate content against schema
   const validateContent = useCallback(async (content: string, filePath: string) => {

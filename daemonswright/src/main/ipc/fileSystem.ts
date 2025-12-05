@@ -11,10 +11,9 @@
 import { ipcMain, dialog } from 'electron';
 import fs from 'fs/promises';
 import path from 'path';
-import chokidar, { FSWatcher } from 'chokidar';
-
-// Track active file watchers
-const watchers = new Map<string, FSWatcher>();
+// We load chokidar dynamically at runtime (it may be published as an ESM-only package)
+// Track active file watchers (use `any` to avoid type issues if types are missing)
+const watchers = new Map<string, any>();
 
 export function registerFileSystemHandlers(): void {
   // Open folder dialog
@@ -84,13 +83,27 @@ export function registerFileSystemHandlers(): void {
       await existingWatcher.close();
     }
 
-    const watcher = chokidar.watch(dirPath, {
+    // Dynamically import chokidar to support ESM-only distributions.
+    // Use an indirect runtime import so TypeScript (when compiling to CommonJS)
+    // doesn't rewrite it into a require() call which fails for ESM-only packages.
+    let chokidarModule: any;
+    try {
+      // eslint-disable-next-line no-new-func
+      const runtimeImport: (id: string) => Promise<any> = new Function('id', 'return import(id)') as any;
+      chokidarModule = await runtimeImport('chokidar');
+    } catch (err) {
+      throw new Error(`Failed to load chokidar module: ${err}`);
+    }
+
+    const chokidarImpl = chokidarModule && (chokidarModule.default ?? chokidarModule);
+
+    const watcher = chokidarImpl.watch(dirPath, {
       ignored: /(^|[\/\\])\../, // Ignore dotfiles
       persistent: true,
       ignoreInitial: true,
     });
 
-    watcher.on('all', (eventType, filePath) => {
+    watcher.on('all', (eventType: string, filePath: string) => {
       // Send event to renderer
       const { BrowserWindow } = require('electron');
       const windows = BrowserWindow.getAllWindows();

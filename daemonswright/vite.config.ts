@@ -4,6 +4,7 @@ import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  root: path.resolve(__dirname, 'src'),
   plugins: [react()],
   resolve: {
     alias: {
@@ -15,6 +16,12 @@ export default defineConfig({
   },
   base: './',
   build: {
-    outDir: 'dist/renderer',
+    // When root is src/, output to project-level dist/renderer
+    outDir: path.resolve(__dirname, 'dist', 'renderer'),
+    emptyOutDir: true,
+    // Enable sourcemaps and keep output readable for easier debugging of built artifacts
+    sourcemap: true,
+    // Disable minification for debug builds (set to 'esbuild' or 'terser' for production)
+    minify: false,
   },
 });

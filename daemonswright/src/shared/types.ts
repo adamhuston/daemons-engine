@@ -95,6 +95,7 @@ export interface RoomNode {
   description?: string;
   room_type?: string;
   area_id?: string;
+  z_level: number;
   exits: Record<string, string>;
   position: { x: number; y: number };
 }
@@ -124,11 +125,19 @@ export interface AppState {
   currentEditor: EditorState;
 }
 
+// Settings API
+export interface SettingsAPI {
+  getLastFolder: () => Promise<string | null>;
+  getRecentFolders: () => Promise<string[]>;
+  addRecentFolder: (folderPath: string) => Promise<boolean>;
+}
+
 // Window API exposed via preload
 export interface DaemonswrightAPI {
   fs: FileSystemAPI;
   schema: SchemaAPI;
   server: ServerAPI;
+  settings: SettingsAPI;
 }
 
 // Extend window type

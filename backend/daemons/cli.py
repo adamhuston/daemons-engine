@@ -43,7 +43,7 @@ def init(name: str, force: bool):
 
     if project_dir.exists() and any(project_dir.iterdir()) and not force:
         if name != ".":
-            click.echo(f"Error: Directory '{name}' already exists and is not empty.")
+            click.echo(f"⚠️ Error: Directory '{name}' already exists and is not empty.")
             click.echo("Use --force to overwrite, or choose a different name.")
             sys.exit(1)
 
@@ -62,16 +62,16 @@ def init(name: str, force: bool):
             shutil.rmtree(dest_world_data)
         if not dest_world_data.exists():
             shutil.copytree(package_world_data, dest_world_data)
-            click.echo("  Copied world_data/ (all starter content)")
+            click.echo("🗺️  Copied world_data/ (all starter content)")
         else:
-            click.echo("  Skipped world_data/ (already exists)")
+            click.echo("🗺️  Skipped world_data/ (already exists)")
 
         # Count copied files
         yaml_count = len(list(dest_world_data.rglob("*.yaml")))
-        click.echo(f"    ({yaml_count} YAML files)")
+        click.echo(f"📁    ({yaml_count} YAML files)")
     else:
         # Fallback: create empty directory structure
-        click.echo("  Warning: Bundled world_data not found, creating empty structure")
+        click.echo("⚠️  Warning: Bundled world_data not found, creating empty structure")
         directories = [
             "world_data/areas",
             "world_data/rooms",
@@ -93,7 +93,7 @@ def init(name: str, force: bool):
 
     # Create behaviors directory
     (project_dir / "behaviors").mkdir(parents=True, exist_ok=True)
-    click.echo("  Created behaviors/")
+    click.echo("😇  Created behaviors/")
 
     # Create main.py
     main_py = '''"""
@@ -109,7 +109,7 @@ from daemons.main import app
 __all__ = ["app"]
 '''
     (project_dir / "main.py").write_text(main_py)
-    click.echo("  Created main.py")
+    click.echo("🥧  Created main.py")
 
     # Create config.py
     config_py = '''"""
@@ -143,7 +143,7 @@ WORLD_DATA_DIR = "world_data"
 BEHAVIORS_DIR = "behaviors"
 '''
     (project_dir / "config.py").write_text(config_py)
-    click.echo("  Created config.py")
+    click.echo("⚙️  Created config.py")
 
     # Note: We don't create a local alembic folder by default.
     # The 'daemons db upgrade' command will use the package's built-in migrations.
@@ -164,11 +164,11 @@ htmlcov/
 .pytest_cache/
 """
     (project_dir / ".gitignore").write_text(gitignore)
-    click.echo("  Created .gitignore")
+    click.echo("💁  Created .gitignore")
 
     click.echo("")
     click.echo(
-        click.style("✓ Project initialized successfully!", fg="green", bold=True)
+        click.style("✅ Project initialized successfully!", fg="green", bold=True)
     )
     click.echo("")
     click.echo("Next steps:")
@@ -176,8 +176,6 @@ htmlcov/
         click.echo(f"  cd {name}")
     click.echo("  daemons db upgrade    # Initialize the database")
     click.echo("  daemons run           # Start the server")
-    click.echo("")
-    click.echo("Note: Always run 'daemons' commands from your project directory (where main.py is located)")
     click.echo("")
     click.echo("Documentation: https://github.com/adamhuston/1126")
 
@@ -212,19 +210,19 @@ def run(host: str, port: int, reload: bool, workers: int, production: bool):
             click.echo("")
             click.echo(click.style("⚠️  JWT_SECRET_KEY not set!", fg="red", bold=True))
             click.echo("")
-            click.echo("A secure secret key is required for production.")
-            click.echo("This key is used to sign authentication tokens.")
+            click.echo("🔑 A secure secret key is required for production.")
+            click.echo("🔑 This key is used to sign authentication tokens.")
             click.echo("")
 
             # Generate a suggested key
             suggested_key = secrets.token_hex(32)
 
-            if click.confirm("Would you like to generate a new secret key?", default=True):
+            if click.confirm("🔑 Would you like to generate a new secret key?", default=True):
                 click.echo("")
-                click.echo("Generated secret key:")
+                click.echo("🔑 Generated secret key:")
                 click.echo(click.style(f"  {suggested_key}", fg="green"))
                 click.echo("")
-                click.echo("To use this key, set the environment variable before running:")
+                click.echo("🔑 To use this key, set the environment variable before running:")
                 click.echo("")
                 click.echo(click.style("  PowerShell:", fg="cyan"))
                 click.echo(f'    $env:JWT_SECRET_KEY = "{suggested_key}"')
@@ -236,23 +234,23 @@ def run(host: str, port: int, reload: bool, workers: int, production: bool):
                 click.echo(f'    JWT_SECRET_KEY={suggested_key}')
                 click.echo("")
 
-                if click.confirm("Set this key for the current session and continue?", default=True):
+                if click.confirm("🔑 Set this key for the current session and continue?", default=True):
                     os.environ["JWT_SECRET_KEY"] = suggested_key
-                    click.echo(click.style("✓ Secret key set for this session", fg="green"))
+                    click.echo(click.style("🔐 Secret key set for this session", fg="green"))
                     click.echo("")
                 else:
                     click.echo("")
-                    click.echo("Server startup cancelled. Set JWT_SECRET_KEY and try again.")
+                    click.echo("⚠️ Server startup cancelled. Set JWT_SECRET_KEY and try again.")
                     sys.exit(1)
             else:
                 click.echo("")
-                click.echo("Generate a key manually with:")
+                click.echo("🔑 Generate a key manually with:")
                 click.echo('  python -c "import secrets; print(secrets.token_hex(32))"')
                 click.echo("")
-                click.echo("Then set it as an environment variable before running.")
+                click.echo("🔑 Then set it as an environment variable before running.")
                 sys.exit(1)
         else:
-            click.echo(click.style("✓ JWT_SECRET_KEY is configured", fg="green"))
+            click.echo(click.style("🔐 JWT_SECRET_KEY is configured", fg="green"))
 
         # Warn about reload in production
         if reload:
@@ -265,7 +263,7 @@ def run(host: str, port: int, reload: bool, workers: int, production: bool):
         if cwd not in sys.path:
             sys.path.insert(0, cwd)
 
-        click.echo(f"Starting game server from {cwd}...")
+        click.echo(f"⏳ Starting game server from {cwd}...")
         uvicorn.run(
             "main:app",
             host=host,
@@ -278,16 +276,16 @@ def run(host: str, port: int, reload: bool, workers: int, production: bool):
         # Check if there's a project directory nearby (user might be in wrong dir)
         possible_dirs = [d for d in Path(".").iterdir() if d.is_dir() and (d / "main.py").exists()]
         if possible_dirs:
-            click.echo(click.style("No main.py found in current directory.", fg="yellow"))
+            click.echo(click.style("📂 No main.py found in current directory.", fg="yellow"))
             click.echo("")
-            click.echo("Found project directory nearby. Try:")
+            click.echo("📂 Found project directory nearby. Try:")
             for d in possible_dirs[:3]:  # Show up to 3
                 click.echo(f"  cd {d.name} && daemons run")
             click.echo("")
             # Still run the engine directly as fallback
 
         # Run the engine directly using the installed package
-        click.echo("Starting Daemons server (standalone mode)...")
+        click.echo("⏳ Starting Daemons server (standalone mode)...")
 
         from daemons.main import app
 
@@ -321,11 +319,11 @@ def upgrade(revision: str):
     alembic_ini = Path("alembic.ini")
 
     if alembic_ini.exists():
-        click.echo("Running migrations from local alembic.ini...")
+        click.echo("🗃️ Running migrations from local alembic.ini...")
         alembic_cfg = Config(str(alembic_ini))
     else:
         # Use the engine's built-in migrations
-        click.echo("Running engine migrations...")
+        click.echo("🗃️ Running engine migrations...")
         package_dir = Path(__file__).parent
         alembic_cfg = Config()
         alembic_cfg.set_main_option("script_location", str(package_dir / "alembic"))
@@ -333,7 +331,7 @@ def upgrade(revision: str):
 
     try:
         command.upgrade(alembic_cfg, revision)
-        click.echo(click.style("✓ Database upgraded successfully!", fg="green"))
+        click.echo(click.style("✅ Database upgraded successfully!", fg="green"))
     except Exception as e:
         click.echo(click.style(f"Error: {e}", fg="red"))
         sys.exit(1)
@@ -358,7 +356,7 @@ def downgrade(revision: str):
 
     try:
         command.downgrade(alembic_cfg, revision)
-        click.echo(click.style("✓ Database downgraded successfully!", fg="green"))
+        click.echo(click.style("✅ Database downgraded successfully!", fg="green"))
     except Exception as e:
         click.echo(click.style(f"Error: {e}", fg="red"))
         sys.exit(1)
@@ -413,7 +411,7 @@ def client(host: str, port: int):
         if importlib.util.find_spec("flet") is None:
             raise ImportError("flet not found")
     except ImportError:
-        click.echo(click.style("Error: Flet is not installed.", fg="red"))
+        click.echo(click.style("⚠️ Error: Flet is not installed.", fg="red"))
         click.echo("Install it with: pip install daemons-engine[client]")
         click.echo("Or: pip install flet")
         sys.exit(1)
@@ -422,10 +420,10 @@ def client(host: str, port: int):
     try:
         from daemons.client import client as client_module
 
-        click.echo(f"Launching client connecting to {host}:{port}...")
+        click.echo(f"⏳ Launching client connecting to {host}:{port}...")
         client_module.run(host=host, port=port)
     except ImportError:
-        click.echo(click.style("Error: Client module not found.", fg="red"))
+        click.echo(click.style("⚠️ Error: Client module not found.", fg="red"))
         click.echo("The client may not be installed with this package.")
         sys.exit(1)
 
@@ -449,7 +447,7 @@ def wright(world_data: str | None):
     wright_dir = Path(__file__).parent.parent.parent / "daemonswright"
 
     if not wright_dir.exists():
-        click.echo(click.style("Error: Daemonswright not found.", fg="red"))
+        click.echo(click.style("⚠️ Error: Daemonswright not found.", fg="red"))
         click.echo("")
         click.echo("Daemonswright is the visual content editor for Daemons.")
         click.echo("It should be installed alongside the daemons-engine package.")
@@ -460,7 +458,7 @@ def wright(world_data: str | None):
     # Check if npm dependencies are installed
     node_modules = wright_dir / "node_modules"
     if not node_modules.exists():
-        click.echo(click.style("Daemonswright dependencies not installed.", fg="yellow"))
+        click.echo(click.style("⚠️ Daemonswright dependencies not installed.", fg="yellow"))
         click.echo("Installing dependencies (this may take a moment)...")
         click.echo("")
 
@@ -474,12 +472,12 @@ def wright(world_data: str | None):
             click.echo(click.style("✓ Dependencies installed!", fg="green"))
             click.echo("")
         except subprocess.CalledProcessError:
-            click.echo(click.style("Error: Failed to install dependencies.", fg="red"))
+            click.echo(click.style("⚠️ Error: Failed to install dependencies.", fg="red"))
             click.echo("Try running 'npm install' manually in the daemonswright directory.")
             sys.exit(1)
 
     # Launch the electron app
-    click.echo("Launching Daemonswright Content Studio...")
+    click.echo("🚀 Launching Daemonswright...")
 
     args = ["npm", "run", "electron:dev"]
     env = None
@@ -501,7 +499,7 @@ def wright(world_data: str | None):
         click.echo("")
         click.echo("Daemonswright closed.")
     except subprocess.CalledProcessError as e:
-        click.echo(click.style(f"Error launching Daemonswright: {e}", fg="red"))
+        click.echo(click.style(f"⚠️ Error launching Daemonswright: {e}", fg="red"))
         sys.exit(1)
 
 
