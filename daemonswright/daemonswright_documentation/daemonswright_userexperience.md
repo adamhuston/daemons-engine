@@ -138,6 +138,313 @@ This means the Room Builder must scan spawn/instance files to display room conte
 
 ---
 
+## Room Properties Panel - Tabbed Interface
+
+The Room Properties Panel uses a **tabbed interface** to organize room editing into logical sections. When a room is selected, the panel shows three tabs:
+
+### Tab Structure
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Room: cave_entrance                                │
+│  ID: ethereal_cave_entrance                         │
+├────────────┬────────────┬────────────┬──────────────┤
+│ Properties │    NPCs    │   Items    │    Exits     │
+├────────────┴────────────┴────────────┴──────────────┤
+│                                                     │
+│  [Tab Content Area]                                 │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+### Properties Tab
+
+The default tab showing core room attributes:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| Name | Text input | Display name for the room |
+| Description | Textarea | What the player sees when entering |
+| Room Type | Select + Add | Type (forest, cave, urban, etc.) |
+| Area | Read-only | Area the room belongs to |
+| Z-Level | Read-only | Vertical layer (editable via layer move) |
+| Lighting Override | Select | Override area lighting (optional) |
+| On Enter Effect | Text | Message/effect when entering |
+| On Exit Effect | Text | Message/effect when leaving |
+
+### NPCs Tab
+
+Manage NPC spawns for the selected room:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  NPCs in this Room                                  │
+├─────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────┐   │
+│  │ 👤 Goblin Guard                        [×]  │   │
+│  │    Template: goblin_warrior                  │   │
+│  │    Quantity: 2                               │   │
+│  │    [Edit Spawn] [Edit Template]              │   │
+│  └─────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ 👤 Merchant Thalia                     [×]  │   │
+│  │    Template: npc_merchant_general            │   │
+│  │    Unique: Yes                               │   │
+│  │    [Edit Spawn] [Edit Template]              │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  ─────────────────────────────────────────────────  │
+│  [+ Add Existing NPC]  [+ Create New NPC]           │
+└─────────────────────────────────────────────────────┘
+```
+
+**NPC Tab Features:**
+
+| Feature | Behavior | File Impact |
+|---------|----------|-------------|
+| **List NPCs** | Show all NPC spawns with `room_id` matching this room | None (read) |
+| **Add Existing** | Search/select from NPC templates, add spawn entry | Creates `npc_spawns/*.yaml` entry |
+| **Create New** | Opens NPC template editor, then adds spawn | Creates `npcs/*.yaml` + spawn entry |
+| **Edit Spawn** | Edit quantity, behavior, respawn settings | Updates `npc_spawns/*.yaml` |
+| **Edit Template** | Opens NPC template in Entity Editor | Updates `npcs/*.yaml` |
+| **Remove** | Removes spawn entry (template remains) | Deletes from `npc_spawns/*.yaml` |
+
+**Add NPC Modal:**
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Add NPC to Room                              [×]   │
+├─────────────────────────────────────────────────────┤
+│  Search: [____________] 🔍                          │
+│                                                     │
+│  Available NPCs:                                    │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ ○ goblin_warrior - Goblin Warrior            │   │
+│  │ ○ goblin_shaman - Goblin Shaman              │   │
+│  │ ● npc_merchant_general - Merchant            │   │
+│  │ ○ skeleton_archer - Skeleton Archer          │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  Spawn Settings:                                    │
+│  Quantity: [1____]                                  │
+│  Respawn: [Never ▼]                                 │
+│                                                     │
+│         [Cancel]  [Add to Room]                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**NPC Spawn Data Structure:**
+
+```yaml
+# npc_spawns/ethereal_spawns.yaml
+spawns:
+  - spawn_id: spawn_goblin_cave_1
+    npc_template_id: goblin_warrior
+    room_id: ethereal_cave_entrance
+    quantity: 2
+    respawn_seconds: 300
+    behavior: patrol
+    
+  - spawn_id: spawn_merchant_cave
+    npc_template_id: npc_merchant_general
+    room_id: ethereal_cave_entrance
+    unique: true
+    dialogue_id: merchant_thalia_dialogue
+```
+
+### Items Tab
+
+Manage item instances for the selected room:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Items in this Room                                 │
+├─────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────┐   │
+│  │ 📦 Healing Potion                      [×]  │   │
+│  │    Template: potion_healing_minor            │   │
+│  │    Quantity: 3                               │   │
+│  │    Container: chest_01                       │   │
+│  │    [Edit Instance] [Edit Template]           │   │
+│  └─────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ 📦 Rusty Sword                         [×]  │   │
+│  │    Template: weapon_sword_rusty              │   │
+│  │    Quantity: 1                               │   │
+│  │    Location: ground                          │   │
+│  │    [Edit Instance] [Edit Template]           │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  ─────────────────────────────────────────────────  │
+│  [+ Add Existing Item]  [+ Create New Item]         │
+└─────────────────────────────────────────────────────┘
+```
+
+**Items Tab Features:**
+
+| Feature | Behavior | File Impact |
+|---------|----------|-------------|
+| **List Items** | Show all item instances with `room_id` matching this room | None (read) |
+| **Add Existing** | Search/select from item templates, add instance | Creates `item_instances/*.yaml` entry |
+| **Create New** | Opens item template editor, then adds instance | Creates `items/*.yaml` + instance entry |
+| **Edit Instance** | Edit quantity, container, hidden, locked settings | Updates `item_instances/*.yaml` |
+| **Edit Template** | Opens item template in Entity Editor | Updates `items/*.yaml` |
+| **Remove** | Removes instance entry (template remains) | Deletes from `item_instances/*.yaml` |
+
+**Add Item Modal:**
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Add Item to Room                             [×]   │
+├─────────────────────────────────────────────────────┤
+│  Search: [____________] 🔍                          │
+│                                                     │
+│  Filter: [All Types ▼]                              │
+│                                                     │
+│  Available Items:                                   │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ ○ weapon_sword_iron - Iron Sword             │   │
+│  │ ○ weapon_sword_rusty - Rusty Sword           │   │
+│  │ ● potion_healing_minor - Healing Potion      │   │
+│  │ ○ armor_leather_basic - Leather Armor        │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  Instance Settings:                                 │
+│  Quantity: [1____]                                  │
+│  Location: [Ground ▼]  Container: [________]        │
+│  ☐ Hidden  ☐ Locked                                 │
+│                                                     │
+│         [Cancel]  [Add to Room]                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Item Instance Data Structure:**
+
+```yaml
+# item_instances/ethereal_items.yaml
+instances:
+  - instance_id: potion_cave_1
+    item_template_id: potion_healing_minor
+    room_id: ethereal_cave_entrance
+    quantity: 3
+    container_id: chest_01
+    
+  - instance_id: sword_cave_floor
+    item_template_id: weapon_sword_rusty
+    room_id: ethereal_cave_entrance
+    quantity: 1
+    location: ground
+    hidden: false
+```
+
+### Exits Tab
+
+Manage room exits and connections:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Exits from this Room                               │
+├─────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────┐   │
+│  │ 🧭 North → cave_tunnel_north           [×]  │   │
+│  │    Bidirectional: Yes                        │   │
+│  │    [Jump to Room]                            │   │
+│  └─────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ 🧭 Down → cave_depths                  [×]  │   │
+│  │    Bidirectional: Yes                        │   │
+│  │    [Jump to Room]                            │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  ─────────────────────────────────────────────────  │
+│  [+ Add Exit]                                       │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Visual Feedback on Room Nodes
+
+Room nodes in the canvas show visual indicators for their contents:
+
+```
+        ┌─────────────────────────┐
+        │    Cave Entrance        │
+        │    ─────────────        │
+        │  A dark cave opening    │
+        │                         │
+        │  👤 3   📦 4            │  ← Content badges
+        └─────────────────────────┘
+```
+
+**Badge Behavior:**
+- 👤 **NPC badge**: Shows count of NPC spawns in room
+- 📦 **Item badge**: Shows count of item instances in room
+- Clicking badge switches to corresponding tab in properties panel
+- Hover shows tooltip with list of contents
+
+**Visual States:**
+- Empty room: No badges shown
+- Room with NPCs only: 👤 badge
+- Room with items only: 📦 badge  
+- Room with both: Both badges shown
+- Selected room: Highlighted border, full badges
+
+---
+
+## Drag-and-Drop Placement
+
+### From Palette (Future Enhancement)
+
+The left sidebar can include a **Content Palette** for drag-and-drop placement:
+
+```
+┌────────────────┐
+│   LAYERS       │
+│   ...          │
+├────────────────┤
+│   PALETTE      │
+├────────────────┤
+│ 📁 NPCs        │
+│   👤 Goblin    │  ← Drag onto room
+│   👤 Merchant  │
+│   👤 Guard     │
+│                │
+│ 📁 Items       │
+│   📦 Potion    │  ← Drag onto room
+│   📦 Sword     │
+│   📦 Shield    │
+│                │
+│ [Search...]    │
+└────────────────┘
+```
+
+**Drag-and-Drop Flow:**
+1. Drag NPC/item from palette
+2. Drop onto room node
+3. Spawn/instance entry created with default settings
+4. Properties panel opens to NPC/Items tab for adjustment
+
+### Quick Actions on Room Node
+
+Right-click context menu on room node:
+
+```
+┌─────────────────────────┐
+│ Edit Properties         │
+│ ─────────────────────── │
+│ Add NPC...              │
+│ Add Item...             │
+│ ─────────────────────── │
+│ Create NPC Here...      │  ← Opens NPC template editor
+│ Create Item Here...     │  ← Opens item template editor
+│ ─────────────────────── │
+│ Delete Room             │
+└─────────────────────────┘
+```
+
+---
+
 ## UI Layout
 
 ```

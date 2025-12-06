@@ -67,21 +67,6 @@ export function useWorkspace() {
     }
   }, [openFolderByPath]);
 
-  // Restore last opened folder on mount
-  useEffect(() => {
-    const restoreLastFolder = async () => {
-      try {
-        const lastFolder = await window.daemonswright?.settings?.getLastFolder();
-        if (lastFolder) {
-          await openFolderByPath(lastFolder);
-        }
-      } catch (error) {
-        console.error('Failed to restore last folder:', error);
-      }
-    };
-    restoreLastFolder();
-  }, [openFolderByPath]);
-
   // Select a file
   const selectFile = useCallback(async (filePath: string) => {
     try {
@@ -171,6 +156,7 @@ export function useWorkspace() {
     fileContent: state.fileContent,
     isDirty: state.isDirty,
     openFolder,
+    openFolderByPath,
     selectFile,
     updateContent,
     saveFile,

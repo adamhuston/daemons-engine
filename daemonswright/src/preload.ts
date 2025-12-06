@@ -7,6 +7,12 @@ const fsApi = {
 	openFolder: async (): Promise<string | null> => {
 		return ipcRenderer.invoke('fs:openFolder');
 	},
+	selectSaveFolder: async (defaultName?: string): Promise<string | null> => {
+		return ipcRenderer.invoke('fs:selectSaveFolder', defaultName);
+	},
+	createDirectory: async (dirPath: string): Promise<boolean> => {
+		return ipcRenderer.invoke('fs:createDirectory', dirPath);
+	},
 	listDirectory: async (dirPath: string) => {
 		return ipcRenderer.invoke('fs:listDirectory', dirPath);
 	},

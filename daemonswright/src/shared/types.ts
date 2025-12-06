@@ -14,6 +14,8 @@ export interface FileEntry {
 
 export interface FileSystemAPI {
   openFolder: () => Promise<string | null>;
+  selectSaveFolder: (defaultName?: string) => Promise<string | null>;
+  createDirectory: (dirPath: string) => Promise<boolean>;
   listDirectory: (dirPath: string) => Promise<FileEntry[]>;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<boolean>;
@@ -108,6 +110,32 @@ export interface RoomConnection {
   sourceHandle: string; // direction (north, south, etc.)
   targetHandle: string;
   bidirectional?: boolean; // true if both rooms have exits to each other
+}
+
+// NPC Spawn types - represents an NPC placed in a room
+export interface NpcSpawn {
+  spawn_id: string;
+  npc_template_id: string;
+  room_id: string;
+  quantity?: number;
+  behavior?: 'stationary' | 'patrol' | 'wander' | 'guard' | 'merchant';
+  respawn_seconds?: number;
+  unique?: boolean;
+  dialogue_id?: string;
+  filePath?: string; // Source file for this spawn entry
+}
+
+// Item Instance types - represents an item placed in a room
+export interface ItemInstance {
+  instance_id: string;
+  item_template_id: string;
+  room_id: string;
+  quantity?: number;
+  location?: 'ground' | 'table' | 'shelf' | 'hidden' | 'container';
+  container_id?: string;
+  hidden?: boolean;
+  locked?: boolean;
+  filePath?: string; // Source file for this instance entry
 }
 
 // Editor state

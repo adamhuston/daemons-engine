@@ -8,3 +8,5 @@ export { useFileWatcher } from './useFileWatcher';
 export { useServer } from './useServer';
 export { useRoomBuilder } from './useRoomBuilder';
 export { useLayout } from './useLayout';
+export { useRoomContents } from './useRoomContents';
+export type { NpcTemplate, ItemTemplate } from './useRoomContents';

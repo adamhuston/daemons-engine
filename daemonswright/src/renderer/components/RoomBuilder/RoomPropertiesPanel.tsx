@@ -1,14 +1,42 @@
 /**
  * RoomPropertiesPanel Component
  *
- * Sidebar panel for viewing and editing room properties.
- * Displays when a room is selected in the Room Builder.
+ * Tabbed sidebar panel for viewing and editing room properties,
+ * NPCs, items, and exits. Displays when a room is selected in the Room Builder.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Form, Input, Select, Button, Divider, List, Tag, Empty, Spin, Typography } from 'antd';
-import { SaveOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import type { RoomNode } from '../../../shared/types';
+import {
+  Form,
+  Input,
+  Select,
+  Button,
+  Divider,
+  List,
+  Tag,
+  Empty,
+  Spin,
+  Typography,
+  Tabs,
+  Card,
+  Badge,
+  Modal,
+  InputNumber,
+  Space,
+  Popconfirm,
+} from 'antd';
+import {
+  SaveOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+  UserOutlined,
+  InboxOutlined,
+  CompassOutlined,
+  EditOutlined,
+  SearchOutlined,
+} from '@ant-design/icons';
+import type { RoomNode, NpcSpawn, ItemInstance } from '../../../shared/types';
+import { AddableSelect } from '../AddableSelect';
 
 const { TextArea } = Input;
 const { Text, Title } = Typography;
@@ -40,6 +68,24 @@ const LIGHTING_OPTIONS = [
   { value: 'prismatic', label: 'Prismatic' },
 ];
 
+// Item location options
+const ITEM_LOCATION_OPTIONS = [
+  { value: 'ground', label: 'Ground' },
+  { value: 'table', label: 'Table' },
+  { value: 'shelf', label: 'Shelf' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'container', label: 'In Container' },
+];
+
+// NPC behavior options
+const NPC_BEHAVIOR_OPTIONS = [
+  { value: 'stationary', label: 'Stationary' },
+  { value: 'patrol', label: 'Patrol' },
+  { value: 'wander', label: 'Wander' },
+  { value: 'guard', label: 'Guard' },
+  { value: 'merchant', label: 'Merchant' },
+];
+
 interface RoomFormData {
   name: string;
   description: string;
@@ -51,6 +97,19 @@ interface RoomFormData {
   on_exit_effect: string;
 }
 
+interface NpcTemplate {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface ItemTemplate {
+  id: string;
+  name: string;
+  item_type?: string;
+  description?: string;
+}
+
 interface RoomPropertiesPanelProps {
   selectedRoom: RoomNode | null;
   onSave: (roomId: string, updates: Partial<RoomFormData>) => Promise<void>;
@@ -60,6 +119,22 @@ interface RoomPropertiesPanelProps {
   onRemoveExit: (roomId: string, direction: string) => void;
   isLoading?: boolean;
   isDirty?: boolean;
+  roomTypeOptions?: string[];
+  onAddRoomType?: (newType: string) => Promise<boolean>;
+  // NPC management
+  npcSpawns?: NpcSpawn[];
+  npcTemplates?: NpcTemplate[];
+  onAddNpcSpawn?: (roomId: string, spawn: Partial<NpcSpawn>) => Promise<boolean>;
+  onUpdateNpcSpawn?: (spawnId: string, updates: Partial<NpcSpawn>) => Promise<boolean>;
+  onRemoveNpcSpawn?: (spawnId: string) => Promise<boolean>;
+  onEditNpcTemplate?: (templateId: string) => void;
+  // Item management
+  itemInstances?: ItemInstance[];
+  itemTemplates?: ItemTemplate[];
+  onAddItemInstance?: (roomId: string, instance: Partial<ItemInstance>) => Promise<boolean>;
+  onUpdateItemInstance?: (instanceId: string, updates: Partial<ItemInstance>) => Promise<boolean>;
+  onRemoveItemInstance?: (instanceId: string) => Promise<boolean>;
+  onEditItemTemplate?: (templateId: string) => void;
 }
 
 export function RoomPropertiesPanel({
@@ -71,9 +146,42 @@ export function RoomPropertiesPanel({
   onRemoveExit,
   isLoading = false,
   isDirty = false,
+  roomTypeOptions = [],
+  onAddRoomType,
+  // NPC props
+  npcSpawns = [],
+  npcTemplates = [],
+  onAddNpcSpawn,
+  onUpdateNpcSpawn,
+  onRemoveNpcSpawn,
+  onEditNpcTemplate,
+  // Item props
+  itemInstances = [],
+  itemTemplates = [],
+  onAddItemInstance,
+  onUpdateItemInstance,
+  onRemoveItemInstance,
+  onEditItemTemplate,
 }: RoomPropertiesPanelProps) {
   const [form] = Form.useForm<RoomFormData>();
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('properties');
+  
+  // Modal states
+  const [addNpcModalOpen, setAddNpcModalOpen] = useState(false);
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false);
+  const [npcSearchQuery, setNpcSearchQuery] = useState('');
+  const [itemSearchQuery, setItemSearchQuery] = useState('');
+  const [selectedNpcTemplate, setSelectedNpcTemplate] = useState<string | null>(null);
+  const [selectedItemTemplate, setSelectedItemTemplate] = useState<string | null>(null);
+  
+  // Add NPC/Item forms
+  const [addNpcForm] = Form.useForm();
+  const [addItemForm] = Form.useForm();
+
+  // Filter NPCs/Items for this room
+  const roomNpcSpawns = npcSpawns.filter((spawn) => spawn.room_id === selectedRoom?.id);
+  const roomItemInstances = itemInstances.filter((inst) => inst.room_id === selectedRoom?.id);
 
   // Update form when selected room changes
   useEffect(() => {
@@ -110,6 +218,64 @@ export function RoomPropertiesPanel({
     await onDelete(selectedRoom.id);
   }, [selectedRoom, onDelete]);
 
+  // Handle add NPC
+  const handleAddNpc = useCallback(async () => {
+    if (!selectedRoom || !selectedNpcTemplate || !onAddNpcSpawn) return;
+    
+    try {
+      const values = addNpcForm.getFieldsValue();
+      await onAddNpcSpawn(selectedRoom.id, {
+        npc_template_id: selectedNpcTemplate,
+        room_id: selectedRoom.id,
+        quantity: values.quantity || 1,
+        behavior: values.behavior || 'stationary',
+        respawn_seconds: values.respawn_seconds || 0,
+      });
+      setAddNpcModalOpen(false);
+      addNpcForm.resetFields();
+      setSelectedNpcTemplate(null);
+      setNpcSearchQuery('');
+    } catch (error) {
+      console.error('Failed to add NPC spawn:', error);
+    }
+  }, [selectedRoom, selectedNpcTemplate, onAddNpcSpawn, addNpcForm]);
+
+  // Handle add Item
+  const handleAddItem = useCallback(async () => {
+    if (!selectedRoom || !selectedItemTemplate || !onAddItemInstance) return;
+    
+    try {
+      const values = addItemForm.getFieldsValue();
+      await onAddItemInstance(selectedRoom.id, {
+        item_template_id: selectedItemTemplate,
+        room_id: selectedRoom.id,
+        quantity: values.quantity || 1,
+        location: values.location || 'ground',
+        container_id: values.container_id,
+        hidden: values.hidden || false,
+      });
+      setAddItemModalOpen(false);
+      addItemForm.resetFields();
+      setSelectedItemTemplate(null);
+      setItemSearchQuery('');
+    } catch (error) {
+      console.error('Failed to add item instance:', error);
+    }
+  }, [selectedRoom, selectedItemTemplate, onAddItemInstance, addItemForm]);
+
+  // Filter templates by search query
+  const filteredNpcTemplates = npcTemplates.filter(
+    (t) =>
+      t.name.toLowerCase().includes(npcSearchQuery.toLowerCase()) ||
+      t.id.toLowerCase().includes(npcSearchQuery.toLowerCase())
+  );
+
+  const filteredItemTemplates = itemTemplates.filter(
+    (t) =>
+      t.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
+      t.id.toLowerCase().includes(itemSearchQuery.toLowerCase())
+  );
+
   // If no room is selected, show empty state
   if (!selectedRoom) {
     return (
@@ -128,6 +294,11 @@ export function RoomPropertiesPanel({
     target,
   }));
 
+  // Count badges for tabs
+  const npcCount = roomNpcSpawns.length;
+  const itemCount = roomItemInstances.length;
+  const exitCount = exits.length;
+
   return (
     <div className="room-properties-panel">
       {isLoading ? (
@@ -136,6 +307,7 @@ export function RoomPropertiesPanel({
         </div>
       ) : (
         <>
+          {/* Header */}
           <div className="panel-header">
             <Title level={5} style={{ margin: 0 }}>
               {selectedRoom.name}
@@ -145,119 +317,551 @@ export function RoomPropertiesPanel({
             </Text>
           </div>
 
-          <Divider style={{ margin: '12px 0' }} />
-
-          <Form
-            form={form}
-            layout="vertical"
+          {/* Tabbed Interface */}
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
             size="small"
-            className="room-form"
-          >
-            <Form.Item label="Name" name="name" rules={[{ required: true }]}>
-              <Input placeholder="Room name" />
-            </Form.Item>
-
-            <Form.Item label="Description" name="description">
-              <TextArea
-                rows={4}
-                placeholder="Room description (what the player sees)"
-              />
-            </Form.Item>
-
-            <Form.Item label="Room Type" name="room_type">
-              <Select options={ROOM_TYPE_OPTIONS} />
-            </Form.Item>
-
-            <Form.Item label="Area" name="area_id">
-              <Input placeholder="area_id" disabled />
-            </Form.Item>
-
-            <Form.Item label="Z-Level" name="z_level">
-              <Input type="number" disabled />
-            </Form.Item>
-
-            <Form.Item label="Lighting Override" name="lighting_override">
-              <Select
-                options={LIGHTING_OPTIONS}
-                allowClear
-                placeholder="Use area default"
-              />
-            </Form.Item>
-
-            <Form.Item label="On Enter Effect" name="on_enter_effect">
-              <Input placeholder="Message when entering" />
-            </Form.Item>
-
-            <Form.Item label="On Exit Effect" name="on_exit_effect">
-              <Input placeholder="Message when leaving" />
-            </Form.Item>
-          </Form>
-
-          <Divider style={{ margin: '12px 0' }}>Exits</Divider>
-
-          {exits.length > 0 ? (
-            <List
-              size="small"
-              dataSource={exits}
-              renderItem={(exit) => (
-                <List.Item
-                  className="exit-item"
-                  actions={[
-                    <Button
-                      key="delete"
-                      type="text"
+            style={{ marginTop: 8 }}
+            items={[
+              {
+                key: 'properties',
+                label: (
+                  <span>
+                    <EditOutlined />
+                    Properties
+                  </span>
+                ),
+                children: (
+                  <>
+                    <Form
+                      form={form}
+                      layout="vertical"
                       size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => onRemoveExit(selectedRoom.id, exit.direction)}
-                    />,
-                  ]}
-                >
-                  <div
-                    className="exit-info"
-                    onClick={() => onExitClick(exit.direction, exit.target)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <Tag color={exit.direction === 'up' || exit.direction === 'down' ? 'gold' : 'green'}>
-                      {exit.direction}
-                    </Tag>
-                    <Text ellipsis style={{ maxWidth: 120 }}>
-                      → {exit.target}
+                      className="room-form"
+                    >
+                      <Form.Item label="Name" name="name" rules={[{ required: true }]}>
+                        <Input placeholder="Room name" />
+                      </Form.Item>
+
+                      <Form.Item label="Description" name="description">
+                        <TextArea
+                          rows={4}
+                          placeholder="Room description (what the player sees)"
+                        />
+                      </Form.Item>
+
+                      <Form.Item label="Room Type" name="room_type">
+                        {onAddRoomType ? (
+                          <AddableSelect
+                            value={form.getFieldValue('room_type')}
+                            onChange={(val) => form.setFieldValue('room_type', val)}
+                            options={roomTypeOptions.length > 0 ? roomTypeOptions : ROOM_TYPE_OPTIONS.map(o => o.value)}
+                            onAddOption={onAddRoomType}
+                            placeholder="Select room type"
+                          />
+                        ) : (
+                          <Select options={ROOM_TYPE_OPTIONS} />
+                        )}
+                      </Form.Item>
+
+                      <Form.Item label="Area" name="area_id">
+                        <Input placeholder="area_id" disabled />
+                      </Form.Item>
+
+                      <Form.Item label="Z-Level" name="z_level">
+                        <Input type="number" disabled />
+                      </Form.Item>
+
+                      <Form.Item label="Lighting Override" name="lighting_override">
+                        <Select
+                          options={LIGHTING_OPTIONS}
+                          allowClear
+                          placeholder="Use area default"
+                        />
+                      </Form.Item>
+
+                      <Form.Item label="On Enter Effect" name="on_enter_effect">
+                        <Input placeholder="Message when entering" />
+                      </Form.Item>
+
+                      <Form.Item label="On Exit Effect" name="on_exit_effect">
+                        <Input placeholder="Message when leaving" />
+                      </Form.Item>
+                    </Form>
+
+                    <Divider style={{ margin: '12px 0' }} />
+
+                    <div className="panel-actions">
+                      <Button
+                        type="primary"
+                        icon={<SaveOutlined />}
+                        onClick={handleSave}
+                        loading={saving}
+                        disabled={!isDirty}
+                        block
+                      >
+                        Save Changes
+                      </Button>
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={handleDelete}
+                        style={{ marginTop: 8 }}
+                        block
+                      >
+                        Delete Room
+                      </Button>
+                    </div>
+                  </>
+                ),
+              },
+              {
+                key: 'npcs',
+                label: (
+                  <Badge count={npcCount} size="small" offset={[8, 0]}>
+                    <span>
+                      <UserOutlined />
+                      NPCs
+                    </span>
+                  </Badge>
+                ),
+                children: (
+                  <div className="tab-content">
+                    {roomNpcSpawns.length > 0 ? (
+                      <List
+                        size="small"
+                        dataSource={roomNpcSpawns}
+                        renderItem={(spawn) => {
+                          const template = npcTemplates.find((t) => t.id === spawn.npc_template_id);
+                          return (
+                            <Card
+                              size="small"
+                              className="content-card"
+                              style={{ marginBottom: 8 }}
+                            >
+                              <div className="content-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Space>
+                                  <UserOutlined />
+                                  <Text strong>{template?.name || spawn.npc_template_id}</Text>
+                                </Space>
+                                <Popconfirm
+                                  title="Remove NPC from room?"
+                                  onConfirm={() => onRemoveNpcSpawn?.(spawn.spawn_id)}
+                                  okText="Remove"
+                                  cancelText="Cancel"
+                                >
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                  />
+                                </Popconfirm>
+                              </div>
+                              <div className="content-card-details">
+                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                  Template: {spawn.npc_template_id}
+                                </Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                  Quantity: {spawn.quantity || 1}
+                                  {spawn.behavior && ` • ${spawn.behavior}`}
+                                </Text>
+                              </div>
+                              <div className="content-card-actions" style={{ marginTop: 8 }}>
+                                <Button
+                                  size="small"
+                                  onClick={() => onEditNpcTemplate?.(spawn.npc_template_id)}
+                                >
+                                  Edit Template
+                                </Button>
+                              </div>
+                            </Card>
+                          );
+                        }}
+                      />
+                    ) : (
+                      <Empty
+                        description="No NPCs in this room"
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        style={{ margin: '24px 0' }}
+                      />
+                    )}
+
+                    <Divider style={{ margin: '12px 0' }} />
+
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Button
+                        icon={<PlusOutlined />}
+                        onClick={() => setAddNpcModalOpen(true)}
+                        block
+                      >
+                        Add Existing NPC
+                      </Button>
+                      <Button
+                        icon={<PlusOutlined />}
+                        type="dashed"
+                        onClick={() => {
+                          // TODO: Open NPC template editor
+                          console.log('Create new NPC template');
+                        }}
+                        block
+                      >
+                        Create New NPC
+                      </Button>
+                    </Space>
+                  </div>
+                ),
+              },
+              {
+                key: 'items',
+                label: (
+                  <Badge count={itemCount} size="small" offset={[8, 0]}>
+                    <span>
+                      <InboxOutlined />
+                      Items
+                    </span>
+                  </Badge>
+                ),
+                children: (
+                  <div className="tab-content">
+                    {roomItemInstances.length > 0 ? (
+                      <List
+                        size="small"
+                        dataSource={roomItemInstances}
+                        renderItem={(instance) => {
+                          const template = itemTemplates.find((t) => t.id === instance.item_template_id);
+                          return (
+                            <Card
+                              size="small"
+                              className="content-card"
+                              style={{ marginBottom: 8 }}
+                            >
+                              <div className="content-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Space>
+                                  <InboxOutlined />
+                                  <Text strong>{template?.name || instance.item_template_id}</Text>
+                                </Space>
+                                <Popconfirm
+                                  title="Remove item from room?"
+                                  onConfirm={() => onRemoveItemInstance?.(instance.instance_id)}
+                                  okText="Remove"
+                                  cancelText="Cancel"
+                                >
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                  />
+                                </Popconfirm>
+                              </div>
+                              <div className="content-card-details">
+                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                  Template: {instance.item_template_id}
+                                </Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                  Qty: {instance.quantity || 1}
+                                  {instance.location && ` • ${instance.location}`}
+                                  {instance.container_id && ` • in ${instance.container_id}`}
+                                </Text>
+                              </div>
+                              <div className="content-card-actions" style={{ marginTop: 8 }}>
+                                <Button
+                                  size="small"
+                                  onClick={() => onEditItemTemplate?.(instance.item_template_id)}
+                                >
+                                  Edit Template
+                                </Button>
+                              </div>
+                            </Card>
+                          );
+                        }}
+                      />
+                    ) : (
+                      <Empty
+                        description="No items in this room"
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        style={{ margin: '24px 0' }}
+                      />
+                    )}
+
+                    <Divider style={{ margin: '12px 0' }} />
+
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Button
+                        icon={<PlusOutlined />}
+                        onClick={() => setAddItemModalOpen(true)}
+                        block
+                      >
+                        Add Existing Item
+                      </Button>
+                      <Button
+                        icon={<PlusOutlined />}
+                        type="dashed"
+                        onClick={() => {
+                          // TODO: Open item template editor
+                          console.log('Create new item template');
+                        }}
+                        block
+                      >
+                        Create New Item
+                      </Button>
+                    </Space>
+                  </div>
+                ),
+              },
+              {
+                key: 'exits',
+                label: (
+                  <Badge count={exitCount} size="small" offset={[8, 0]}>
+                    <span>
+                      <CompassOutlined />
+                      Exits
+                    </span>
+                  </Badge>
+                ),
+                children: (
+                  <div className="tab-content">
+                    {exits.length > 0 ? (
+                      <List
+                        size="small"
+                        dataSource={exits}
+                        renderItem={(exit) => (
+                          <List.Item
+                            className="exit-item"
+                            actions={[
+                              <Popconfirm
+                                key="delete"
+                                title="Remove this exit?"
+                                onConfirm={() => onRemoveExit(selectedRoom.id, exit.direction)}
+                                okText="Remove"
+                                cancelText="Cancel"
+                              >
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  danger
+                                  icon={<DeleteOutlined />}
+                                />
+                              </Popconfirm>,
+                            ]}
+                          >
+                            <div
+                              className="exit-info"
+                              onClick={() => onExitClick(exit.direction, exit.target)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <Tag color={exit.direction === 'up' || exit.direction === 'down' ? 'gold' : 'green'}>
+                                {exit.direction}
+                              </Tag>
+                              <Text ellipsis style={{ maxWidth: 120 }}>
+                                → {exit.target}
+                              </Text>
+                            </div>
+                          </List.Item>
+                        )}
+                      />
+                    ) : (
+                      <Empty
+                        description="No exits from this room"
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        style={{ margin: '24px 0' }}
+                      />
+                    )}
+
+                    <Divider style={{ margin: '12px 0' }} />
+
+                    <Button
+                      icon={<PlusOutlined />}
+                      onClick={() => {
+                        // TODO: Open add exit modal
+                        console.log('Add exit');
+                      }}
+                      block
+                    >
+                      Add Exit
+                    </Button>
+
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
+                      Tip: Drag from room edge to create exits visually
                     </Text>
                   </div>
-                </List.Item>
+                ),
+              },
+            ]}
+          />
+
+          {/* Add NPC Modal */}
+          <Modal
+            title="Add NPC to Room"
+            open={addNpcModalOpen}
+            onCancel={() => {
+              setAddNpcModalOpen(false);
+              setSelectedNpcTemplate(null);
+              setNpcSearchQuery('');
+              addNpcForm.resetFields();
+            }}
+            onOk={handleAddNpc}
+            okText="Add to Room"
+            okButtonProps={{ disabled: !selectedNpcTemplate }}
+          >
+            <Input
+              placeholder="Search NPCs..."
+              prefix={<SearchOutlined />}
+              value={npcSearchQuery}
+              onChange={(e) => setNpcSearchQuery(e.target.value)}
+              style={{ marginBottom: 12 }}
+            />
+
+            <div
+              style={{
+                maxHeight: 200,
+                overflowY: 'auto',
+                border: '1px solid #d9d9d9',
+                borderRadius: 4,
+                marginBottom: 16,
+              }}
+            >
+              {filteredNpcTemplates.length > 0 ? (
+                <List
+                  size="small"
+                  dataSource={filteredNpcTemplates}
+                  renderItem={(template) => (
+                    <List.Item
+                      onClick={() => setSelectedNpcTemplate(template.id)}
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor:
+                          selectedNpcTemplate === template.id ? '#e6f7ff' : 'transparent',
+                        padding: '8px 12px',
+                      }}
+                    >
+                      <Space>
+                        <UserOutlined />
+                        <div>
+                          <Text strong>{template.name}</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            {template.id}
+                          </Text>
+                        </div>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              ) : (
+                <Empty
+                  description="No NPCs found"
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  style={{ margin: 16 }}
+                />
               )}
-            />
-          ) : (
-            <Empty
-              description="No exits"
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
-          )}
+            </div>
 
-          <Divider style={{ margin: '12px 0' }} />
+            <Form form={addNpcForm} layout="vertical" size="small">
+              <Form.Item label="Quantity" name="quantity" initialValue={1}>
+                <InputNumber min={1} max={99} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item label="Behavior" name="behavior" initialValue="stationary">
+                <Select options={NPC_BEHAVIOR_OPTIONS} />
+              </Form.Item>
+              <Form.Item label="Respawn (seconds, 0 = never)" name="respawn_seconds" initialValue={0}>
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Form>
+          </Modal>
 
-          <div className="panel-actions">
-            <Button
-              type="primary"
-              icon={<SaveOutlined />}
-              onClick={handleSave}
-              loading={saving}
-              disabled={!isDirty}
-              block
+          {/* Add Item Modal */}
+          <Modal
+            title="Add Item to Room"
+            open={addItemModalOpen}
+            onCancel={() => {
+              setAddItemModalOpen(false);
+              setSelectedItemTemplate(null);
+              setItemSearchQuery('');
+              addItemForm.resetFields();
+            }}
+            onOk={handleAddItem}
+            okText="Add to Room"
+            okButtonProps={{ disabled: !selectedItemTemplate }}
+          >
+            <Input
+              placeholder="Search items..."
+              prefix={<SearchOutlined />}
+              value={itemSearchQuery}
+              onChange={(e) => setItemSearchQuery(e.target.value)}
+              style={{ marginBottom: 12 }}
+            />
+
+            <div
+              style={{
+                maxHeight: 200,
+                overflowY: 'auto',
+                border: '1px solid #d9d9d9',
+                borderRadius: 4,
+                marginBottom: 16,
+              }}
             >
-              Save Changes
-            </Button>
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              onClick={handleDelete}
-              style={{ marginTop: 8 }}
-              block
-            >
-              Delete Room
-            </Button>
-          </div>
+              {filteredItemTemplates.length > 0 ? (
+                <List
+                  size="small"
+                  dataSource={filteredItemTemplates}
+                  renderItem={(template) => (
+                    <List.Item
+                      onClick={() => setSelectedItemTemplate(template.id)}
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor:
+                          selectedItemTemplate === template.id ? '#e6f7ff' : 'transparent',
+                        padding: '8px 12px',
+                      }}
+                    >
+                      <Space>
+                        <InboxOutlined />
+                        <div>
+                          <Text strong>{template.name}</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            {template.id}
+                            {template.item_type && ` • ${template.item_type}`}
+                          </Text>
+                        </div>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              ) : (
+                <Empty
+                  description="No items found"
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  style={{ margin: 16 }}
+                />
+              )}
+            </div>
+
+            <Form form={addItemForm} layout="vertical" size="small">
+              <Form.Item label="Quantity" name="quantity" initialValue={1}>
+                <InputNumber min={1} max={999} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item label="Location" name="location" initialValue="ground">
+                <Select options={ITEM_LOCATION_OPTIONS} />
+              </Form.Item>
+              <Form.Item label="Container ID (if in container)" name="container_id">
+                <Input placeholder="e.g., chest_01" />
+              </Form.Item>
+              <Form.Item label="Hidden" name="hidden" valuePropName="checked">
+                <Select
+                  options={[
+                    { value: false, label: 'Visible' },
+                    { value: true, label: 'Hidden (requires search)' },
+                  ]}
+                />
+              </Form.Item>
+            </Form>
+          </Modal>
         </>
       )}
     </div>

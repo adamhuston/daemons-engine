@@ -28,6 +28,7 @@ import { Select, Button, Tooltip, Modal, Form, Input, Popover, Space } from 'ant
 import { UndoOutlined, RedoOutlined, PlusOutlined, SwapOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { RoomNode, RoomConnection } from '../../../shared/types';
 import { RoomNodeComponent } from './RoomNode';
+import { AddableSelect } from '../AddableSelect';
 
 // Grid size in pixels - rooms snap to this grid
 const GRID_SIZE = 150;
@@ -57,6 +58,10 @@ interface RoomBuilderProps {
   onConnectionDelete: (connectionId: string) => Promise<boolean>;
   onConnectionUpdate?: (oldConnectionId: string, newSource: string, newTarget: string, direction: string) => Promise<boolean>;
   onRemoveExit: (roomId: string, direction: string) => Promise<boolean>;
+  onAreaCreate: (areaId: string, displayName: string) => Promise<boolean>;
+  // Schema options for room types
+  roomTypeOptions?: string[];
+  onAddRoomType?: (newType: string) => Promise<boolean>;
 }
 
 // Custom node types
@@ -76,6 +81,9 @@ export function RoomBuilder({
   onConnectionDelete,
   onConnectionUpdate,
   onRemoveExit,
+  onAreaCreate,
+  roomTypeOptions = [],
+  onAddRoomType,
 }: RoomBuilderProps) {
   // Get unique areas from rooms
   const areas = useMemo(() => {
@@ -98,6 +106,10 @@ export function RoomBuilder({
   const [createFromExit, setCreateFromExit] = useState<{ sourceRoomId: string; direction: string } | null>(null);
   const [createForm] = Form.useForm();
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+
+  // Create area modal state
+  const [createAreaModalOpen, setCreateAreaModalOpen] = useState(false);
+  const [createAreaForm] = Form.useForm();
 
   // Selected edge state for edge editing
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
@@ -634,6 +646,13 @@ export function RoomBuilder({
             })),
           ]}
         />
+        <Tooltip title="Create New Area">
+          <Button
+            type="default"
+            icon={<PlusOutlined />}
+            onClick={() => setCreateAreaModalOpen(true)}
+          />
+        </Tooltip>
         {areaZLevels.length > 1 && (
           <Select
             value={activeLayer}
@@ -783,23 +802,36 @@ export function RoomBuilder({
             label="Room Type"
             rules={[{ required: true }]}
           >
-            <Select
-              options={[
-                { value: 'ethereal', label: 'Ethereal' },
-                { value: 'forest', label: 'Forest' },
-                { value: 'cave', label: 'Cave' },
-                { value: 'urban', label: 'Urban' },
-                { value: 'chamber', label: 'Chamber' },
-                { value: 'corridor', label: 'Corridor' },
-                { value: 'outdoor', label: 'Outdoor' },
-                { value: 'indoor', label: 'Indoor' },
-                { value: 'dungeon', label: 'Dungeon' },
-                { value: 'shop', label: 'Shop' },
-                { value: 'inn', label: 'Inn' },
-                { value: 'temple', label: 'Temple' },
-                { value: 'water', label: 'Water' },
-              ]}
-            />
+            {onAddRoomType ? (
+              <AddableSelect
+                value={createForm.getFieldValue('room_type')}
+                onChange={(val) => createForm.setFieldValue('room_type', val)}
+                options={roomTypeOptions.length > 0 ? roomTypeOptions : [
+                  'ethereal', 'forest', 'cave', 'urban', 'chamber', 'corridor',
+                  'outdoor', 'indoor', 'dungeon', 'shop', 'inn', 'temple', 'water'
+                ]}
+                onAddOption={onAddRoomType}
+                placeholder="Select room type"
+              />
+            ) : (
+              <Select
+                options={[
+                  { value: 'ethereal', label: 'Ethereal' },
+                  { value: 'forest', label: 'Forest' },
+                  { value: 'cave', label: 'Cave' },
+                  { value: 'urban', label: 'Urban' },
+                  { value: 'chamber', label: 'Chamber' },
+                  { value: 'corridor', label: 'Corridor' },
+                  { value: 'outdoor', label: 'Outdoor' },
+                  { value: 'indoor', label: 'Indoor' },
+                  { value: 'dungeon', label: 'Dungeon' },
+                  { value: 'shop', label: 'Shop' },
+                  { value: 'inn', label: 'Inn' },
+                  { value: 'temple', label: 'Temple' },
+                  { value: 'water', label: 'Water' },
+                ]}
+              />
+            )}
           </Form.Item>
           <Form.Item name="area_id" hidden>
             <Input />
@@ -813,6 +845,53 @@ export function RoomBuilder({
             This will also create an exit from <strong>{createFromExit.sourceRoomId}</strong> to the new room.
           </div>
         )}
+      </Modal>
+
+      {/* Create Area Modal */}
+      <Modal
+        title="Create New Area"
+        open={createAreaModalOpen}
+        onOk={async () => {
+          try {
+            const values = await createAreaForm.validateFields();
+            const success = await onAreaCreate(values.id, values.name);
+            if (success) {
+              setCreateAreaModalOpen(false);
+              createAreaForm.resetFields();
+              // Select the newly created area
+              const normalizedId = `area_${values.id.toLowerCase().replace(/\s+/g, '_').replace(/^area_/, '')}`;
+              setSelectedArea(normalizedId);
+            }
+          } catch (err) {
+            console.error('Failed to create area:', err);
+          }
+        }}
+        onCancel={() => {
+          setCreateAreaModalOpen(false);
+          createAreaForm.resetFields();
+        }}
+        okText="Create"
+      >
+        <Form form={createAreaForm} layout="vertical">
+          <Form.Item
+            name="name"
+            label="Area Name"
+            rules={[{ required: true, message: 'Area name is required' }]}
+          >
+            <Input placeholder="Dark Forest" />
+          </Form.Item>
+          <Form.Item
+            name="id"
+            label="Area ID"
+            rules={[
+              { required: true, message: 'Area ID is required' },
+              { pattern: /^[a-z0-9_]+$/, message: 'Only lowercase letters, numbers, and underscores allowed' }
+            ]}
+            extra="Used for folder name and room references"
+          >
+            <Input placeholder="dark_forest" />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

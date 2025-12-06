@@ -1,5 +1,14 @@
 /* Daemonswright Global Styles */
 
+/* Font Imports */
+@font-face {
+  font-family: 'Metal Mania';
+  src: url('../assets/fonts/Metal_Mania/MetalMania-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --color-bg-primary: #1e1e1e;
   --color-bg-secondary: #252526;
@@ -11,6 +20,10 @@
   --color-warning: #faad14;
   --color-error: #ff4d4f;
   --border-color: #3c3c3c;
+  
+  /* Font families */
+  --font-display: 'Metal Mania', cursive;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {

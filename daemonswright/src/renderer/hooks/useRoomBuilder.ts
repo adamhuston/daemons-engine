@@ -38,6 +38,7 @@ interface UseRoomBuilderResult {
   addConnection: (source: string, target: string, direction: string) => Promise<boolean>;
   removeConnection: (connectionId: string) => Promise<boolean>;
   removeExit: (roomId: string, direction: string) => Promise<boolean>;
+  createArea: (areaId: string, displayName: string) => Promise<boolean>;
 }
 
 // Direction to offset mapping for positioning exits
@@ -432,6 +433,82 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
     }
   }, [rooms, getRoomFilePath]);
 
+  // Create a new area (folder with initial room, layout, and area definition)
+  const createArea = useCallback(async (areaId: string, displayName: string): Promise<boolean> => {
+    if (!worldDataPath) return false;
+    
+    try {
+      // Normalize area_id to use underscores and lowercase
+      const normalizedAreaId = `area_${areaId.toLowerCase().replace(/\s+/g, '_').replace(/^area_/, '')}`;
+      const folderName = normalizedAreaId.replace('area_', '');
+      const areaPath = `${worldDataPath}/rooms/${folderName}`;
+      
+      // Create the area definition file in /areas folder
+      const areaDefPath = `${worldDataPath}/areas/${folderName}.yaml`;
+      const initialRoomId = `${folderName}_start`;
+      const areaDefContent = yaml.dump({
+        id: normalizedAreaId,
+        name: displayName,
+        description: `${displayName} area.`,
+        time_scale: 1.0,
+        starting_day: 1,
+        starting_hour: 6,
+        starting_minute: 0,
+        biome: 'outdoor',
+        climate: 'temperate',
+        ambient_lighting: 'natural',
+        weather_profile: 'standard',
+        danger_level: 1,
+        magic_intensity: 'normal',
+        default_respawn_time: 300,
+        recommended_level: 1,
+        theme: 'exploration',
+        area_flags: {
+          safe_zone: false,
+          pvp_enabled: false,
+          magic_enhanced: false,
+        },
+        entry_points: [initialRoomId],
+      }, { indent: 2, lineWidth: 120, noRefs: true });
+      await window.daemonswright.fs.writeFile(areaDefPath, areaDefContent);
+      
+      // Create empty layout file in rooms folder
+      const layoutPath = `${areaPath}/_layout.yaml`;
+      const layoutContent = yaml.dump({ positions: {} }, { indent: 2 });
+      await window.daemonswright.fs.writeFile(layoutPath, layoutContent);
+      
+      // Create an initial room for the area
+      const roomPath = `${areaPath}/${initialRoomId}.yaml`;
+      const roomData: RoomYaml = {
+        id: initialRoomId,
+        area_id: normalizedAreaId,
+        name: `${displayName} - Start`,
+        description: `The starting point of ${displayName}.`,
+        room_type: 'outdoor',
+        z_level: 0,
+        exits: {},
+      };
+      const roomContent = yaml.dump(roomData, { indent: 2, lineWidth: 120, noRefs: true });
+      await window.daemonswright.fs.writeFile(roomPath, roomContent);
+      
+      // Update layout with initial room position
+      const updatedLayout = yaml.dump({ 
+        positions: { 
+          [initialRoomId]: { x: 0, y: 0 } 
+        } 
+      }, { indent: 2 });
+      await window.daemonswright.fs.writeFile(layoutPath, updatedLayout);
+      
+      // Reload rooms to pick up the new area
+      await loadRooms();
+      
+      return true;
+    } catch (err) {
+      console.error('Failed to create area:', err);
+      return false;
+    }
+  }, [worldDataPath, loadRooms]);
+
   // Add a new connection and save to room YAML
   const addConnection = useCallback(async (source: string, target: string, direction: string): Promise<boolean> => {
     const sourceRoom = rooms.find((r) => r.id === source);
@@ -725,6 +802,7 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
     addConnection,
     removeConnection,
     removeExit,
+    createArea,
   };
 }
 

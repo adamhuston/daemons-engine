@@ -10,3 +10,4 @@ export { RoomBuilder } from './RoomBuilder';
 export { QuestDesigner } from './QuestDesigner';
 export { DialogueEditor } from './DialogueEditor';
 export { FormEditor } from './FormEditor';
+export { Loader, InlineLoader, AppLoader, StartScreen } from './Loader';

@@ -30,6 +30,31 @@ export function registerFileSystemHandlers(): void {
     return result.filePaths[0];
   });
 
+  // Select folder for saving (create new world)
+  ipcMain.handle('fs:selectSaveFolder', async (_event, defaultName?: string) => {
+    const result = await dialog.showSaveDialog({
+      title: 'Create New World',
+      defaultPath: defaultName || 'world_data',
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+    });
+
+    if (result.canceled || !result.filePath) {
+      return null;
+    }
+
+    return result.filePath;
+  });
+
+  // Create directory (and parent directories)
+  ipcMain.handle('fs:createDirectory', async (_event, dirPath: string) => {
+    try {
+      await fs.mkdir(dirPath, { recursive: true });
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to create directory: ${error}`);
+    }
+  });
+
   // List directory contents
   ipcMain.handle('fs:listDirectory', async (_event, dirPath: string) => {
     try {

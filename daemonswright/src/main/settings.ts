@@ -33,11 +33,16 @@ let settings: AppSettings = {};
 export function loadSettings(): AppSettings {
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
-      const data = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-      settings = JSON.parse(data);
+      const data = fs.readFileSync(SETTINGS_FILE, 'utf-8').trim();
+      // Only parse if we have valid content
+      if (data && data.length > 0) {
+        settings = JSON.parse(data);
+      } else {
+        settings = {};
+      }
     }
   } catch (error) {
-    console.error('Failed to load settings:', error);
+    console.error('Failed to load settings, using defaults:', error);
     settings = {};
   }
   return settings;

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Layout } from 'antd';
 import { FileTree } from './components/FileTree';
+import { AppLoader, InlineLoader, StartScreen } from './components/Loader';
 import React, { Suspense } from 'react';
 // Ensure the lazily loaded module exposes a default React component for React.lazy
 const YamlEditor = React.lazy(() =>
@@ -17,15 +18,35 @@ import { MenuBar, EditorView } from './components/MenuBar';
 import { useWorkspace } from './hooks/useWorkspace';
 import { useSchema } from './hooks/useSchema';
 import { useRoomBuilder } from './hooks/useRoomBuilder';
+import { useSchemaOptions } from './hooks/useSchemaOptions';
 import type { RoomNode } from '../shared/types';
 import './styles/App.css';
 
 const { Sider, Content, Footer } = Layout;
 
+/**
+ * Suspense fallback component for lazy-loaded editors
+ */
+function EditorFallback() {
+  return (
+    <div className="suspense-loader">
+      <InlineLoader message="Loading editor..." />
+    </div>
+  );
+}
+
 function App() {
+  // Track initial app loading state
+  const [appReady, setAppReady] = useState(false);
+  
+  // Track last folder and recent folders for start screen
+  const [lastFolder, setLastFolder] = useState<string | null>(null);
+  const [recentFolders, setRecentFolders] = useState<string[]>([]);
+
   const {
     worldDataPath,
     openFolder,
+    openFolderByPath,
     files,
     selectedFile,
     selectFile,
@@ -49,7 +70,11 @@ function App() {
     addConnection,
     removeConnection,
     removeExit,
+    createArea,
   } = useRoomBuilder(worldDataPath);
+
+  // Schema options for dynamic field values
+  const { roomOptions, areaOptions, addOption } = useSchemaOptions(worldDataPath);
 
   // Selected room for properties panel
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -60,6 +85,21 @@ function App() {
 
   // Room property change tracking
   const [roomIsDirty, setRoomIsDirty] = useState(false);
+
+  // Load last folder and recent folders on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const last = await window.daemonswright?.settings?.getLastFolder();
+        const recent = await window.daemonswright?.settings?.getRecentFolders();
+        setLastFolder(last || null);
+        setRecentFolders(recent || []);
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const handleFileSelect = useCallback((filePath: string) => {
     selectFile(filePath);
@@ -94,15 +134,40 @@ function App() {
     return () => window.removeEventListener('editor:save', onEditorSave);
   }, [handleSave]);
 
-  return (
-    <Layout className="app-layout">
-      <MenuBar
-        onOpenFolder={openFolder}
-        onSave={handleSave}
-        canSave={isDirty}
-        currentView={currentView}
-        onViewChange={setCurrentView}
+  // Mark app as ready once initial hooks have settled
+  useEffect(() => {
+    // Small delay to ensure all hooks have initialized
+    const timer = setTimeout(() => {
+      setAppReady(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // If no world is loaded, show the start screen
+  if (!worldDataPath) {
+    return (
+      <StartScreen 
+        onWorldSelect={openFolderByPath}
+        lastFolder={lastFolder}
+        recentFolders={recentFolders}
       />
+    );
+  }
+
+  return (
+    <AppLoader 
+      isLoading={!appReady} 
+      minDisplayTime={1500} 
+      message="Loading world data..."
+    >
+      <Layout className="app-layout">
+        <MenuBar
+          onOpenFolder={openFolder}
+          onSave={handleSave}
+          canSave={isDirty}
+          currentView={currentView}
+          onViewChange={setCurrentView}
+        />
 
       <Layout className="main-layout">
         <Sider
@@ -121,7 +186,7 @@ function App() {
 
         <Content className="editor-content">
           {currentView === 'yaml' && selectedFile ? (
-            <Suspense fallback={<div className="editor-loading">Loading editor…</div>}>
+            <Suspense fallback={<EditorFallback />}>
               <YamlEditor
                 filePath={selectedFile}
                 content={fileContent}
@@ -133,7 +198,7 @@ function App() {
           ) : currentView === 'room-builder' ? (
             <Layout style={{ height: '100%' }}>
               <Content style={{ flex: 1, minWidth: 0 }}>
-                <Suspense fallback={<div className="editor-loading">Loading Room Builder…</div>}>
+                <Suspense fallback={<EditorFallback />}>
                   <RoomBuilder
                     rooms={rooms}
                     connections={connections}
@@ -161,6 +226,11 @@ function App() {
                     onConnectionCreate={addConnection}
                     onConnectionDelete={removeConnection}
                     onRemoveExit={removeExit}
+                    onAreaCreate={createArea}
+                    roomTypeOptions={roomOptions.room_type || []}
+                    onAddRoomType={async (newType) => {
+                      return await addOption('room', 'room_type', newType);
+                    }}
                   />
                 </Suspense>
               </Content>
@@ -168,7 +238,7 @@ function App() {
                 width={300}
                 style={{ background: 'var(--color-bg-secondary)' }}
               >
-                <Suspense fallback={<div className="editor-loading">Loading…</div>}>
+                <Suspense fallback={<EditorFallback />}>
                   <RoomPropertiesPanel
                     selectedRoom={selectedRoom}
                     onSave={async (roomId, updates) => {
@@ -193,6 +263,10 @@ function App() {
                       await removeExit(roomId, direction);
                     }}
                     isDirty={roomIsDirty}
+                    roomTypeOptions={roomOptions.room_type || []}
+                    onAddRoomType={async (newType) => {
+                      return await addOption('room', 'room_type', newType);
+                    }}
                   />
                 </Suspense>
               </Sider>
@@ -215,6 +289,7 @@ function App() {
         />
       </Footer>
     </Layout>
+    </AppLoader>
   );
 }
 
