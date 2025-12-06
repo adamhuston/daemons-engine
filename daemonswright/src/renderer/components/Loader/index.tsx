@@ -13,7 +13,7 @@ import {
   HistoryOutlined,
   RightOutlined,
 } from '@ant-design/icons';
-import logoImage from '../../assets/images/dwcms_placeholder.png';
+import logoImage from '../../assets/images/dw-art.png';
 import './Loader.css';
 
 const { Text, Title } = Typography;
@@ -27,8 +27,8 @@ interface LoaderProps {
   transparent?: boolean;
 }
 
-export function Loader({ 
-  message = 'Loading...', 
+export function Loader({
+  message = 'Loading...',
   fullscreen = true,
   transparent = false,
 }: LoaderProps) {
@@ -38,9 +38,9 @@ export function Loader({
         {/* Logo with ominous glow - nothing else */}
         <div className="loader-logo-wrapper">
           <div className="loader-glow-red" />
-          <img 
-            src={logoImage} 
-            alt="Daemonswright CMS" 
+          <img
+            src={logoImage}
+            alt="Daemonswright CMS"
             className="loader-logo"
           />
         </div>
@@ -67,7 +67,7 @@ export function InlineLoader({ message = 'Loading...' }: { message?: string }) {
 
 /**
  * Start Screen - Main entry point for the app
- * 
+ *
  * Shows options to:
  * - Create a new world
  * - Open an existing world
@@ -107,7 +107,7 @@ export function StartScreen({
 
       // Create the directory structure
       await window.daemonswright.fs.createDirectory(savePath);
-      
+
       // Create subdirectories for content types
       const subdirs = [
         'abilities',
@@ -181,13 +181,13 @@ export function StartScreen({
         <div className="start-logo-section">
           <div className="start-logo-wrapper">
             <div className="loader-glow-red" />
-            <img 
-              src={logoImage} 
-              alt="Daemonswright CMS" 
+            <img
+              src={logoImage}
+              alt="Daemonswright CMS"
               className="start-logo"
             />
           </div>
-          
+
           <div className="start-text">
             <Title level={1} className="start-title">D&AElig;MONSWRIGHT</Title>
           </div>
@@ -305,17 +305,17 @@ fields:
     type: string
     required: true
     description: Unique identifier for the room
-  
+
   name:
     type: string
     required: true
     description: Display name shown to players
-  
+
   description:
     type: string
     required: true
     description: The text shown when a player enters the room
-  
+
   room_type:
     type: string
     enum:
@@ -333,21 +333,21 @@ fields:
       - temple
       - water
     description: The type/biome of the room
-  
+
   area_id:
     type: string
     ref: areas
     description: Reference to the parent area
-  
+
   z_level:
     type: integer
     default: 0
     description: Vertical layer (floor level)
-  
+
   exits:
     type: object
     description: Map of direction to destination room_id
-  
+
   lighting_override:
     type: string
     enum:
@@ -371,16 +371,16 @@ fields:
     type: string
     required: true
     description: Unique identifier for the NPC
-  
+
   name:
     type: string
     required: true
     description: Display name of the NPC
-  
+
   description:
     type: string
     description: Description shown when examining the NPC
-  
+
   npc_type:
     type: string
     enum:
@@ -392,17 +392,17 @@ fields:
       - celestial
       - fiend
     description: The creature type
-  
+
   level:
     type: integer
     default: 1
     description: NPC level for scaling
-  
+
   faction_id:
     type: string
     ref: factions
     description: The faction this NPC belongs to
-  
+
   dialogue_id:
     type: string
     ref: dialogues
@@ -421,16 +421,16 @@ fields:
     type: string
     required: true
     description: Unique identifier for the item
-  
+
   name:
     type: string
     required: true
     description: Display name of the item
-  
+
   description:
     type: string
     description: Description shown when examining
-  
+
   item_type:
     type: string
     enum:
@@ -442,17 +442,17 @@ fields:
       - misc
       - container
     description: Category of item
-  
+
   value:
     type: integer
     default: 0
     description: Base gold value
-  
+
   weight:
     type: number
     default: 0.1
     description: Weight in pounds
-  
+
   stackable:
     type: boolean
     default: false
@@ -494,7 +494,7 @@ description: The starting zone for new adventurers
 
 /**
  * App Loader - Handles loading transition
- * 
+ *
  * Shows a loader while the app is initializing, with a minimum display time
  * for smooth transitions.
  */
