@@ -5,10 +5,11 @@
  * visual graph representation (items, NPCs, abilities, classes, etc.)
  */
 
-import { useCallback, useMemo } from 'react';
-import { Form, Input, InputNumber, Select, Switch, Card, Button, Divider, Space } from 'antd';
+import { useCallback, useMemo, useState, useEffect } from 'react';
+import { Form, Input, InputNumber, Select, Switch, Card, Button, Divider, Space, Spin } from 'antd';
 import { PlusOutlined, DeleteOutlined, LinkOutlined } from '@ant-design/icons';
 import type { SchemaDefinition, SchemaField } from '../../shared/types';
+import { EntityMultiSelect } from './EntityMultiSelect';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -19,9 +20,10 @@ interface FormEditorProps {
   onChange: (data: Record<string, unknown>) => void;
   contentType: string;
   onNavigateToEntity?: (entityType: string, entityId: string) => void;
+  worldDataPath?: string | null;
 }
 
-export function FormEditor({ schema, data, onChange, contentType, onNavigateToEntity }: FormEditorProps) {
+export function FormEditor({ schema, data, onChange, contentType, onNavigateToEntity, worldDataPath }: FormEditorProps) {
   const [form] = Form.useForm();
 
   // Initialize form with data
@@ -48,7 +50,7 @@ export function FormEditor({ schema, data, onChange, contentType, onNavigateToEn
     if (fieldName.includes('room_id') || fieldName === 'location') {
       return 'rooms';
     }
-    if (fieldName.includes('ability_id') || fieldName.includes('ability_template')) {
+    if (fieldName.includes('ability') || fieldName.includes('abilities')) {
       return 'abilities';
     }
     if (fieldName.includes('quest_id')) {
@@ -56,6 +58,9 @@ export function FormEditor({ schema, data, onChange, contentType, onNavigateToEn
     }
     if (fieldName.includes('dialogue_id')) {
       return 'dialogues';
+    }
+    if (fieldName.includes('class_id') || fieldName === 'required_class') {
+      return 'classes';
     }
     return null;
   };
@@ -135,6 +140,21 @@ export function FormEditor({ schema, data, onChange, contentType, onNavigateToEn
         );
 
       case 'array':
+        // Check if this is a reference array (like available_abilities)
+        const arrayRefType = field.ref || inferRefType(name);
+        if (arrayRefType && worldDataPath) {
+          return (
+            <Form.Item key={name} {...commonProps}>
+              <EntityMultiSelect
+                entityType={arrayRefType}
+                worldDataPath={worldDataPath}
+                placeholder={`Select ${name.replace(/_/g, ' ')}...`}
+              />
+            </Form.Item>
+          );
+        }
+        
+        // Default array handling with Form.List
         return (
           <Form.Item key={name} {...commonProps}>
             <Form.List name={name}>

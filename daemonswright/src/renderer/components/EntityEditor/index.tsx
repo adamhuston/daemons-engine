@@ -17,6 +17,7 @@ import {
   SaveOutlined,
   FormOutlined,
   CodeOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import yaml from 'js-yaml';
 import { FormEditor } from '../FormEditor';
@@ -42,6 +43,7 @@ const ENTITY_CATEGORIES: EntityCategory[] = [
   { key: 'npcs', label: 'NPCs', icon: <UserOutlined />, folder: 'npcs', schemaId: 'npcs' },
   { key: 'items', label: 'Items', icon: <GiftOutlined />, folder: 'items', schemaId: 'items' },
   { key: 'abilities', label: 'Abilities', icon: <ThunderboltOutlined />, folder: 'abilities', schemaId: 'abilities' },
+  { key: 'classes', label: 'Classes', icon: <TeamOutlined />, folder: 'classes', schemaId: 'classes' },
   { key: 'triggers', label: 'Triggers', icon: <ThunderboltOutlined />, folder: 'triggers', schemaId: 'triggers', useCustomEditor: true },
 ];
 
@@ -507,6 +509,7 @@ export function EntityEditor({ worldDataPath, schemas }: EntityEditorProps) {
                   onChange={handleEntityChange}
                   contentType={currentCategory.label.slice(0, -1)}
                   onNavigateToEntity={handleNavigateToEntity}
+                  worldDataPath={worldDataPath}
                 />
               ) : (
                 <Card>
