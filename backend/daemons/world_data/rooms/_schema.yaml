@@ -112,6 +112,16 @@ lighting_override: string | null (optional)
   # If null, uses area's ambient_lighting
   # Example: "pitch_black" (for a deep cave in a normally bright area)
 
+# Phase 17.1: Temperature Override (Optional)
+# ==========================================
+temperature_override: int | null (optional)
+  # Override area's calculated temperature for this specific room
+  # Useful for forges (hot), ice caves (cold), magic-heated rooms, etc.
+  # Temperature is in Fahrenheit
+  # If null, uses area's base_temperature with biome/time modifiers
+  # Range: -100 to 200 (realistic range: 0-120)
+  # Example: 120 (blacksmith's forge), 20 (ice cave), 70 (magically climate-controlled)
+
 # Room Type Customization (Optional)
 # ==================================
 room_type_emoji: string | null (optional)

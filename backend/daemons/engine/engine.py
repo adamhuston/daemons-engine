@@ -145,6 +145,12 @@ class WorldEngine:
         self.lighting_system = LightingSystem(world, self.time_manager)
         self.ctx.lighting_system = self.lighting_system
 
+        # Phase 17.1: Temperature system
+        from daemons.engine.systems.temperature import TemperatureSystem
+
+        self.temperature_system = TemperatureSystem(world)
+        self.ctx.temperature_system = self.temperature_system
+
         # Phase 12.1: Schema registry for CMS integration
         import os
 
@@ -550,6 +556,16 @@ class WorldEngine:
             names=["lightlevel", "ll"],
             category="admin",
             description="[GM] Check light level in current room",
+            usage="",
+        )
+
+        # Phase 17.1: Temperature command
+        self.command_router.register_handler(
+            primary_name="temperature",
+            handler=self._temperature_handler,
+            names=["temperature", "temp"],
+            category="info",
+            description="Check the temperature in current room",
             usage="",
         )
 
@@ -1012,6 +1028,77 @@ class WorldEngine:
             lines.append("🌕 Normal - Full visibility")
         elif visibility == VisibilityLevel.ENHANCED:
             lines.append("✨ Enhanced - Perfect clarity")
+
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    def _temperature_handler(
+        self, engine: Any, player_id: PlayerId, args: str
+    ) -> list[Event]:
+        """Check the temperature in the current room."""
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "Player not found.")]
+
+        room = self.world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are not in a valid room.")]
+
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+
+        # Get temperature system
+        if not hasattr(self, "temperature_system") or not self.temperature_system:
+            return [self._msg_to_player(player_id, "Temperature system not available.")]
+
+        import time
+
+        state = self.temperature_system.calculate_room_temperature(room, time.time())
+        area = self.world.areas.get(room.area_id) if room.area_id else None
+
+        # Build temperature report
+        lines = ["🌡️ Temperature Analysis"]
+        lines.append("=" * 40)
+
+        # Main temperature display
+        temp_display = self.temperature_system.format_temperature_display(
+            state.temperature, include_effects=False
+        )
+        lines.append(f"Current: {temp_display}")
+        lines.append("")
+
+        # Breakdown (show calculation details)
+        if state.is_override:
+            lines.append("(Room has fixed temperature override)")
+        else:
+            lines.append("Temperature Breakdown:")
+            lines.append(f"  Base (area): {state.base_temperature}°F")
+            if state.biome_modifier != 0:
+                biome = area.biome if area else "unknown"
+                sign = "+" if state.biome_modifier > 0 else ""
+                lines.append(f"  Biome ({biome}): {sign}{state.biome_modifier}°F")
+            if state.time_modifier != 0:
+                sign = "+" if state.time_modifier > 0 else ""
+                lines.append(f"  Time of day: {sign}{state.time_modifier}°F")
+            lines.append(f"  Final: {state.temperature}°F")
+
+        # Effects warning
+        effects = self.temperature_system.get_temperature_effects(state.temperature)
+        if effects["message"]:
+            lines.append("")
+            lines.append(f"{effects['icon']} {effects['message']}")
+            if effects["damage_per_tick"] > 0:
+                lines.append(f"  ⚠️ Taking {effects['damage_per_tick']} damage per tick!")
+            if effects["movement_penalty"] > 0:
+                lines.append(
+                    f"  ⚠️ Movement slowed by {int(effects['movement_penalty'] * 100)}%"
+                )
+            if effects["stamina_regen_modifier"] < 1.0:
+                reduction = int((1 - effects["stamina_regen_modifier"]) * 100)
+                lines.append(f"  ⚠️ Stamina regeneration reduced by {reduction}%")
+
+        lines.append("=" * 40)
 
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
@@ -4374,6 +4461,18 @@ class WorldEngine:
         # Get description based on light level
         description = self.lighting_system.get_visible_description(room, light_level)
         lines: list[str] = [f"**{room_emoji} {room.name}**", description]
+
+        # Phase 17.1: Show temperature for extreme conditions
+        if hasattr(self, "temperature_system") and self.temperature_system:
+            temp_state = self.temperature_system.calculate_room_temperature(
+                room, current_time
+            )
+            if self.temperature_system.should_show_temperature(temp_state.temperature):
+                temp_display = self.temperature_system.format_temperature_display(
+                    temp_state.temperature, include_effects=False
+                )
+                lines.append("")
+                lines.append(f"Temperature: {temp_display}")
 
         # List all entities (players and NPCs) in the same room
         # Filter by visibility

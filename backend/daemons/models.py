@@ -82,6 +82,11 @@ class Room(Base):
     # Example: deep cave room in forest area = "pitch_black"
     lighting_override: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Phase 17.1: Temperature system
+    # Per-room temperature override in Fahrenheit (overrides area calculation)
+    # Example: forge room = 110, ice cave = 20
+    temperature_override: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # YAML content management
     # True = managed by YAML files, False = created/modified via API
     yaml_managed: Mapped[bool] = mapped_column(
@@ -187,6 +192,16 @@ class Area(Base):
     )
     weather_profile: Mapped[str] = mapped_column(
         String, nullable=False, server_default="clear"
+    )
+
+    # Phase 17.1: Temperature system
+    # Base temperature in Fahrenheit (typical range: -50 to 150)
+    base_temperature: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="70"
+    )
+    # Daily temperature variation (+/- degrees based on time of day)
+    temperature_variation: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="20"
     )
 
     # Gameplay properties

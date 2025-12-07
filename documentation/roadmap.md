@@ -1664,13 +1664,393 @@ Stub client tweaks
 - [ ] Consider OWASP ZAP automated scanning
 - [ ] Document security practices in SECURITY.md
 
-### Phase 17 - Areas engine update
-- Flora and Fauna
-- Temperature
-- Weather and Climate
-- Biomes = compatible subsets of Temperature + Weather + Climate + Flora + Fauna
-- Flora and Fauna generation and competition: condition-dependent spawn cycles
-- Roads and paths - tracking and trails
+### Phase 17 - Areas Engine Update ⬜
+
+**Goals**: Expand environmental simulation with dynamic weather, temperature, flora/fauna ecosystems, biome coherence, and terrain features like roads and paths.
+
+**Status**: Not Started | **Priority**: Medium (worldbuilding enhancement)
+
+**Existing Foundation**:
+- ✅ Areas have: `biome`, `climate`, `weather_profile`, `ambient_lighting`, `time_scale`
+- ✅ LightingSystem with time-of-day modifiers and biome immunity
+- ✅ NPC respawn system with area-wide defaults and per-NPC overrides
+- ✅ Trigger system for condition-based events (light_level, visibility_level)
+- ✅ Item templates with environmental properties (provides_light, etc.)
+- ✅ Room `room_type` field for terrain classification
+
+---
+
+#### Phase 17.1 - Temperature System ⬜
+
+**Purpose**: Add temperature as a gameplay mechanic affecting players, NPCs, and spawn conditions
+
+- [ ] **Database Schema**:
+    - [ ] Add `base_temperature` to areas table (int, -50 to 150°F, default 70)
+    - [ ] Add `temperature_variation` to areas (int, daily variance, default 20)
+    - [ ] Add `temperature_override` to rooms table (nullable int)
+    - [ ] Create Alembic migration `phase17_1_temperature.py`
+
+- [ ] **TemperatureSystem Class** (`backend/daemons/engine/systems/temperature.py`):
+    - [ ] `calculate_room_temperature(room, current_time)` → int
+    - [ ] Base = area.base_temperature ± time-of-day modifier
+    - [ ] Time modifiers: night(-15), dawn(-5), day(0), dusk(-5)
+    - [ ] Room override replaces calculation (like lighting_override)
+    - [ ] Biome modifiers: arctic(-40), desert(+30), underground(constant)
+
+- [ ] **Temperature Thresholds**:
+    - [ ] FREEZING (< 32°F): Cold damage tick, movement penalty
+    - [ ] COLD (32-50°F): Stamina regen reduced
+    - [ ] COMFORTABLE (50-80°F): No effect
+    - [ ] HOT (80-100°F): Stamina regen reduced
+    - [ ] SCORCHING (> 100°F): Heat damage tick, movement penalty
+
+- [ ] **WorldArea/WorldRoom Updates**:
+    - [ ] Add `base_temperature` and `temperature_variation` to WorldArea
+    - [ ] Add `temperature_override` to WorldRoom
+    - [ ] Integrate with loader.py for YAML loading
+
+- [ ] **Trigger Conditions**:
+    - [ ] `temperature_above`: Fire when room temp > threshold
+    - [ ] `temperature_below`: Fire when room temp < threshold
+    - [ ] `temperature_range`: Fire when temp within range
+
+- [ ] **Player Effects**:
+    - [ ] Temperature damage ticks (configurable in d20.py)
+    - [ ] `temperature` command to check current temperature
+    - [ ] Temperature shown in `look` output for extreme conditions
+
+- [ ] **Testing**:
+    - [ ] Unit tests for TemperatureSystem calculations
+    - [ ] Integration tests for temperature triggers
+    - [ ] Test biome modifiers and time-of-day variations
+
+---
+
+#### Phase 17.2 - Weather System ⬜
+
+**Purpose**: Dynamic weather that changes over time and affects gameplay
+
+- [ ] **Database Schema**:
+    - [ ] Create `weather_states` table (id, area_id, weather_type, intensity, started_at, duration)
+    - [ ] Expand areas `weather_profile` into `weather_patterns` JSON field
+    - [ ] Add `weather_immunity` boolean to areas (for underground, indoor, etc.)
+    - [ ] Create Alembic migration `phase17_2_weather.py`
+
+- [ ] **Weather Types** (enum):
+    - [ ] CLEAR, CLOUDY, OVERCAST
+    - [ ] RAIN (light, moderate, heavy), STORM (thunderstorm)
+    - [ ] SNOW (flurries, moderate, blizzard)
+    - [ ] FOG (light, dense)
+    - [ ] WIND (breezy, windy, gale)
+
+- [ ] **WeatherSystem Class** (`backend/daemons/engine/systems/weather.py`):
+    - [ ] `get_current_weather(area_id)` → WeatherState
+    - [ ] `advance_weather(area_id)` → WeatherState (transition logic)
+    - [ ] `schedule_weather_tick()` - periodic weather updates (every 5-15 min game time)
+    - [ ] Weather transitions based on climate + season + randomness
+    - [ ] Markov chain or weighted probability for realistic progression
+
+- [ ] **Weather Effects**:
+    - [ ] Visibility modifiers (fog/rain reduce light_level)
+    - [ ] Temperature modifiers (rain cools, clear sun heats)
+    - [ ] Movement modifiers (blizzard/storm = slower travel)
+    - [ ] Combat modifiers (rain = ranged penalty, wind = casting penalty)
+
+- [ ] **Weather Patterns by Climate**:
+    - [ ] `arid`: CLEAR (70%), WIND (25%), STORM (5%)
+    - [ ] `temperate`: CLEAR (40%), CLOUDY (30%), RAIN (20%), STORM (10%)
+    - [ ] `arctic`: SNOW (50%), CLOUDY (30%), BLIZZARD (15%), CLEAR (5%)
+    - [ ] `tropical`: RAIN (40%), STORM (25%), CLEAR (25%), CLOUDY (10%)
+
+- [ ] **Integration**:
+    - [ ] Weather shown in `look` output
+    - [ ] `weather` command for detailed forecast
+    - [ ] Weather events broadcast to area on change
+    - [ ] Trigger conditions: `weather_is`, `weather_intensity`
+
+- [ ] **Area YAML Schema Update**:
+    ```yaml
+    weather_patterns:
+      clear: 0.4
+      rain: 0.3
+      storm: 0.1
+      cloudy: 0.2
+    weather_immunity: false
+    ```
+
+---
+
+#### Phase 17.3 - Biome Coherence System ⬜
+
+**Purpose**: Define biomes as coherent combinations of temperature + weather + climate + flora + fauna
+
+- [ ] **Biome Definition Schema** (`world_data/biomes/_schema.yaml`):
+    ```yaml
+    id: string
+    name: string
+    description: string
+    
+    # Environmental ranges
+    temperature_range: [min, max]  # Comfortable range for this biome
+    climate_types: [list]          # Compatible climates
+    weather_patterns: dict         # Default weather probabilities
+    ambient_lighting: string       # Default lighting
+    
+    # Flora/Fauna compatibility
+    flora_tags: [list]             # e.g., ["deciduous", "conifer", "grass"]
+    fauna_tags: [list]             # e.g., ["woodland", "predator", "prey"]
+    
+    # Gameplay modifiers
+    danger_modifier: int           # Added to area danger_level
+    magic_affinity: string         # Affects magic_intensity
+    ```
+
+- [ ] **Predefined Biomes** (`world_data/biomes/`):
+    - [ ] `temperate_forest.yaml`: 40-75°F, deciduous trees, deer/wolves/bears
+    - [ ] `boreal_forest.yaml`: 20-55°F, conifers, moose/wolves/bears
+    - [ ] `grassland.yaml`: 50-90°F, grasses/flowers, bison/rabbits/hawks
+    - [ ] `desert.yaml`: 60-120°F, cacti/shrubs, snakes/lizards/vultures
+    - [ ] `arctic_tundra.yaml`: -20-40°F, mosses/lichens, bears/wolves/seals
+    - [ ] `swamp.yaml`: 60-85°F, reeds/cypress, gators/herons/snakes
+    - [ ] `mountain.yaml`: 30-60°F, alpine flowers/conifers, goats/eagles
+    - [ ] `underground.yaml`: 50-60°F constant, mushrooms/moss, bats/spiders
+    - [ ] `ethereal.yaml`: N/A temperature, magical flora, wisps/spirits
+
+- [ ] **BiomeSystem Class** (`backend/daemons/engine/systems/biome.py`):
+    - [ ] Load biome definitions from YAML
+    - [ ] `validate_area_biome(area)` → warnings for incompatible settings
+    - [ ] `get_compatible_flora(biome_id)` → list of flora template IDs
+    - [ ] `get_compatible_fauna(biome_id)` → list of NPC template IDs
+
+- [ ] **Area Validation**:
+    - [ ] Warn if area.temperature outside biome.temperature_range
+    - [ ] Warn if area.climate not in biome.climate_types
+    - [ ] Warn if spawned NPCs don't match fauna_tags
+
+---
+
+#### Phase 17.4 - Flora System ⬜
+
+**Purpose**: Define plants, trees, and vegetation as interactive world objects
+
+- [ ] **Flora Template Schema** (`world_data/flora/_schema.yaml`):
+    ```yaml
+    id: string                      # e.g., "flora_oak_tree"
+    name: string                    # "Oak Tree"
+    description: string             # Flavor text
+    flora_type: enum                # tree, shrub, grass, flower, fungus
+    
+    # Environmental requirements
+    biome_tags: [list]              # Compatible biomes
+    temperature_range: [min, max]   # Survival range
+    light_requirement: enum         # full_sun, partial_shade, shade, any
+    
+    # Interaction
+    harvestable: bool               # Can players gather from it?
+    harvest_items: [list]           # Items gained: [{item_id, quantity, chance}]
+    harvest_cooldown: int           # Seconds until re-harvestable
+    
+    # Visual/Seasonal
+    seasonal_variants: dict         # {spring: desc, summer: desc, fall: desc, winter: desc}
+    provides_cover: bool            # Affects visibility/stealth
+    blocks_movement: bool           # Large trees might block some directions
+    ```
+
+- [ ] **Flora Templates from flora_and_fauna.md**:
+    - [ ] Trees (20): oak, maple, pine, fir, etc. with biome assignments
+    - [ ] Shrubs (19): berry bushes, sagebrush, etc.
+    - [ ] Grasses/Flowers (24): wildflowers, cattails, ferns, etc.
+
+- [ ] **Room Flora System**:
+    - [ ] Add `flora` field to rooms (list of flora instance refs)
+    - [ ] Flora instances track: template_id, room_id, last_harvested, quantity
+    - [ ] Flora shown in `look` output under "Vegetation:" section
+
+- [ ] **Harvest Command**:
+    - [ ] `harvest <plant>` - gather resources from harvestable flora
+    - [ ] Skill check for rare items (herbalism skill future?)
+    - [ ] Cooldown per-player-per-plant
+
+- [ ] **Flora Spawn System**:
+    - [ ] Flora spawns defined per-area or per-room
+    - [ ] Density settings (sparse, moderate, dense, lush)
+    - [ ] Regeneration over time after harvest
+
+---
+
+#### Phase 17.5 - Fauna System ⬜
+
+**Purpose**: Extend NPC templates with fauna-specific properties for wildlife behavior
+
+- [ ] **Fauna Template Extensions** (NPC schema additions):
+    ```yaml
+    # Add to npcs/_schema.yaml
+    is_fauna: bool                  # Distinguishes wildlife from humanoids
+    fauna_type: enum                # mammal, bird, reptile, fish, insect
+    
+    # Environmental requirements
+    biome_tags: [list]              # Where this creature naturally spawns
+    temperature_tolerance: [min, max]  # Survival range
+    activity_period: enum           # diurnal, nocturnal, crepuscular, always
+    
+    # Ecological role
+    diet: enum                      # herbivore, carnivore, omnivore
+    prey_tags: [list]               # What it hunts (other fauna_tags)
+    predator_tags: [list]           # What hunts it
+    
+    # Behavior modifiers
+    pack_size: [min, max]           # Spawns in groups
+    territorial: bool               # Attacks intruders
+    migratory: bool                 # Moves between areas seasonally
+    ```
+
+- [ ] **Fauna Templates from flora_and_fauna.md**:
+    - [ ] Mammals (27): deer, wolf, bear, fox, etc.
+    - [ ] Birds (23): eagle, hawk, owl, songbirds, etc.
+    - [ ] Reptiles (14): snakes, turtles, lizards, etc.
+
+- [ ] **FaunaSystem Class** (`backend/daemons/engine/systems/fauna.py`):
+    - [ ] Extends NPC spawning with fauna-specific logic
+    - [ ] Activity period checks (nocturnal = spawn at night)
+    - [ ] Pack spawning (wolves spawn in groups of 3-5)
+    - [ ] Predator-prey interactions (wolves chase deer)
+
+- [ ] **Fauna AI Behaviors** (new behavior scripts):
+    - [ ] `grazing`: Herbivores wander and "eat" flora
+    - [ ] `hunting`: Carnivores seek prey NPCs
+    - [ ] `fleeing_predator`: Prey flees from predator NPCs
+    - [ ] `nesting`: Returns to spawn room at night
+    - [ ] `territorial`: Attacks NPCs entering territory
+
+---
+
+#### Phase 17.6 - Condition-Dependent Spawn Cycles ⬜
+
+**Purpose**: Flora and fauna spawn based on environmental conditions
+
+- [ ] **Spawn Condition System**:
+    - [ ] Extend `npc_spawns/_schema.yaml` with spawn conditions:
+    ```yaml
+    spawns:
+      - template_id: npc_wolf
+        room_id: forest_clearing
+        quantity: 3
+        spawn_conditions:
+          time_of_day: [dusk, night, dawn]  # Nocturnal
+          temperature_range: [20, 70]        # Not too hot
+          weather_not: [storm, blizzard]     # Seek shelter in storms
+          biome_match: true                  # Only if room biome matches
+    ```
+
+- [ ] **SpawnConditionEvaluator**:
+    - [ ] Check all conditions before spawning
+    - [ ] Re-evaluate periodically for despawn conditions
+    - [ ] Integrate with NPC housekeeping tick
+
+- [ ] **Population Management**:
+    - [ ] Area-wide population caps per fauna type
+    - [ ] Competition: predators reduce prey population
+    - [ ] Recovery: fauna respawns faster when population low
+    - [ ] Balance: herbivores need flora, carnivores need herbivores
+
+- [ ] **Seasonal Spawning** (future enhancement):
+    - [ ] Some fauna only in certain seasons
+    - [ ] Migration patterns between areas
+    - [ ] Breeding seasons = more spawns
+
+---
+
+#### Phase 17.7 - Roads and Paths System ⬜
+
+**Purpose**: Track player movement patterns, create dynamic trails, and define road networks
+
+- [ ] **Road/Path Types**:
+    - [ ] `road`: Paved/maintained, fast travel, safe
+    - [ ] `trail`: Worn path, moderate speed, some danger
+    - [ ] `track`: Faint path, normal speed, more danger
+    - [ ] `wilderness`: No path, slower travel, maximum danger
+
+- [ ] **Database Schema**:
+    - [ ] Add `path_type` to rooms (enum, nullable, default wilderness)
+    - [ ] Create `room_connections` table for path metadata:
+        - [ ] from_room_id, to_room_id, direction
+        - [ ] path_type, travel_time_modifier, danger_modifier
+        - [ ] discovered_by_players (JSON array)
+    - [ ] Create Alembic migration `phase17_7_roads.py`
+
+- [ ] **Movement Integration**:
+    - [ ] Path type affects travel time (roads = faster)
+    - [ ] Path type affects encounter chance
+    - [ ] Hidden paths require discovery (search command, quests)
+
+- [ ] **Tracking System**:
+    - [ ] Record movement patterns: who went where, when
+    - [ ] `tracks` command: "You see footprints heading north"
+    - [ ] Track decay over time (rain washes away tracks)
+    - [ ] Skill-based tracking (future: ranger abilities)
+
+- [ ] **Trail Formation** (dynamic paths):
+    - [ ] High-traffic routes become worn (wilderness → track → trail)
+    - [ ] Track "traffic_count" per connection
+    - [ ] Periodic evaluation upgrades/downgrades paths
+    - [ ] Player actions can create shortcuts
+
+- [ ] **Road Network Features**:
+    - [ ] Named roads (e.g., "King's Highway")
+    - [ ] Road signs at intersections
+    - [ ] Waypoints and milestones
+    - [ ] `roads` command to list known roads
+
+---
+
+#### Phase 17.8 - Integration & Polish ⬜
+
+- [ ] **YAML Schema Updates**:
+    - [ ] Update `areas/_schema.yaml` with new fields
+    - [ ] Create `biomes/_schema.yaml`
+    - [ ] Create `flora/_schema.yaml`
+    - [ ] Update `npcs/_schema.yaml` with fauna fields
+    - [ ] Update `npc_spawns/_schema.yaml` with conditions
+
+- [ ] **CMS Integration**:
+    - [ ] Add biome selector to area editor
+    - [ ] Flora placement in room editor
+    - [ ] Spawn condition builder UI
+    - [ ] Path type selector for connections
+
+- [ ] **Commands Summary**:
+    - [ ] `temperature` - Check current temperature
+    - [ ] `weather` - Check current weather and forecast
+    - [ ] `harvest <plant>` - Gather from flora
+    - [ ] `tracks` - Look for animal/player tracks
+    - [ ] `roads` - List known roads in area
+
+- [ ] **Documentation**:
+    - [ ] Update ARCHITECTURE.md with new systems
+    - [ ] Update DATABASE_SCHEMA.md
+    - [ ] Content creator guide for biomes/flora/fauna
+    - [ ] Example content: complete biome with flora/fauna
+
+- [ ] **Testing**:
+    - [ ] Unit tests for each new system
+    - [ ] Integration tests for spawn conditions
+    - [ ] Performance tests for weather ticks
+    - [ ] Sample biomes with full content
+
+---
+
+#### Implementation Order
+
+1. **Phase 17.1** (Temperature) - Foundation for weather integration
+2. **Phase 17.2** (Weather) - Builds on temperature
+3. **Phase 17.3** (Biomes) - Defines coherent environments
+4. **Phase 17.4** (Flora) - Static environmental content
+5. **Phase 17.5** (Fauna) - Extends NPC system
+6. **Phase 17.6** (Spawn Cycles) - Ties flora/fauna to conditions
+7. **Phase 17.7** (Roads) - Travel and tracking
+8. **Phase 17.8** (Integration) - Polish and documentation
+
+**Estimated Effort**: Large phase, recommend splitting into 17.1-17.3 (core environmental) and 17.4-17.7 (content systems)
 
 ### Phase 18 - Knobs and Levers: comprehensive In-game commands and API Routes documentation
 User-focused documentation for in-game commands and API routes for development

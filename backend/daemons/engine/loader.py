@@ -113,6 +113,8 @@ async def load_world(session: AsyncSession) -> World:
             on_enter_effect=r.on_enter_effect,
             on_exit_effect=r.on_exit_effect,
             lighting_override=getattr(r, "lighting_override", None),
+            # Phase 17.1: Temperature system
+            temperature_override=getattr(r, "temperature_override", None),
         )
 
     # Update the global emoji cache with any new types discovered
@@ -206,6 +208,9 @@ async def load_world(session: AsyncSession) -> World:
             default_respawn_time=a.default_respawn_time,
             time_phases=time_phases,
             entry_points=entry_points,
+            # Phase 17.1: Temperature system
+            base_temperature=getattr(a, "base_temperature", 70),
+            temperature_variation=getattr(a, "temperature_variation", 20),
         )
 
     # ----- Link rooms to areas -----

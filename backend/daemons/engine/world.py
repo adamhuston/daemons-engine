@@ -368,6 +368,12 @@ class WorldArea:
     room_ids: set[RoomId] = field(default_factory=set)
     neighbor_areas: set[AreaId] = field(default_factory=set)
 
+    # ---------- Phase 17.1: Temperature System ----------
+    # Base temperature in Fahrenheit (default 70 = comfortable)
+    base_temperature: int = 70
+    # Daily temperature variation (+/- degrees based on time of day)
+    temperature_variation: int = 20
+
     # ---------- Phase 5.4: Area Enhancements ----------
     # Level range recommendation for players
     recommended_level: tuple[int, int] = (1, 10)  # (min_level, max_level)
@@ -1703,6 +1709,11 @@ class WorldRoom:
     lighting_override: str | None = (
         None  # String value 0-100, or None for calculated light
     )
+
+    # ---------- Phase 17.1: Temperature System ----------
+    # Room-specific temperature override in Fahrenheit (replaces area calculation)
+    # Example: forge room = 110, ice cave = 20, None = use area calculation
+    temperature_override: int | None = None
 
     # ---------- Phase 5: Trigger System ----------
     # Triggers respond to events (on_enter, on_exit, on_command, on_timer)

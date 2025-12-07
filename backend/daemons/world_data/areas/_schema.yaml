@@ -58,6 +58,20 @@ weather_profile: string (default: "clear")
   # Options: "clear", "stable", "rainy", "stormy", "variable"
   # Example: "stable"
 
+# Temperature Properties (Optional)
+# ================================
+base_temperature: int (default: 70)
+  # Base temperature in Fahrenheit for the area
+  # This is modified by biome type and time of day
+  # Range: -100 to 200 (realistic range: 0-120)
+  # Example: 75 (pleasant), 20 (cold), 95 (hot)
+
+temperature_variation: int (default: 20)
+  # How much temperature can vary within this area
+  # Individual rooms can override with temperature_override
+  # Range: 0-50 (0 = constant temperature)
+  # Example: 20 (typical day/night swing)
+
 # Gameplay Properties (Required)
 # ==============================
 danger_level: int (default: 1)

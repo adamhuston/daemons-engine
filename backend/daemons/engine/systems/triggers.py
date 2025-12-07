@@ -708,6 +708,11 @@ class TriggerSystem:
         # Phase 11 conditions - Light and Vision
         self.condition_handlers["light_level"] = self._condition_light_level
         self.condition_handlers["visibility_level"] = self._condition_visibility_level
+        # Phase 17.1 conditions - Temperature
+        self.condition_handlers["temperature_above"] = self._condition_temperature_above
+        self.condition_handlers["temperature_below"] = self._condition_temperature_below
+        self.condition_handlers["temperature_range"] = self._condition_temperature_range
+        self.condition_handlers["temperature_level"] = self._condition_temperature_level
 
     def _condition_flag_set(self, ctx: TriggerContext, params: dict[str, Any]) -> bool:
         """
@@ -952,6 +957,96 @@ class TriggerSystem:
         visibility = lighting_system.get_visibility_level(current_light)
 
         return visibility.value == expected_level
+
+    def _condition_temperature_above(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the room's temperature is above a threshold.
+
+        Params:
+            value: Temperature threshold in Fahrenheit
+        """
+        room = ctx.get_room()
+        if not room:
+            return False
+
+        # Get temperature system from context
+        temperature_system = getattr(self.ctx, "temperature_system", None)
+        if not temperature_system:
+            return False
+
+        threshold = params.get("value", 100)
+        state = temperature_system.calculate_room_temperature(room, 0)  # Time handled internally
+        return state.temperature > threshold
+
+    def _condition_temperature_below(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the room's temperature is below a threshold.
+
+        Params:
+            value: Temperature threshold in Fahrenheit
+        """
+        room = ctx.get_room()
+        if not room:
+            return False
+
+        # Get temperature system from context
+        temperature_system = getattr(self.ctx, "temperature_system", None)
+        if not temperature_system:
+            return False
+
+        threshold = params.get("value", 32)
+        state = temperature_system.calculate_room_temperature(room, 0)
+        return state.temperature < threshold
+
+    def _condition_temperature_range(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the room's temperature is within a range.
+
+        Params:
+            min_temp: Minimum temperature (inclusive)
+            max_temp: Maximum temperature (inclusive)
+        """
+        room = ctx.get_room()
+        if not room:
+            return False
+
+        # Get temperature system from context
+        temperature_system = getattr(self.ctx, "temperature_system", None)
+        if not temperature_system:
+            return False
+
+        min_temp = params.get("min_temp", 0)
+        max_temp = params.get("max_temp", 100)
+        state = temperature_system.calculate_room_temperature(room, 0)
+        return min_temp <= state.temperature <= max_temp
+
+    def _condition_temperature_level(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the room's temperature level matches a category.
+
+        Params:
+            level: Temperature level name ("freezing", "cold", "comfortable", "hot", "scorching")
+        """
+        room = ctx.get_room()
+        if not room:
+            return False
+
+        # Get temperature system from context
+        temperature_system = getattr(self.ctx, "temperature_system", None)
+        if not temperature_system:
+            return False
+
+        expected_level = params.get("level", "comfortable").lower()
+        state = temperature_system.calculate_room_temperature(room, 0)
+        return state.level.value == expected_level
 
     def _compare(self, actual: float, operator: str, expected: float) -> bool:
         """Helper to perform numeric comparison."""
