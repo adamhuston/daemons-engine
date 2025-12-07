@@ -1,0 +1,28 @@
+# Mana Shield Ability
+# Create a shield of mana to absorb damage
+
+ability_id: mana_shield
+name: Mana Shield
+description: Create a shield of mana to absorb damage
+ability_type: active
+ability_category: magic
+costs:
+  mana: 40
+cooldown: 5.0
+gcd_category: spell
+behavior_id: mana_shield
+effects:
+- shield_effect
+target_type: self
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 10
+required_class: null
+scaling:
+  intelligence: 1.0
+keywords:
+- defensive
+- magic
+- protection

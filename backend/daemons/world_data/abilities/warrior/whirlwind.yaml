@@ -1,0 +1,27 @@
+# Whirlwind Attack Ability
+# Spin in place, attacking all enemies in the room
+
+ability_id: whirlwind
+name: Whirlwind Attack
+description: Spin in place, attacking all enemies in the room
+ability_type: active
+ability_category: melee
+costs:
+  rage: 40
+cooldown: 5.0
+gcd_category: melee
+behavior_id: whirlwind_attack
+effects: []
+target_type: room
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: false
+required_level: 10
+required_class: null
+scaling:
+  strength: 1.5
+keywords:
+- aoe
+- melee
+- rage-spender

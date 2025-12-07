@@ -1,0 +1,30 @@
+# True Sight Ability
+# Penetrates illusions and reveals hidden objects and creatures
+
+ability_id: true_sight
+name: True Sight
+description: Penetrates illusions and reveals hidden objects and creatures
+ability_type: active
+ability_category: utility
+costs:
+  mana: 50
+cooldown: 10.0
+gcd_category: utility
+behavior_id: true_sight
+effects: []
+target_type: self
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 8
+required_class: null
+keywords:
+- utility
+- detection
+- illusion
+- magic
+- high-level
+metadata:
+  duration: 30.0
+  radius: 10

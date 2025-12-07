@@ -1,0 +1,27 @@
+# Quick Strike Ability
+# A fast strike that can be chained multiple times
+
+ability_id: quick_strike
+name: Quick Strike
+description: A fast strike that can be chained multiple times
+ability_type: active
+ability_category: melee
+costs:
+  energy: 15
+cooldown: 0.8
+gcd_category: melee
+behavior_id: quick_strike
+effects: []
+target_type: enemy
+target_range: 1
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 3
+required_class: null
+scaling:
+  dexterity: 1.0
+keywords:
+- fast
+- combo
+- melee

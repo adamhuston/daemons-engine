@@ -1,0 +1,25 @@
+# Shadow Clone Ability
+# Create a shadow copy of yourself to confuse enemies
+
+ability_id: shadow_clone
+name: Shadow Clone
+description: Create a shadow copy of yourself to confuse enemies
+ability_type: active
+ability_category: utility
+costs:
+  energy: 50
+cooldown: 6.0
+gcd_category: null
+behavior_id: shadow_clone
+effects: []
+target_type: self
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 12
+required_class: null
+keywords:
+- utility
+- evasion
+- tactical

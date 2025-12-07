@@ -1,0 +1,234 @@
+/**
+ * DialogueEditor Styles
+ */
+
+.dialogue-editor-layout {
+  height: 100%;
+  background: var(--color-bg-primary);
+}
+
+.dialogue-editor-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-primary);
+}
+
+/* Dialogue Tree List */
+.dialogue-tree-list {
+  background: var(--color-bg-secondary) !important;
+  border-right: 1px solid var(--color-border);
+}
+
+.dialogue-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dialogue-list-header h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.dialogue-list {
+  padding: 8px;
+  overflow-y: auto;
+  height: calc(100% - 56px);
+}
+
+.dialogue-list .ant-list-item {
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.dialogue-list .ant-list-item:hover {
+  background: var(--color-bg-primary);
+}
+
+.dialogue-list-item.selected {
+  background: var(--color-primary-bg) !important;
+  border-color: var(--color-primary) !important;
+}
+
+.dialogue-list-item-content {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+}
+
+/* Editor Content */
+.dialogue-editor-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialogue-editor {
+  height: 100%;
+  width: 100%;
+}
+
+.dialogue-editor-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Dialogue Node Styles */
+.dialogue-node {
+  min-width: 200px;
+  max-width: 280px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s;
+}
+
+.dialogue-node:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.dialogue-node.selected {
+  box-shadow: 0 0 0 2px #1890ff;
+}
+
+.dialogue-node.entry {
+  border-left: 3px solid #52c41a;
+}
+
+.dialogue-node.npc {
+  border-left: 3px solid #1890ff;
+}
+
+.dialogue-node.player {
+  border-left: 3px solid #faad14;
+}
+
+.dialogue-node-content {
+  padding: 8px 12px;
+}
+
+.dialogue-node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.dialogue-node-text {
+  font-size: 13px;
+  line-height: 1.4;
+  max-height: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dialogue-node-options {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.dialogue-option {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--color-bg-primary);
+  border-radius: 4px;
+  margin-bottom: 4px;
+  position: relative;
+}
+
+.dialogue-option:last-child {
+  margin-bottom: 0;
+}
+
+/* Properties Panel Sider */
+.dialogue-properties-sider {
+  background: var(--color-bg-secondary) !important;
+  border-left: 1px solid var(--color-border);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Properties Panel */
+.dialogue-properties-panel {
+  padding: 16px;
+  min-height: 100%;
+}
+
+.dialogue-properties-empty {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialogue-properties-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dialogue-properties-header .node-id {
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.dialogue-form .ant-form-item {
+  margin-bottom: 12px;
+}
+
+.dialogue-options {
+  max-height: none;
+}
+
+.dialogue-options .ant-collapse-header {
+  padding: 8px 12px !important;
+}
+
+.option-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.option-header .option-text {
+  flex: 1;
+  font-size: 12px;
+}
+
+.option-header .option-next {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.option-header .option-next-link {
+  cursor: pointer;
+  color: var(--color-primary);
+  transition: color 0.2s;
+}
+
+.option-header .option-next-link:hover {
+  color: var(--color-primary-hover, #40a9ff);
+  text-decoration: underline;
+}
+
+.dialogue-actions {
+  margin-top: 16px;
+}

@@ -1,0 +1,27 @@
+# Battle Rage Ability
+# Enter a state of rage, increasing damage and gaining a protective barrier
+
+ability_id: battle_rage
+name: Battle Rage
+description: Enter a state of rage, increasing damage and gaining a protective barrier
+ability_type: active
+ability_category: utility
+costs:
+  rage: 50
+cooldown: 12.0
+gcd_category: shared
+behaviors:
+- mana_shield
+- damage_boost
+target_type: self
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 15
+required_class: null
+keywords:
+- buff
+- defensive
+- offensive
+- rage

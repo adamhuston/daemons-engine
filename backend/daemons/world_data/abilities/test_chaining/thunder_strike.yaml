@@ -1,0 +1,29 @@
+# Thunder Strike Ability
+# A powerful strike that shocks and stuns your enemy
+
+ability_id: thunder_strike
+name: Thunder Strike
+description: A powerful strike that shocks and stuns your enemy
+ability_type: active
+ability_category: melee
+costs:
+  mana: 30
+cooldown: 6.0
+gcd_category: melee
+behaviors:
+- power_attack
+- stun_effect
+target_type: enemy
+target_range: 1
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 12
+required_class: null
+scaling:
+  strength: 2.0
+keywords:
+- combo
+- stun
+- melee
+- thunder

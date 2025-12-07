@@ -24,8 +24,8 @@ import ReactFlow, {
   ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Select, Button, Tooltip, Modal, Form, Input, Popover, Space } from 'antd';
-import { UndoOutlined, RedoOutlined, PlusOutlined, SwapOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Select, Button, Tooltip, Modal, Form, Input, Popover, Space, message } from 'antd';
+import { UndoOutlined, RedoOutlined, PlusOutlined, SwapOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import type { RoomNode, RoomConnection } from '../../../shared/types';
 import { RoomNodeComponent } from './RoomNode';
 import { AddableSelect } from '../AddableSelect';
@@ -37,6 +37,24 @@ const GRID_SIZE = 150;
 interface HistoryEntry {
   nodes: Node[];
   edges: Edge[];
+}
+
+// Content counts per room
+interface RoomContentCounts {
+  [roomId: string]: {
+    npcCount: number;
+    itemCount: number;
+  };
+}
+
+// Copied room data for clipboard
+interface CopiedRoomData {
+  name: string;
+  description: string;
+  room_type: string;
+  area_id: string;
+  z_level: number;
+  originalId: string; // For generating new ID
 }
 
 interface RoomBuilderProps {
@@ -62,6 +80,11 @@ interface RoomBuilderProps {
   // Schema options for room types
   roomTypeOptions?: string[];
   onAddRoomType?: (newType: string) => Promise<boolean>;
+  // Content counts for badges
+  roomContentCounts?: RoomContentCounts;
+  // Drag-and-drop handlers for NPC/Item placement
+  onNpcDrop?: (roomId: string, npcTemplateId: string) => void;
+  onItemDrop?: (roomId: string, itemTemplateId: string) => void;
 }
 
 // Custom node types
@@ -84,6 +107,9 @@ export function RoomBuilder({
   onAreaCreate,
   roomTypeOptions = [],
   onAddRoomType,
+  roomContentCounts = {},
+  onNpcDrop,
+  onItemDrop,
 }: RoomBuilderProps) {
   // Get unique areas from rooms
   const areas = useMemo(() => {
@@ -208,6 +234,7 @@ export function RoomBuilder({
         const opacity = getLayerOpacity(room.z_level);
         const isActive = isOnActiveLayer(room.z_level);
         const isActiveRoom = room.id === activeRoomId;
+        const contentCounts = roomContentCounts[room.id] || { npcCount: 0, itemCount: 0 };
         return {
           id: room.id,
           type: 'room',
@@ -223,6 +250,11 @@ export function RoomBuilder({
             isActiveRoom,
             exits: room.exits,
             onCreateFromExit: handleCreateFromExit,
+            npcCount: contentCounts.npcCount,
+            itemCount: contentCounts.itemCount,
+            // Drag-and-drop handlers
+            onNpcDrop,
+            onItemDrop,
           },
           style: { 
             opacity,
@@ -233,7 +265,7 @@ export function RoomBuilder({
           connectable: isActive,
         };
       }),
-    [filteredRooms, getLayerOpacity, isOnActiveLayer, handleCreateFromExit, activeRoomId]
+    [filteredRooms, getLayerOpacity, isOnActiveLayer, handleCreateFromExit, activeRoomId, roomContentCounts, onNpcDrop, onItemDrop]
   );
 
   // Check if a connection is bidirectional (by looking it up in connections array)
@@ -345,7 +377,91 @@ export function RoomBuilder({
     setTimeout(() => { isUndoRedoRef.current = false; }, 0);
   }, [setNodes, setEdges]);
 
-  // Keyboard shortcuts for undo/redo
+  // Clipboard for copy/paste
+  const clipboardRef = useRef<CopiedRoomData | null>(null);
+
+  // Copy the currently selected room
+  const copyRoom = useCallback(() => {
+    if (!activeRoomId) {
+      message.warning('No room selected to copy');
+      return;
+    }
+    
+    const room = rooms.find((r) => r.id === activeRoomId);
+    if (!room) {
+      message.error('Selected room not found');
+      return;
+    }
+    
+    clipboardRef.current = {
+      name: room.name,
+      description: room.description || '',
+      room_type: room.room_type || 'chamber',
+      area_id: room.area_id || selectedArea || '',
+      z_level: room.z_level,
+      originalId: room.id,
+    };
+    
+    message.success(`Copied "${room.name}"`);
+  }, [activeRoomId, rooms, selectedArea]);
+
+  // Paste the copied room at a new position
+  const pasteRoom = useCallback(async () => {
+    if (!clipboardRef.current) {
+      message.warning('Nothing to paste. Copy a room first (Ctrl+C)');
+      return;
+    }
+    
+    if (!selectedArea) {
+      message.warning('Select an area first');
+      return;
+    }
+    
+    const copied = clipboardRef.current;
+    
+    // Generate unique ID based on original ID + timestamp
+    const timestamp = Date.now();
+    const baseId = copied.originalId.replace(/_copy_\d+$/, ''); // Remove any previous _copy suffix
+    const newId = `${baseId}_copy_${timestamp}`;
+    
+    // Calculate paste position at center of current viewport with offset
+    let pastePosition = { x: 0, y: 0 };
+    if (reactFlowInstance.current) {
+      const { x, y, zoom } = reactFlowInstance.current.getViewport();
+      // Get the center of the visible area
+      const centerX = -x / zoom + 400;
+      const centerY = -y / zoom + 300;
+      
+      // Snap to grid with slight offset to avoid exact overlap
+      pastePosition = {
+        x: Math.round(centerX / GRID_SIZE) * GRID_SIZE + GRID_SIZE,
+        y: Math.round(centerY / GRID_SIZE) * GRID_SIZE + GRID_SIZE,
+      };
+    }
+    
+    // Create the new room
+    const success = await onRoomCreate(
+      {
+        id: newId,
+        name: `${copied.name} (Copy)`,
+        description: copied.description,
+        room_type: copied.room_type,
+        area_id: copied.area_id,
+        z_level: activeLayer === 'all' ? copied.z_level : (activeLayer as number),
+      },
+      pastePosition
+    );
+    
+    if (success) {
+      message.success(`Pasted "${copied.name} (Copy)"`);
+      // Select the newly created room
+      onRoomSelect(newId);
+    } else {
+      message.error('Failed to paste room');
+    }
+  }, [selectedArea, activeLayer, onRoomCreate, onRoomSelect]);
+
+  // Keyboard shortcuts for undo/redo and copy/paste
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
@@ -356,10 +472,28 @@ export function RoomBuilder({
           undo();
         }
       }
+      // Copy: Ctrl/Cmd+C
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        // Only handle if not in an input/textarea
+        if (document.activeElement?.tagName !== 'INPUT' && 
+            document.activeElement?.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          copyRoom();
+        }
+      }
+      // Paste: Ctrl/Cmd+V
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+        // Only handle if not in an input/textarea
+        if (document.activeElement?.tagName !== 'INPUT' && 
+            document.activeElement?.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          pasteRoom();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, copyRoom, pasteRoom]);
 
   // Sync with props changes
   useEffect(() => {
@@ -695,6 +829,14 @@ export function RoomBuilder({
             icon={<RedoOutlined />}
             onClick={redo}
             disabled={historyIndexRef.current >= historyRef.current.length - 1}
+          />
+        </Tooltip>
+        <Tooltip title="Copy Room (Ctrl+C)">
+          <Button
+            type="text"
+            icon={<CopyOutlined />}
+            onClick={copyRoom}
+            disabled={!activeRoomId}
           />
         </Tooltip>
       </div>

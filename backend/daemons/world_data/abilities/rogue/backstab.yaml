@@ -1,0 +1,27 @@
+# Backstab Ability
+# A precise strike from the shadows dealing extra damage
+
+ability_id: backstab
+name: Backstab
+description: A precise strike from the shadows dealing extra damage
+ability_type: active
+ability_category: melee
+costs:
+  energy: 30
+cooldown: 3.0
+gcd_category: melee
+behavior_id: backstab
+effects: []
+target_type: enemy
+target_range: 1
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 1
+required_class: null
+scaling:
+  dexterity: 1.4
+keywords:
+- assassination
+- high-damage
+- precision

@@ -1,0 +1,31 @@
+# Frost Venom Ability
+# Coat your blade in frozen poison, slowing and poisoning your target
+
+ability_id: frost_venom
+name: Frost Venom
+description: Coat your blade in frozen poison, slowing and poisoning your target
+ability_type: active
+ability_category: melee
+costs:
+  energy: 40
+  mana: 20
+cooldown: 8.0
+gcd_category: melee
+behaviors:
+- poison_strike
+- frostbolt
+target_type: enemy
+target_range: 1
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 18
+required_class: null
+scaling:
+  dexterity: 1.3
+  intelligence: 0.7
+keywords:
+- hybrid
+- poison
+- frost
+- crowd-control

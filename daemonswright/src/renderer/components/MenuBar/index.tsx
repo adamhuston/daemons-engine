@@ -14,7 +14,7 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
-export type EditorView = 'yaml' | 'room-builder' | 'quest-designer';
+export type EditorView = 'yaml' | 'room-builder' | 'entity-editor' | 'quest-designer' | 'dialogue-editor';
 
 interface MenuBarProps {
   onOpenFolder: () => void;
@@ -84,9 +84,22 @@ export function MenuBar({
       style: currentView === 'room-builder' ? { fontWeight: 'bold' } : undefined,
     },
     {
+      key: 'entity-editor',
+      label: 'Entity Editor',
+      onClick: () => onViewChange?.('entity-editor'),
+      style: currentView === 'entity-editor' ? { fontWeight: 'bold' } : undefined,
+    },
+    {
       key: 'quest-designer',
       label: 'Quest Designer',
-      disabled: true, // Not implemented yet
+      onClick: () => onViewChange?.('quest-designer'),
+      style: currentView === 'quest-designer' ? { fontWeight: 'bold' } : undefined,
+    },
+    {
+      key: 'dialogue-editor',
+      label: 'Dialogue Editor',
+      onClick: () => onViewChange?.('dialogue-editor'),
+      style: currentView === 'dialogue-editor' ? { fontWeight: 'bold' } : undefined,
     },
   ];
 

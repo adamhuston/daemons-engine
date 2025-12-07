@@ -18,6 +18,7 @@ export interface FileSystemAPI {
   createDirectory: (dirPath: string) => Promise<boolean>;
   listDirectory: (dirPath: string) => Promise<FileEntry[]>;
   readFile: (filePath: string) => Promise<string>;
+  fileExists: (filePath: string) => Promise<boolean>;
   writeFile: (filePath: string, content: string) => Promise<boolean>;
   deleteFile: (filePath: string) => Promise<boolean>;
   watchDirectory: (dirPath: string) => Promise<boolean>;
@@ -46,6 +47,9 @@ export interface ValidationError {
   line?: number;
   column?: number;
   message: string;
+  severity?: 'error' | 'warning' | 'info';
+  field?: string;
+  filePath?: string;
 }
 
 export interface ValidationResult {

@@ -80,6 +80,16 @@ export function registerFileSystemHandlers(): void {
     }
   });
 
+  // Check if file exists
+  ipcMain.handle('fs:fileExists', async (_event, filePath: string) => {
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
   // Write file content (creates parent directories if needed)
   ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string) => {
     try {

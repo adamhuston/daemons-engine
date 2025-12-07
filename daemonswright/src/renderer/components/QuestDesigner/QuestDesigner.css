@@ -1,0 +1,176 @@
+/**
+ * QuestDesigner Styles
+ */
+
+.quest-designer-layout {
+  height: 100%;
+  background: var(--color-bg-primary);
+}
+
+.quest-designer-content {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+/* Spin wrapper needs full height */
+.quest-designer-spin,
+.quest-designer-spin > .ant-spin-container {
+  height: 100%;
+}
+
+.quest-designer {
+  height: 100%;
+  width: 100%;
+}
+
+.quest-designer-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-primary);
+}
+
+/* Quest Designer Sider */
+.quest-designer-sider {
+  background: var(--color-bg-secondary) !important;
+  border-left: 1px solid var(--color-border);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Quest Properties Panel */
+.quest-properties-panel {
+  padding: 16px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.quest-properties-empty {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quest-properties-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.quest-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.quest-form {
+  flex: 0 0 auto;
+}
+
+.quest-form .ant-form-item {
+  margin-bottom: 12px;
+}
+
+.quest-objectives {
+  flex: 0 0 auto;
+}
+
+.objective-card {
+  background: var(--color-bg-primary);
+}
+
+.objective-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quest-actions {
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+/* Quest Node Styles */
+.quest-node {
+  min-width: 180px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s;
+}
+
+.quest-node:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.quest-node.selected {
+  box-shadow: 0 0 0 2px #1890ff;
+}
+
+.quest-node-content {
+  padding: 4px 0;
+}
+
+.quest-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.quest-label {
+  font-size: 13px;
+}
+
+.quest-id {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-family: monospace;
+  margin-bottom: 8px;
+}
+
+.quest-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.quest-meta .ant-tag {
+  font-size: 10px;
+  padding: 0 4px;
+  line-height: 18px;
+}
+
+/* Category badges */
+.category-main {
+  background: #ff4d4f;
+  color: white;
+}
+
+.category-side {
+  background: #1890ff;
+  color: white;
+}
+
+.category-daily {
+  background: #52c41a;
+  color: white;
+}
+
+.category-repeatable {
+  background: #722ed1;
+  color: white;
+}
+
+.category-epic {
+  background: #faad14;
+  color: black;
+}

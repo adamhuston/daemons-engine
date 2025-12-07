@@ -1,0 +1,29 @@
+# Detect Magic Ability
+# Senses magical auras and enchantments in the area
+
+ability_id: detect_magic
+name: Detect Magic
+description: Senses magical auras and enchantments in the area
+ability_type: active
+ability_category: utility
+costs:
+  mana: 15
+cooldown: 3.0
+gcd_category: utility
+behavior_id: detect_magic
+effects: []
+target_type: self
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 2
+required_class: null
+keywords:
+- utility
+- detection
+- magic
+- sensing
+metadata:
+  duration: 60.0
+  radius: 3

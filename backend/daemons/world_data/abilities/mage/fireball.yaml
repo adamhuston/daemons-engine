@@ -1,0 +1,28 @@
+# Fireball Ability
+# Hurl a ball of flame that explodes in an area
+
+ability_id: fireball
+name: Fireball
+description: Hurl a ball of flame that explodes in an area
+ability_type: active
+ability_category: magic
+costs:
+  mana: 50
+cooldown: 4.0
+gcd_category: spell
+behavior_id: fireball
+effects:
+- burn_effect
+target_type: enemy
+target_range: 5
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 8
+required_class: null
+scaling:
+  intelligence: 1.6
+keywords:
+- aoe
+- fire
+- damage

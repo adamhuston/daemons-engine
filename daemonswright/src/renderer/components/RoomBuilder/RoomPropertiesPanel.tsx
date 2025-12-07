@@ -119,6 +119,7 @@ interface RoomPropertiesPanelProps {
   onRemoveExit: (roomId: string, direction: string) => void;
   isLoading?: boolean;
   isDirty?: boolean;
+  onDirtyChange?: (isDirty: boolean) => void;
   roomTypeOptions?: string[];
   onAddRoomType?: (newType: string) => Promise<boolean>;
   // NPC management
@@ -146,6 +147,7 @@ export function RoomPropertiesPanel({
   onRemoveExit,
   isLoading = false,
   isDirty = false,
+  onDirtyChange,
   roomTypeOptions = [],
   onAddRoomType,
   // NPC props
@@ -196,8 +198,15 @@ export function RoomPropertiesPanel({
         on_enter_effect: '',
         on_exit_effect: '',
       });
+      // Reset dirty state when switching rooms
+      onDirtyChange?.(false);
     }
-  }, [selectedRoom, form]);
+  }, [selectedRoom, form, onDirtyChange]);
+
+  // Track form changes to update dirty state
+  const handleValuesChange = useCallback(() => {
+    onDirtyChange?.(true);
+  }, [onDirtyChange]);
 
   // Handle form save
   const handleSave = useCallback(async () => {
@@ -207,10 +216,11 @@ export function RoomPropertiesPanel({
       setSaving(true);
       const values = form.getFieldsValue();
       await onSave(selectedRoom.id, values);
+      onDirtyChange?.(false);
     } finally {
       setSaving(false);
     }
-  }, [selectedRoom, form, onSave]);
+  }, [selectedRoom, form, onSave, onDirtyChange]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -339,6 +349,7 @@ export function RoomPropertiesPanel({
                       layout="vertical"
                       size="small"
                       className="room-form"
+                      onValuesChange={handleValuesChange}
                     >
                       <Form.Item label="Name" name="name" rules={[{ required: true }]}>
                         <Input placeholder="Room name" />

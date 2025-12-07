@@ -413,18 +413,72 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
     if (!filePath) return false;
     
     try {
-      // Delete the file
+      // First, find all rooms that have exits pointing to this room and remove those exits
+      const roomsWithExitsToDeleted = rooms.filter((r) => {
+        if (r.id === roomId) return false;
+        if (!r.exits) return false;
+        return Object.values(r.exits).includes(roomId);
+      });
+      
+      // Update each room that points to the deleted room
+      for (const sourceRoom of roomsWithExitsToDeleted) {
+        const sourceFilePath = getRoomFilePath(sourceRoom);
+        if (!sourceFilePath) continue;
+        
+        try {
+          const content = await window.daemonswright.fs.readFile(sourceFilePath);
+          const parsed = yaml.load(content) as RoomYaml;
+          
+          if (parsed.exits) {
+            // Remove all exits that point to the deleted room
+            const updatedExits: Record<string, string> = {};
+            for (const [direction, target] of Object.entries(parsed.exits)) {
+              if (target !== roomId) {
+                updatedExits[direction] = target;
+              }
+            }
+            parsed.exits = updatedExits;
+            
+            // Write back the updated room
+            const newContent = yaml.dump(parsed, {
+              indent: 2,
+              lineWidth: 120,
+              noRefs: true,
+            });
+            await window.daemonswright.fs.writeFile(sourceFilePath, newContent);
+          }
+        } catch (err) {
+          console.warn(`Failed to update exits for room ${sourceRoom.id}:`, err);
+        }
+      }
+      
+      // Delete the room's file
       await window.daemonswright.fs.deleteFile(filePath);
       
-      // Remove from local state
-      setRooms((prev) => prev.filter((r) => r.id !== roomId));
+      // Remove from local state and update exits in other rooms
+      setRooms((prev) => {
+        return prev
+          .filter((r) => r.id !== roomId)
+          .map((r) => {
+            if (!r.exits) return r;
+            // Remove exits pointing to deleted room
+            const hasExitToDeleted = Object.values(r.exits).includes(roomId);
+            if (!hasExitToDeleted) return r;
+            
+            const updatedExits: Record<string, string> = {};
+            for (const [direction, target] of Object.entries(r.exits)) {
+              if (target !== roomId) {
+                updatedExits[direction] = target;
+              }
+            }
+            return { ...r, exits: updatedExits };
+          });
+      });
       
       // Remove connections to/from this room
       setConnections((prev) =>
         prev.filter((c) => c.source !== roomId && c.target !== roomId)
       );
-      
-      // TODO: Update other rooms' exits that point to this room
       
       return true;
     } catch (err) {

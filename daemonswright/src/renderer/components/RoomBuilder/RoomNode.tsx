@@ -4,12 +4,15 @@
  * Custom React Flow node for representing a room on the canvas.
  * Renders as a square with directional handles for exits.
  * Shows + buttons on unused exit handles for creating new rooms.
+ * Shows NPC and item count badges when content is present.
+ * Supports drag-and-drop for NPC/Item placement from ContentPalette.
  */
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Tooltip } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Tooltip, Badge } from 'antd';
+import { PlusOutlined, UserOutlined, InboxOutlined } from '@ant-design/icons';
+import { DRAG_TYPE_NPC, DRAG_TYPE_ITEM } from './ContentPalette';
 
 interface RoomNodeData {
   label: string;
@@ -21,6 +24,11 @@ interface RoomNodeData {
   isActiveRoom?: boolean; // True if this room is shown in the properties panel
   exits?: Record<string, string>; // direction -> target room id
   onCreateFromExit?: (roomId: string, direction: string, position: { x: number; y: number }) => void;
+  npcCount?: number;
+  itemCount?: number;
+  // Drag-and-drop callbacks
+  onNpcDrop?: (roomId: string, npcTemplateId: string) => void;
+  onItemDrop?: (roomId: string, itemTemplateId: string) => void;
 }
 
 // Room type to color mapping
@@ -46,6 +54,12 @@ function RoomNode({ data, selected, xPos, yPos }: NodeProps<RoomNodeData>) {
   const isActiveRoom = data.isActiveRoom === true;
   const baseColor = roomTypeColors[data.room_type ?? 'default'] ?? roomTypeColors.default;
   const exits = data.exits || {};
+  const npcCount = data.npcCount || 0;
+  const itemCount = data.itemCount || 0;
+  
+  // Drag-and-drop state
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [dragType, setDragType] = useState<'npc' | 'item' | null>(null);
   
   // Square room dimensions for grid layout
   const size = 80;
@@ -73,6 +87,50 @@ function RoomNode({ data, selected, xPos, yPos }: NodeProps<RoomNodeData>) {
       data.onCreateFromExit(data.room_id, direction, newPosition);
     }
   }, [data, xPos, yPos]);
+
+  // Drag-and-drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    // Check if we're dragging NPC or Item
+    if (e.dataTransfer.types.includes(DRAG_TYPE_NPC)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDragOver(true);
+      setDragType('npc');
+    } else if (e.dataTransfer.types.includes(DRAG_TYPE_ITEM)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDragOver(true);
+      setDragType('item');
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only clear if leaving the node entirely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+      setDragType(null);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    setDragType(null);
+
+    // Handle NPC drop
+    const npcTemplateId = e.dataTransfer.getData(DRAG_TYPE_NPC);
+    if (npcTemplateId && data.onNpcDrop) {
+      data.onNpcDrop(data.room_id, npcTemplateId);
+      return;
+    }
+
+    // Handle Item drop
+    const itemTemplateId = e.dataTransfer.getData(DRAG_TYPE_ITEM);
+    if (itemTemplateId && data.onItemDrop) {
+      data.onItemDrop(data.room_id, itemTemplateId);
+      return;
+    }
+  }, [data]);
 
   // Render a handle that can be both source (drag from) and target (drop to)
   const renderHandle = (
@@ -136,19 +194,33 @@ function RoomNode({ data, selected, xPos, yPos }: NodeProps<RoomNodeData>) {
 
   const nodeContent = (
     <div
-      className={`room-node-grid ${selected ? 'selected' : ''} ${isActiveRoom ? 'active-room' : ''}`}
+      className={`room-node-grid ${selected ? 'selected' : ''} ${isActiveRoom ? 'active-room' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       style={{
         width: size,
         height: size,
         position: 'relative',
-        // Outline effect: gold for active room in panel, blue for RF selection
-        outline: isActiveRoom 
-          ? '3px solid #faad14'  // Gold for properties panel selection
-          : selected 
-            ? '3px solid #1890ff'  // Blue for React Flow selection
-            : 'none',
+        // Outline effect: drag-over highlight, gold for active room, blue for RF selection
+        outline: isDragOver
+          ? dragType === 'npc' 
+            ? '3px solid #52c41a'   // Green for NPC drop
+            : '3px solid #faad14'  // Yellow for Item drop
+          : isActiveRoom 
+            ? '3px solid #faad14'  // Gold for properties panel selection
+            : selected 
+              ? '3px solid #1890ff'  // Blue for React Flow selection
+              : 'none',
         outlineOffset: 4,
         borderRadius: 10,
+        // Glow effect when dragging over
+        boxShadow: isDragOver 
+          ? dragType === 'npc'
+            ? '0 0 20px rgba(82, 196, 26, 0.6)'
+            : '0 0 20px rgba(250, 173, 20, 0.6)'
+          : undefined,
+        transition: 'outline 0.15s ease, box-shadow 0.15s ease',
       }}
     >
       {/* Square room shape */}
@@ -187,6 +259,62 @@ function RoomNode({ data, selected, xPos, yPos }: NodeProps<RoomNodeData>) {
           </div>
         </div>
       </div>
+
+      {/* Content badges - show NPC and item counts */}
+      {(npcCount > 0 || itemCount > 0) && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: -4,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: 4,
+            zIndex: 20,
+          }}
+        >
+          {npcCount > 0 && (
+            <Tooltip title={`${npcCount} NPC${npcCount !== 1 ? 's' : ''}`}>
+              <div
+                style={{
+                  background: '#722ed1',
+                  borderRadius: 10,
+                  padding: '1px 5px',
+                  fontSize: 9,
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  border: '1px solid rgba(255,255,255,0.3)',
+                }}
+              >
+                <UserOutlined style={{ fontSize: 8 }} />
+                {npcCount}
+              </div>
+            </Tooltip>
+          )}
+          {itemCount > 0 && (
+            <Tooltip title={`${itemCount} item${itemCount !== 1 ? 's' : ''}`}>
+              <div
+                style={{
+                  background: '#fa8c16',
+                  borderRadius: 10,
+                  padding: '1px 5px',
+                  fontSize: 9,
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  border: '1px solid rgba(255,255,255,0.3)',
+                }}
+              >
+                <InboxOutlined style={{ fontSize: 8 }} />
+                {itemCount}
+              </div>
+            </Tooltip>
+          )}
+        </div>
+      )}
 
       {/* Cardinal direction handles with plus buttons */}
       {/* North (top center) */}

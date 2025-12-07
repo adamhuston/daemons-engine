@@ -74,28 +74,28 @@ daemons-studio  # launches content editor
 - [x] Display exits as edges between room nodes *(styled by direction: yellow for up/down, green for cardinal)*
 - [x] Create exit: drag from directional handle to destination room *(connection callback exists)*
 - [ ] Bidirectional exit prompt on creation
-- [ ] Delete exit: click edge → delete from room YAML(s)
+- [x] Delete exit: click edge → delete from room YAML(s)
 - [ ] Vertical exits (up/down) with layer creation prompt
 
 **Room Contents Display:**
-- [ ] Scan `npc_spawns/*.yaml` for NPCs in each room
-- [ ] Scan `item_instances/*.yaml` for items in each room
-- [ ] Display content badges on room nodes (👤 NPC count, 📦 item count)
-- [ ] Contents list in properties panel when room selected
+- [x] Scan `npc_spawns/*.yaml` for NPCs in each room *(useRoomContents hook)*
+- [x] Scan `item_instances/*.yaml` for items in each room *(useRoomContents hook)*
+- [x] Display content badges on room nodes (👤 NPC count, 📦 item count)
+- [x] Contents list in properties panel when room selected *(tabbed NPC/Items panels)*
 
 **Core Features:**
 - [x] Undo/redo for all operations *(history-based with Ctrl+Z/Ctrl+Shift+Z)*
-- [ ] Copy/paste rooms
+- [x] Copy/paste rooms *(Ctrl+C/V with unique ID generation)*
 - [ ] Canvas state persistence (zoom, pan, active layer)
 - [x] File watcher for external YAML changes *(implemented in useFileWatcher hook)*
 
 **Success Criteria:**
 - [x] Room canvas shows all rooms in an area with grid layout
-- [ ] Rooms snap to grid when dragged *(free drag currently, no snap)*
+- [x] Rooms snap to grid when dragged *(snaps on drag stop)*
 - [x] Layer tabs appear based on room Z values
-- [ ] Creating exit by dragging updates source room YAML *(UI works, YAML write not implemented)*
-- [ ] Creating room creates both YAML file and `_layout.yaml` entry
-- [ ] NPC/item badges appear on rooms (from spawn/instance files)
+- [x] Creating exit by dragging updates source room YAML
+- [x] Creating room creates both YAML file and `_layout.yaml` entry
+- [x] NPC/item badges appear on rooms (from spawn/instance files)
 - [x] Undo/redo works for all room operations
 
 
@@ -258,26 +258,24 @@ Phase 4: Server Connection (optional) + Packaging
 
 ## Phase 2 Remaining Work Summary
 
-The Room Builder has a solid foundation with read-only visualization working well. The remaining work focuses on **write operations** and **grid snapping**:
+Phase 2 is now **substantially complete**. The Room Builder supports full CRUD operations for rooms and exits with YAML persistence.
 
-### High Priority (Core Editing)
-1. **Grid snapping** - Snap room positions to grid coordinates on drag
-2. **`_layout.yaml` persistence** - Save room positions to layout files
-3. **Room properties panel** - Sidebar form for editing room fields
-4. **Write room changes to YAML** - Bidirectional sync (currently read-only)
-5. **Create room** - Click canvas → modal → create YAML + layout entry
-6. **Delete room** - Remove YAML file, update exits that referenced it
+### ✅ Completed Features
+- Grid snapping (snaps on drag stop)
+- `_layout.yaml` persistence
+- Room properties panel with form editing
+- Write room/exit changes to YAML (bidirectional sync)
+- Create room (modal → YAML + layout)
+- Delete room with exit cleanup
+- Delete exit from YAML
+- Scan spawn/instance files for NPC/item content
+- Content badges (👤/📦 counts on room nodes)
+- Properties panel dirty state tracking
+- Copy/paste rooms (Ctrl+C/V with unique ID generation)
 
-### Medium Priority (Exit Editing)
-7. **Write exit changes to YAML** - Currently visual only
-8. **Bidirectional exit prompt** - Ask to create return exit
-9. **Delete exit** - Click edge to remove from YAML
-10. **Vertical exit layer creation** - Prompt to create room on new layer
-
-### Lower Priority (Content Display)
-11. **Scan spawn/instance files** - Load NPC/item placements per room
-12. **Content badges** - Show 👤/📦 counts on room nodes
-13. **Canvas state persistence** - Remember zoom/pan/active layer
-14. **Copy/paste rooms** - Duplicate rooms with new IDs
+### 🔄 Remaining Work (Lower Priority)
+1. **Bidirectional exit prompt** - Ask to create return exit on new connection
+2. **Vertical exit layer creation** - Prompt to create room on new layer when creating up/down exit
+3. **Canvas state persistence** - Remember zoom/pan/active layer between sessions
 
 

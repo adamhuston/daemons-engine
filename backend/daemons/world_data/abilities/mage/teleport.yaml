@@ -1,0 +1,25 @@
+# Teleport Ability
+# Instantly teleport to a nearby location
+
+ability_id: teleport
+name: Teleport
+description: Instantly teleport to a nearby location
+ability_type: active
+ability_category: magic
+costs:
+  mana: 60
+cooldown: 6.0
+gcd_category: spell
+behavior_id: teleport
+effects: []
+target_type: self
+target_range: 3
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 15
+required_class: null
+keywords:
+- utility
+- movement
+- escape

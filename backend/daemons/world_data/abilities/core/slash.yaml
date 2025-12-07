@@ -1,0 +1,26 @@
+# Slash Ability
+# A basic melee attack with your weapon
+
+ability_id: slash
+name: Slash
+description: A basic melee attack with your weapon
+ability_type: active
+ability_category: melee
+costs: {}
+cooldown: 1.0
+gcd_category: melee
+behavior_id: melee_attack
+effects: []
+target_type: enemy
+target_range: 1
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 1
+required_class: null
+scaling:
+  strength: 1.2
+keywords:
+- physical
+- basic
+- weapon

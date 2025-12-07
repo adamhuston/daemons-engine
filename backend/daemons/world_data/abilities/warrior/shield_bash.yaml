@@ -1,0 +1,28 @@
+# Shield Bash Ability
+# Bash an enemy with your shield, stunning them briefly
+
+ability_id: shield_bash
+name: Shield Bash
+description: Bash an enemy with your shield, stunning them briefly
+ability_type: active
+ability_category: melee
+costs:
+  rage: 20
+cooldown: 4.0
+gcd_category: melee
+behavior_id: shield_bash
+effects:
+- stun_effect
+target_type: enemy
+target_range: 1
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 8
+required_class: null
+scaling:
+  strength: 0.8
+keywords:
+- utility
+- crowd-control
+- defensive

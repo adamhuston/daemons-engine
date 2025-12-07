@@ -1,0 +1,28 @@
+# Open Container Ability
+# Opens a sealed or locked container without a key
+
+ability_id: open_container
+name: Open Container
+description: Opens a sealed or locked container without a key
+ability_type: active
+ability_category: utility
+costs:
+  mana: 25
+cooldown: 2.5
+gcd_category: utility
+behavior_id: unlock_container
+effects: []
+target_type: enemy
+target_range: 2
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 4
+required_class: null
+keywords:
+- utility
+- containers
+- treasure
+- magic
+metadata:
+  lock_difficulty: 2

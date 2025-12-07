@@ -1,0 +1,109 @@
+/**
+ * ErrorPanel Styles
+ */
+
+.error-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-secondary);
+}
+
+.error-panel-empty {
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+
+.error-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.error-panel-counts {
+  display: flex;
+  gap: 12px;
+}
+
+.error-panel-counts .ant-badge {
+  margin-right: 8px;
+}
+
+.error-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.error-panel-list .ant-collapse-header {
+  padding: 8px 12px !important;
+}
+
+.error-file-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-file-name {
+  font-weight: 500;
+}
+
+.error-file-path {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.error-item {
+  background: var(--color-bg-primary);
+  border-radius: 6px;
+  padding: 8px 12px;
+  border-left: 3px solid #ff4d4f;
+}
+
+.error-item.clickable {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.error-item.clickable:hover {
+  background: var(--color-bg-secondary);
+}
+
+.error-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.error-field {
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.error-line {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-left: auto;
+}
+
+.error-message {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}

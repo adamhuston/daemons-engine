@@ -1,0 +1,28 @@
+# Frostbolt Ability
+# Fire an icy projectile that slows the target
+
+ability_id: frostbolt
+name: Frostbolt
+description: Fire an icy projectile that slows the target
+ability_type: active
+ability_category: magic
+costs:
+  mana: 35
+cooldown: 3.0
+gcd_category: spell
+behavior_id: frostbolt
+effects:
+- slow_effect
+target_type: enemy
+target_range: 5
+requires_target: true
+requires_los: true
+can_use_while_moving: true
+required_level: 5
+required_class: null
+scaling:
+  intelligence: 1.2
+keywords:
+- ranged
+- ice
+- crowd-control

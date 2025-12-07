@@ -1,0 +1,29 @@
+# Create Passage Ability
+# Opens a temporary passage through walls or barriers
+
+ability_id: create_passage
+name: Create Passage
+description: Opens a temporary passage through walls or barriers
+ability_type: active
+ability_category: utility
+costs:
+  mana: 75
+cooldown: 20.0
+gcd_category: utility
+behavior_id: create_passage
+effects: []
+target_type: enemy
+target_range: 2
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 7
+required_class: null
+keywords:
+- utility
+- walls
+- barriers
+- magic
+- exploration
+metadata:
+  duration: 120.0

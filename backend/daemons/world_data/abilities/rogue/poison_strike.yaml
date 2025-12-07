@@ -1,0 +1,28 @@
+# Poison Strike Ability
+# Coat your weapon in poison and strike
+
+ability_id: poison_strike
+name: Poison Strike
+description: Coat your weapon in poison and strike
+ability_type: active
+ability_category: melee
+costs:
+  energy: 40
+cooldown: 4.0
+gcd_category: melee
+behavior_id: poison_strike
+effects:
+- poison_effect
+target_type: enemy
+target_range: 1
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 10
+required_class: null
+scaling:
+  dexterity: 1.2
+keywords:
+- poison
+- damage-over-time
+- crowd-control

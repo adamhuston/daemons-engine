@@ -221,7 +221,11 @@ async def load_abilities_from_yaml(path: Path) -> dict[str, AbilityTemplate]:
     """
     Load all ability definitions from YAML files.
 
-    Each YAML file can contain multiple abilities under an "abilities" key.
+    Supports two formats:
+    1. Individual ability files: Each YAML file is a single ability with ability_id at top level
+    2. Legacy list format: YAML file contains an "abilities" list with multiple abilities
+
+    Also supports subdirectories for organization (e.g., abilities/warrior/whirlwind.yaml).
 
     Args:
         path: Path to directory containing ability YAML files (e.g., world_data/abilities/)
@@ -240,7 +244,12 @@ async def load_abilities_from_yaml(path: Path) -> dict[str, AbilityTemplate]:
         logger.warning(f"Abilities directory does not exist: {path}")
         return abilities
 
-    for yaml_file in sorted(path.glob("*.yaml")):
+    # Find all YAML files, including in subdirectories
+    yaml_files = list(path.glob("*.yaml")) + list(path.glob("**/*.yaml"))
+    # Remove duplicates and sort
+    yaml_files = sorted(set(yaml_files))
+
+    for yaml_file in yaml_files:
         if yaml_file.name.startswith("_"):
             # Skip schema/documentation files
             continue
@@ -253,8 +262,18 @@ async def load_abilities_from_yaml(path: Path) -> dict[str, AbilityTemplate]:
                 logger.warning(f"Empty YAML file: {yaml_file}")
                 continue
 
-            # Each YAML file contains an "abilities" list
-            ability_list = data.get("abilities", [])
+            # Determine format: individual ability or list of abilities
+            if "ability_id" in data:
+                # New format: individual ability file
+                ability_list = [data]
+                logger.debug(f"Loading individual ability from {yaml_file.name}")
+            elif "abilities" in data:
+                # Legacy format: list of abilities
+                ability_list = data.get("abilities", [])
+                logger.debug(f"Loading {len(ability_list)} abilities from {yaml_file.name} (list format)")
+            else:
+                logger.warning(f"No ability_id or abilities key in {yaml_file.name}, skipping")
+                continue
 
             if not ability_list:
                 logger.warning(f"No abilities defined in {yaml_file.name}")

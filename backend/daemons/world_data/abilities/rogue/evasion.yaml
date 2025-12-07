@@ -1,0 +1,24 @@
+# Evasion Ability
+# A passive ability: increased chance to dodge attacks
+
+ability_id: evasion
+name: Evasion
+description: 'A passive ability: increased chance to dodge attacks'
+ability_type: passive
+ability_category: utility
+costs: {}
+cooldown: 0
+gcd_category: null
+behavior_id: evasion_passive
+effects: []
+target_type: self
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 8
+required_class: null
+keywords:
+- passive
+- defense
+- dodge

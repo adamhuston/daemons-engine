@@ -1656,7 +1656,7 @@ Stub client tweaks
 - ✅ Integrated into `main.py` legacy WebSocket endpoint
 - ✅ Comprehensive unit tests (43 tests)
 
-### Security Testing & Validation
+#### Security Testing & Validation
 
 - [ ] Run `bandit` static analysis on codebase
 - [ ] Run `safety check` for dependency vulnerabilities
@@ -1664,11 +1664,18 @@ Stub client tweaks
 - [ ] Consider OWASP ZAP automated scanning
 - [ ] Document security practices in SECURITY.md
 
+### Phase 17 - Areas engine update
+- Flora and Fauna
+- Temperature
+- Weather and Climate
+- Biomes = compatible subsets of Temperature + Weather + Climate + Flora + Fauna
+- Flora and Fauna generation and competition: condition-dependent spawn cycles
+- Roads and paths - tracking and trails
 
-### Phase 17 - Knobs and Levers: comprehensive In-game commands and API Routes documentation
+### Phase 18 - Knobs and Levers: comprehensive In-game commands and API Routes documentation
 User-focused documentation for in-game commands and API routes for development
 
-### Phase 18 - Mechanic's Manual: comprehensive guide for modders
+### Phase 19 - Mechanic's Manual: comprehensive guide for modders
 Modder-focused guide to easily extending the engine codebase
 
 ## Phase Z - Backlogged Niceties & polish

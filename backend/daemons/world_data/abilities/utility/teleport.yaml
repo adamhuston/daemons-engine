@@ -1,0 +1,28 @@
+# Teleport Ability
+# Teleports you to a location you know
+
+ability_id: teleport
+name: Teleport
+description: Teleports you to a location you know
+ability_type: active
+ability_category: utility
+costs:
+  mana: 100
+cooldown: 30.0
+gcd_category: utility
+behavior_id: teleport
+effects: []
+target_type: self
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: false
+required_level: 10
+required_class: null
+keywords:
+- utility
+- transportation
+- magic
+- high-level
+metadata:
+  duration: null

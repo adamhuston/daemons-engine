@@ -19,6 +19,9 @@ const fsApi = {
 	readFile: async (filePath: string) => {
 		return ipcRenderer.invoke('fs:readFile', filePath);
 	},
+	fileExists: async (filePath: string) => {
+		return ipcRenderer.invoke('fs:fileExists', filePath);
+	},
 	writeFile: async (filePath: string, content: string) => {
 		return ipcRenderer.invoke('fs:writeFile', filePath, content);
 	},

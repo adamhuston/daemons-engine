@@ -21,6 +21,7 @@ interface StatusBarProps {
   validationErrors: ValidationError[];
   isConnected: boolean;
   serverUrl?: string;
+  onErrorsClick?: () => void;
 }
 
 export function StatusBar({
@@ -29,6 +30,7 @@ export function StatusBar({
   validationErrors,
   isConnected,
   serverUrl,
+  onErrorsClick,
 }: StatusBarProps) {
   const hasErrors = validationErrors.length > 0;
 
@@ -64,17 +66,23 @@ export function StatusBar({
         <Tooltip
           title={
             hasErrors
-              ? `${validationErrors.length} error(s)`
+              ? `${validationErrors.length} error(s) - Click to view`
               : 'No validation errors'
           }
         >
-          {hasErrors ? (
-            <Badge count={validationErrors.length}>
-              <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
-            </Badge>
-          ) : (
-            <CheckCircleOutlined style={{ color: '#52c41a' }} />
-          )}
+          <span
+            className={`validation-status ${hasErrors ? 'has-errors' : ''}`}
+            onClick={hasErrors ? onErrorsClick : undefined}
+            style={{ cursor: hasErrors ? 'pointer' : 'default' }}
+          >
+            {hasErrors ? (
+              <Badge count={validationErrors.length}>
+                <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+              </Badge>
+            ) : (
+              <CheckCircleOutlined style={{ color: '#52c41a' }} />
+            )}
+          </span>
         </Tooltip>
 
         {/* Save status */}

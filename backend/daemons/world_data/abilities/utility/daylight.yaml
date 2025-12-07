@@ -1,0 +1,30 @@
+# Daylight Ability
+# Creates bright daylight in an area, dispelling darkness
+
+ability_id: daylight
+name: Daylight
+description: Creates bright daylight in an area, dispelling darkness
+ability_type: active
+ability_category: utility
+costs:
+  mana: 40
+cooldown: 5.0
+gcd_category: utility
+behavior_id: create_light
+effects: []
+target_type: room
+target_range: 3
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 5
+required_class: null
+keywords:
+- utility
+- light
+- magic
+- support
+metadata:
+  light_level: 100
+  duration: 600.0
+  radius: 5

@@ -1,0 +1,28 @@
+# Unlock Ability
+# Magically unlocks a door or lock
+
+ability_id: unlock
+name: Unlock
+description: Magically unlocks a door or lock
+ability_type: active
+ability_category: utility
+costs:
+  mana: 20
+cooldown: 2.0
+gcd_category: utility
+behavior_id: unlock_door
+effects: []
+target_type: enemy
+target_range: 1
+requires_target: true
+requires_los: true
+can_use_while_moving: false
+required_level: 3
+required_class: null
+keywords:
+- utility
+- unlock
+- lock-picking
+- magic
+metadata:
+  lock_difficulty: 1

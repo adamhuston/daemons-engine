@@ -1,0 +1,9 @@
+greet:
+  x: 100
+  'y': 100
+wisp_lore:
+  x: 850
+  'y': 100
+about_nexus:
+  x: 100
+  'y': 700

@@ -1,0 +1,24 @@
+# Rally Ability
+# A passive ability: gain +10% armor when above 50% health
+
+ability_id: rally
+name: Rally
+description: 'A passive ability: gain +10% armor when above 50% health'
+ability_type: passive
+ability_category: utility
+costs: {}
+cooldown: 0
+gcd_category: null
+behavior_id: rally_passive
+effects: []
+target_type: self
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 10
+required_class: null
+keywords:
+- passive
+- defense
+- survival

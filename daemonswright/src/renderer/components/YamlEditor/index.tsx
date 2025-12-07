@@ -16,6 +16,7 @@ interface YamlEditorProps {
   onChange: (content: string) => void;
   validationErrors: ValidationError[];
   schemas: Record<string, SchemaDefinition>;
+  onNavigateToEntity?: (refType: string, entityId: string) => void;
 }
 
 export function YamlEditor({
@@ -24,6 +25,7 @@ export function YamlEditor({
   onChange,
   validationErrors,
   schemas,
+  onNavigateToEntity,
 }: YamlEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
@@ -51,8 +53,42 @@ export function YamlEditor({
         const saveEvent = new CustomEvent('editor:save');
         window.dispatchEvent(saveEvent);
       });
+
+      // Add Ctrl+Click jump to definition for reference fields
+      if (onNavigateToEntity) {
+        editor.onMouseDown((e) => {
+          if (e.event.ctrlKey || e.event.metaKey) {
+            const position = e.target.position;
+            if (!position) return;
+
+            const model = editor.getModel();
+            if (!model) return;
+
+            const lineContent = model.getLineContent(position.lineNumber);
+            
+            // Check for common reference patterns
+            const patterns = [
+              { regex: /npc_template_id:\s*["']?(\w+)["']?/, refType: 'npcs' },
+              { regex: /item_template_id:\s*["']?(\w+)["']?/, refType: 'items' },
+              { regex: /ability_id:\s*["']?(\w+)["']?/, refType: 'abilities' },
+              { regex: /room_id:\s*["']?(\w+)["']?/, refType: 'rooms' },
+              { regex: /quest_id:\s*["']?(\w+)["']?/, refType: 'quests' },
+              { regex: /dialogue_id:\s*["']?(\w+)["']?/, refType: 'dialogues' },
+              { regex: /template_id:\s*["']?(\w+)["']?/, refType: contentType || 'npcs' },
+            ];
+
+            for (const { regex, refType } of patterns) {
+              const match = lineContent.match(regex);
+              if (match) {
+                onNavigateToEntity(refType, match[1]);
+                break;
+              }
+            }
+          }
+        });
+      }
     },
-    []
+    [onNavigateToEntity, contentType]
   );
 
   // Register completion provider for enum values from schema
@@ -96,6 +132,55 @@ export function YamlEditor({
 
     return () => provider.dispose();
   }, [contentType, schemas]);
+
+  // Register hover provider to show "Ctrl+Click to go to definition" for references
+  useEffect(() => {
+    if (!monacoRef.current || !onNavigateToEntity) return;
+
+    const monaco = monacoRef.current;
+    const referencePatterns = [
+      /npc_template_id:\s*["']?(\w+)["']?/,
+      /item_template_id:\s*["']?(\w+)["']?/,
+      /ability_id:\s*["']?(\w+)["']?/,
+      /room_id:\s*["']?(\w+)["']?/,
+      /quest_id:\s*["']?(\w+)["']?/,
+      /dialogue_id:\s*["']?(\w+)["']?/,
+      /template_id:\s*["']?(\w+)["']?/,
+    ];
+
+    const hoverProvider = monaco.languages.registerHoverProvider('yaml', {
+      provideHover: (model: editor.ITextModel, position: { lineNumber: number; column: number }) => {
+        const lineContent = model.getLineContent(position.lineNumber);
+        
+        for (const pattern of referencePatterns) {
+          const match = lineContent.match(pattern);
+          if (match) {
+            const valueStart = lineContent.indexOf(match[1]);
+            const valueEnd = valueStart + match[1].length;
+            
+            // Check if cursor is on the value
+            if (position.column >= valueStart && position.column <= valueEnd + 1) {
+              return {
+                range: {
+                  startLineNumber: position.lineNumber,
+                  endLineNumber: position.lineNumber,
+                  startColumn: valueStart + 1,
+                  endColumn: valueEnd + 1,
+                },
+                contents: [
+                  { value: `**${match[1]}**` },
+                  { value: 'Ctrl+Click to go to definition' },
+                ],
+              };
+            }
+          }
+        }
+        return null;
+      },
+    });
+
+    return () => hoverProvider.dispose();
+  }, [onNavigateToEntity]);
 
   // Update validation markers when errors change
   useEffect(() => {

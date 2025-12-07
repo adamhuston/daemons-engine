@@ -1,0 +1,29 @@
+# Darkness Ability
+# Shrouds an area in magical darkness
+
+ability_id: darkness
+name: Darkness
+description: Shrouds an area in magical darkness
+ability_type: active
+ability_category: utility
+costs:
+  mana: 35
+cooldown: 4.0
+gcd_category: utility
+behavior_id: darkness
+effects: []
+target_type: self
+target_range: 0
+requires_target: false
+requires_los: false
+can_use_while_moving: true
+required_level: 3
+required_class: null
+keywords:
+- utility
+- darkness
+- stealth
+- magic
+metadata:
+  darkness_level: 75
+  duration: 180.0

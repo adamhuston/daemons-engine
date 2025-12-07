@@ -6,8 +6,8 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import { Form, Input, InputNumber, Select, Switch, Card, Button, Divider } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Form, Input, InputNumber, Select, Switch, Card, Button, Divider, Space } from 'antd';
+import { PlusOutlined, DeleteOutlined, LinkOutlined } from '@ant-design/icons';
 import type { SchemaDefinition, SchemaField } from '../../shared/types';
 
 const { TextArea } = Input;
@@ -18,9 +18,10 @@ interface FormEditorProps {
   data: Record<string, unknown>;
   onChange: (data: Record<string, unknown>) => void;
   contentType: string;
+  onNavigateToEntity?: (entityType: string, entityId: string) => void;
 }
 
-export function FormEditor({ schema, data, onChange, contentType }: FormEditorProps) {
+export function FormEditor({ schema, data, onChange, contentType, onNavigateToEntity }: FormEditorProps) {
   const [form] = Form.useForm();
 
   // Initialize form with data
@@ -35,6 +36,29 @@ export function FormEditor({ schema, data, onChange, contentType }: FormEditorPr
     },
     [onChange]
   );
+
+  // Infer reference type from field name patterns
+  const inferRefType = (fieldName: string): string | null => {
+    if (fieldName.includes('npc_template') || fieldName === 'template_id' && schema.title?.toLowerCase().includes('npc')) {
+      return 'npcs';
+    }
+    if (fieldName.includes('item_template') || fieldName.includes('item_id')) {
+      return 'items';
+    }
+    if (fieldName.includes('room_id') || fieldName === 'location') {
+      return 'rooms';
+    }
+    if (fieldName.includes('ability_id') || fieldName.includes('ability_template')) {
+      return 'abilities';
+    }
+    if (fieldName.includes('quest_id')) {
+      return 'quests';
+    }
+    if (fieldName.includes('dialogue_id')) {
+      return 'dialogues';
+    }
+    return null;
+  };
 
   // Render field based on type
   const renderField = useCallback((name: string, field: SchemaField) => {
@@ -51,7 +75,7 @@ export function FormEditor({ schema, data, onChange, contentType }: FormEditorPr
           return (
             <Form.Item key={name} {...commonProps}>
               <Select placeholder={`Select ${name}`}>
-                {field.enum.map((value) => (
+                {field.enum.map((value: string) => (
                   <Option key={value} value={value}>
                     {value}
                   </Option>
@@ -65,6 +89,27 @@ export function FormEditor({ schema, data, onChange, contentType }: FormEditorPr
           return (
             <Form.Item key={name} {...commonProps}>
               <TextArea rows={4} placeholder={field.description} />
+            </Form.Item>
+          );
+        }
+        // Check for reference fields - add link button
+        // Either explicit field.ref or auto-detect from field name patterns
+        const inferredRef = field.ref || inferRefType(name);
+        if (inferredRef && onNavigateToEntity) {
+          const currentValue = data[name] as string | undefined;
+          return (
+            <Form.Item key={name} {...commonProps}>
+              <Space.Compact style={{ width: '100%' }}>
+                <Input placeholder={field.description} style={{ flex: 1 }} />
+                {currentValue && (
+                  <Button
+                    type="default"
+                    icon={<LinkOutlined />}
+                    onClick={() => onNavigateToEntity(inferredRef, currentValue)}
+                    title={`Go to ${currentValue}`}
+                  />
+                )}
+              </Space.Compact>
             </Form.Item>
           );
         }
@@ -146,7 +191,7 @@ export function FormEditor({ schema, data, onChange, contentType }: FormEditorPr
       optional: [],
     };
 
-    for (const [name, field] of Object.entries(schema.fields)) {
+    for (const [name, field] of Object.entries(schema.fields) as [string, SchemaField][]) {
       if (field.required) {
         groups.required.push([name, field]);
       } else {
