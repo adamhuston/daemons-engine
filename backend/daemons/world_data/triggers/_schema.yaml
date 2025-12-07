@@ -141,18 +141,65 @@ actions: array
   #   type: despawn_npc
   #   npc_id: string (instance id)
 
-  # open_exit - reveal/open a previously hidden exit
+  # ========== Exit/Door Actions ==========
+  
+  # open_exit - add a new exit or reveal a hidden one (legacy, use reveal_exit for hidden exits)
   #   type: open_exit
   #   direction: string (north, south, secret, etc.)
-  #   destination: string (room_id)
+  #   target_room: string (room_id)
   #   OR
   #   params:
   #     direction: string
-  #     destination: string
+  #     target_room: string
 
-  # close_exit - hide/close an exit
+  # close_exit - completely remove an exit (makes it invisible)
   #   type: close_exit
   #   direction: string
+
+  # reveal_exit - make a hidden exit visible (for secret passages)
+  #   type: reveal_exit
+  #   params:
+  #     direction: string (the hidden exit direction to reveal)
+  #     target_room: string (optional, overrides the hidden exit's target)
+
+  # hide_exit - hide an exit again (reverse of reveal_exit)
+  #   type: hide_exit
+  #   params:
+  #     direction: string (the exit direction to hide)
+
+  # ========== Door Actions ==========
+  # Doors are visible exits that can be opened/closed/locked
+  # Unlike hidden exits, closed doors are shown as "north [closed]"
+  
+  # open_door - open a closed door (must be unlocked first)
+  #   type: open_door
+  #   params:
+  #     direction: string (the exit with the door to open)
+
+  # close_door - close an open door
+  #   type: close_door
+  #   params:
+  #     direction: string (the exit with the door to close)
+
+  # lock_door - lock a door (also closes it)
+  #   type: lock_door
+  #   params:
+  #     direction: string (the exit with the door to lock)
+  #     key_item_id: string (optional, item template ID that can unlock this door)
+
+  # unlock_door - unlock a locked door
+  #   type: unlock_door
+  #   params:
+  #     direction: string (the exit with the door to unlock)
+
+  # set_door - create or configure a door with full control
+  #   type: set_door
+  #   params:
+  #     direction: string (required, the exit direction for the door)
+  #     is_open: bool (optional, default: true)
+  #     is_locked: bool (optional, default: false)
+  #     key_item_id: string (optional, item that can unlock this door)
+  #     door_name: string (optional, custom name like "iron gate")
 
   # teleport_player - move player to different room
   #   type: teleport_player

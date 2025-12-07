@@ -27,6 +27,7 @@ from .systems.group_system import GroupSystem
 from .systems.lighting import VisibilityLevel
 from .world import (
     Direction,
+    DoorState,
     EntityId,
     EntityType,
     PlayerId,
@@ -48,6 +49,30 @@ Event = dict[str, Any]
 
 # Module logger for persistence and debug info
 logger = logging.getLogger(__name__)
+
+
+def format_exits_with_doors(room: WorldRoom) -> str:
+    """
+    Format visible exits with door state indicators for display.
+
+    Returns a string like "north, south [closed], east [locked]"
+    showing all visible exits with their door states.
+    """
+    visible_exits = room.get_visible_exits()
+    if not visible_exits:
+        return ""
+
+    exit_parts = []
+    for direction, (target, door) in visible_exits.items():
+        if door is None:
+            # No door - just show direction
+            exit_parts.append(direction)
+        else:
+            # Has a door - show with status indicator
+            indicator = door.get_status_indicator()
+            exit_parts.append(f"{direction}{indicator}")
+
+    return ", ".join(exit_parts)
 
 
 class WorldEngine:
@@ -4085,13 +4110,15 @@ class WorldEngine:
                 )
             ]
 
-        # Use effective exits (includes dynamic exits from triggers)
-        effective_exits = current_room.get_effective_exits()
-        if direction not in effective_exits:
+        # Check if exit is passable (handles hidden exits, closed/locked doors)
+        is_passable, reason = current_room.is_exit_passable(direction)
+        if not is_passable:
             return [
-                self._msg_to_player(player_id, "You can't go that way."),
+                self._msg_to_player(player_id, reason),
             ]
 
+        # Get the target room from effective exits
+        effective_exits = current_room.get_effective_exits()
         new_room_id = effective_exits[direction]
         new_room = world.rooms.get(new_room_id)
         if new_room is None:
@@ -4206,12 +4233,11 @@ class WorldEngine:
             description_lines.append("Items here:")
             description_lines.extend(items_here)
 
-        # Add exits to the room description (use effective exits)
-        effective_exits = new_room.get_effective_exits()
-        if effective_exits:
-            exits = list(effective_exits.keys())
+        # Add exits to the room description (show visible exits with door states)
+        exits_str = format_exits_with_doors(new_room)
+        if exits_str:
             description_lines.append("")
-            description_lines.append(f"Exits: {', '.join(exits)}")
+            description_lines.append(f"Exits: {exits_str}")
 
         events.append(
             self._msg_to_player(
@@ -4374,13 +4400,12 @@ class WorldEngine:
         elif room.items and visibility == VisibilityLevel.MINIMAL:
             lines.append("\nYou can barely make out some objects on the ground.")
 
-        # List available exits (use effective exits for trigger overrides)
+        # List visible exits with door states
         # Always show exits unless pitch black (already handled above)
-        effective_exits = room.get_effective_exits()
-        if effective_exits:
-            exits = list(effective_exits.keys())
+        exits_str = format_exits_with_doors(room)
+        if exits_str:
             lines.append("")
-            lines.append(f"Exits: {', '.join(exits)}")
+            lines.append(f"Exits: {exits_str}")
 
         return [self._msg_to_player(player_id, "\n".join(lines))]
 

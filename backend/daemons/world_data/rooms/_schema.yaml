@@ -50,6 +50,49 @@ exits: dictionary (optional)
   #   up: room_0_0_1
   #   secret: room_hidden_chamber
 
+# Hidden Exits (Optional)
+# =======================
+hidden_exits: dictionary (optional)
+  # Dictionary of secret/hidden exits that are not shown to players
+  # until revealed via trigger actions (reveal_exit).
+  # Keys: direction names (typically "secret", "hidden", or custom names)
+  # Values: room IDs
+  # Hidden exits:
+  #   - Are NOT shown in the "Exits:" list
+  #   - Cannot be traversed until revealed
+  #   - Use reveal_exit trigger action to make visible
+  #   - Use hide_exit trigger action to hide again
+  # Example:
+  #   secret: room_hidden_vault
+  #   hidden: room_treasure_room
+
+# Door States (Optional)
+# ======================
+doors: dictionary (optional)
+  # Dictionary of door states for exits (visible doors that can be opened/closed/locked)
+  # Keys: direction names matching exits
+  # Values: door state object with the following properties:
+  #   is_open: bool (default: true) - Whether the door is open (passable)
+  #   is_locked: bool (default: false) - Whether the door requires unlocking
+  #   key_item_id: string (optional) - Item template ID that can unlock this door
+  #   door_name: string (optional) - Custom display name (e.g., "iron gate", "wooden door")
+  #
+  # Doors vs Hidden Exits:
+  #   - Doors are VISIBLE but may block passage (shown as "north [closed]" or "north [locked]")
+  #   - Hidden exits are INVISIBLE until revealed
+  #   - A hidden exit can also have a door (revealed but locked/closed)
+  #
+  # Example:
+  #   north:
+  #     is_open: false
+  #     is_locked: true
+  #     key_item_id: item_rusty_key
+  #     door_name: "iron gate"
+  #   east:
+  #     is_open: false
+  #     is_locked: false
+  #     door_name: "wooden door"
+
 # Movement Effects (Optional)
 # ===========================
 on_enter_effect: string | null (optional)
@@ -117,6 +160,11 @@ triggers: array (optional, default: [])
 #   west -> west_id
 #   up -> up_id
 #   down -> down_id
+#
+# Runtime-only fields (not stored in database, set via triggers):
+#   dynamic_exits - Exits added/removed at runtime
+#   hidden_exits - Secret exits not shown until revealed
+#   door_states - Door open/closed/locked states
 
 # Complete Example
 # ===============
@@ -143,3 +191,38 @@ triggers: array (optional, default: [])
 #         amount: 20
 #       - type: message_player
 #         message: "You rest in the clearing and feel refreshed."
+
+# Example with Doors and Hidden Exits
+# ===================================
+# id: room_dungeon_entrance
+# area_id: area_ancient_dungeon
+# name: Dungeon Entrance
+# description: |
+#   A heavy iron gate blocks the passage north. Ancient runes
+#   are carved into the stone walls around you.
+# room_type: underground
+# exits:
+#   north: room_dungeon_hall
+#   south: room_forest_path
+# hidden_exits:
+#   secret: room_hidden_treasury
+# doors:
+#   north:
+#     is_open: false
+#     is_locked: true
+#     key_item_id: item_dungeon_key
+#     door_name: "iron gate"
+# triggers:
+#   - id: examine_runes
+#     event: on_command
+#     command_pattern: "examine runes*"
+#     conditions:
+#       - type: has_item
+#         item_id: item_ancient_tome
+#     actions:
+#       - type: message_player
+#         params:
+#           text: "The runes reveal a hidden passage!"
+#       - type: reveal_exit
+#         params:
+#           direction: secret

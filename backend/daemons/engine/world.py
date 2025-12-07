@@ -1641,6 +1641,39 @@ class WorldPlayer(WorldEntity):
 
 
 @dataclass
+class DoorState:
+    """
+    Represents the state of a door on an exit.
+
+    Doors can be:
+    - Open or closed (is_open)
+    - Locked or unlocked (is_locked)
+    - Require a specific key item to unlock (key_item_id)
+
+    A closed door is visible but blocks passage.
+    A locked door requires a key or trigger to unlock before opening.
+    """
+
+    is_open: bool = True  # Whether the door is open (passable)
+    is_locked: bool = False  # Whether the door is locked (requires key/trigger)
+    key_item_id: str | None = None  # Item template ID that can unlock this door
+    door_name: str | None = None  # Optional custom name (e.g., "iron gate", "wooden door")
+
+    def get_display_name(self) -> str:
+        """Get the display name for this door."""
+        return self.door_name or "door"
+
+    def get_status_indicator(self) -> str:
+        """Get a status indicator string for exit display."""
+        if self.is_open:
+            return ""
+        elif self.is_locked:
+            return " [locked]"
+        else:
+            return " [closed]"
+
+
+@dataclass
 class WorldRoom:
     """Runtime representation of a room in the world."""
 
@@ -1687,24 +1720,109 @@ class WorldRoom:
     # Arbitrary room state flags (set/read by triggers)
     room_flags: dict[str, Any] = field(default_factory=dict)
 
+    # ---------- Door System ----------
+    # Hidden exits: directions that exist but are not shown until revealed
+    # Key = direction, Value = target room ID (the exit exists but is hidden)
+    hidden_exits: dict[Direction, RoomId] = field(default_factory=dict)
+    # Door states: tracks open/closed and locked/unlocked state for exits
+    # Key = direction, Value = DoorState dataclass
+    door_states: dict[Direction, "DoorState"] = field(default_factory=dict)
+
     def get_effective_exits(self) -> dict[Direction, RoomId]:
         """
-        Get all available exits, including dynamic ones.
+        Get all passable exits (visible and open).
 
-        Dynamic exits override base exits for the same direction.
-        A dynamic exit set to None means the exit is closed (even if it exists in base).
+        Returns only exits that:
+        1. Are not hidden (or have been revealed via dynamic_exits)
+        2. Are not closed (door_states[dir].is_open == True or no door)
+
+        Use get_visible_exits() for display purposes (includes closed doors).
         """
         # Start with base exits
         effective = dict(self.exits)
-        # Overlay dynamic exits (None = closed)
+
+        # Remove hidden exits (these are secret until revealed)
+        for direction in self.hidden_exits:
+            effective.pop(direction, None)
+
+        # Overlay dynamic exits (None = remove, otherwise add/replace)
         for direction, target in self.dynamic_exits.items():
             if target is None:
-                # Close the exit
+                # Remove the exit entirely
                 effective.pop(direction, None)
             else:
-                # Open/change the exit
+                # Add or replace the exit (this can reveal a hidden exit)
                 effective[direction] = target
-        return effective
+
+        # Filter out exits with closed doors
+        passable = {}
+        for direction, target in effective.items():
+            door = self.door_states.get(direction)
+            if door is None or door.is_open:
+                passable[direction] = target
+
+        return passable
+
+    def get_visible_exits(self) -> dict[Direction, tuple[RoomId, "DoorState | None"]]:
+        """
+        Get all visible exits with their door states for display.
+
+        Returns exits that are not hidden, along with their door state (if any).
+        Includes closed doors - use this for room description display.
+
+        Returns:
+            Dict of direction -> (target_room_id, door_state or None)
+        """
+        # Start with base exits
+        visible = dict(self.exits)
+
+        # Remove hidden exits
+        for direction in self.hidden_exits:
+            visible.pop(direction, None)
+
+        # Overlay dynamic exits
+        for direction, target in self.dynamic_exits.items():
+            if target is None:
+                visible.pop(direction, None)
+            else:
+                visible[direction] = target
+
+        # Attach door states
+        result: dict[Direction, tuple[RoomId, DoorState | None]] = {}
+        for direction, target in visible.items():
+            door = self.door_states.get(direction)
+            result[direction] = (target, door)
+
+        return result
+
+    def is_exit_passable(self, direction: Direction) -> tuple[bool, str]:
+        """
+        Check if an exit can be traversed and return reason if not.
+
+        Returns:
+            (True, "") if passable
+            (False, "reason") if not passable
+        """
+        # Check if exit exists at all
+        all_exits = dict(self.exits)
+        all_exits.update({d: t for d, t in self.dynamic_exits.items() if t is not None})
+
+        if direction not in all_exits:
+            # Check if it's a hidden exit
+            if direction in self.hidden_exits:
+                return (False, "You can't go that way.")  # Don't reveal hidden exits
+            return (False, "You can't go that way.")
+
+        # Check door state
+        door = self.door_states.get(direction)
+        if door:
+            if not door.is_open:
+                if door.is_locked:
+                    return (False, f"The door to the {direction} is locked.")
+                else:
+                    return (False, f"The door to the {direction} is closed.")
+
+        return (True, "")
 
     def get_effective_description(self) -> str:
         """Get the room description, using dynamic override if set."""

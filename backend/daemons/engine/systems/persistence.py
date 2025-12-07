@@ -249,7 +249,7 @@ class StateTracker:
 
     async def _save_room(self, session: AsyncSession, room_id: str) -> None:
         """
-        Save room runtime state (flags, dynamic exits) to database.
+        Save room runtime state (flags, dynamic exits, door states) to database.
 
         Note: Requires room_state table from Phase 6.2 migration.
         """
@@ -259,17 +259,29 @@ class StateTracker:
         if not room:
             return
 
+        # Serialize door states to a dict format
+        door_states_dict = {}
+        if hasattr(room, "door_states") and room.door_states:
+            for direction, door in room.door_states.items():
+                door_states_dict[direction] = {
+                    "is_open": door.is_open,
+                    "is_locked": door.is_locked,
+                    "key_item_id": door.key_item_id,
+                    "door_name": door.door_name,
+                }
+
         # Check if room_state table exists (graceful degradation)
         try:
             await session.execute(
                 text(
                     """
-                INSERT INTO room_state (room_id, room_flags, dynamic_exits, dynamic_description, updated_at)
-                VALUES (:room_id, :room_flags, :dynamic_exits, :dynamic_description, :updated_at)
+                INSERT INTO room_state (room_id, room_flags, dynamic_exits, dynamic_description, door_states, updated_at)
+                VALUES (:room_id, :room_flags, :dynamic_exits, :dynamic_description, :door_states, :updated_at)
                 ON CONFLICT (room_id) DO UPDATE SET
                     room_flags = :room_flags,
                     dynamic_exits = :dynamic_exits,
                     dynamic_description = :dynamic_description,
+                    door_states = :door_states,
                     updated_at = :updated_at
             """
                 ),
@@ -282,11 +294,12 @@ class StateTracker:
                         else "{}"
                     ),
                     "dynamic_description": getattr(room, "dynamic_description", None),
+                    "door_states": str(door_states_dict) if door_states_dict else "{}",
                     "updated_at": time.time(),
                 },
             )
         except Exception as e:
-            # Table doesn't exist yet - skip gracefully
+            # Table doesn't exist yet or missing column - skip gracefully
             print(f"[StateTracker] room_state table not available: {e}")
 
     async def _save_npc(self, session: AsyncSession, npc_id: str) -> None:
@@ -386,6 +399,77 @@ class StateTracker:
 
         if restored_count > 0:
             print(f"[StateTracker] Restored {restored_count} persistent NPC states")
+
+        return restored_count
+
+    async def restore_room_states(self) -> int:
+        """
+        Restore room runtime states (door states, dynamic exits, flags) from database.
+
+        Updates room objects with persisted state.
+        Called during world load.
+
+        Returns number of rooms restored.
+        """
+        import ast
+
+        from sqlalchemy import text
+
+        restored_count = 0
+
+        try:
+            async with self.db_session_factory() as session:
+                result = await session.execute(text("SELECT * FROM room_state"))
+                rows = result.fetchall()
+
+                for row in rows:
+                    room_id = row.room_id
+                    room = self.ctx.world.rooms.get(room_id)
+                    if not room:
+                        continue
+
+                    # Restore room flags
+                    if row.room_flags:
+                        try:
+                            room.room_flags = ast.literal_eval(row.room_flags)
+                        except (ValueError, SyntaxError):
+                            pass
+
+                    # Restore dynamic exits
+                    if row.dynamic_exits:
+                        try:
+                            room.dynamic_exits = ast.literal_eval(row.dynamic_exits)
+                        except (ValueError, SyntaxError):
+                            pass
+
+                    # Restore dynamic description
+                    if hasattr(row, "dynamic_description") and row.dynamic_description:
+                        room.dynamic_description = row.dynamic_description
+
+                    # Restore door states
+                    if hasattr(row, "door_states") and row.door_states:
+                        try:
+                            from ..world import DoorState
+
+                            door_states_dict = ast.literal_eval(row.door_states)
+                            for direction, door_info in door_states_dict.items():
+                                room.door_states[direction] = DoorState(
+                                    is_open=door_info.get("is_open", True),
+                                    is_locked=door_info.get("is_locked", False),
+                                    key_item_id=door_info.get("key_item_id"),
+                                    door_name=door_info.get("door_name"),
+                                )
+                        except (ValueError, SyntaxError):
+                            pass
+
+                    restored_count += 1
+
+        except Exception as e:
+            print(f"[StateTracker] room_state table not available: {e}")
+            return 0
+
+        if restored_count > 0:
+            print(f"[StateTracker] Restored {restored_count} room states")
 
         return restored_count
 

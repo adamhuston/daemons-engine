@@ -513,7 +513,7 @@ def load_triggers_from_yaml(world: World, world_data_dir: str | None = None) -> 
     rooms_loaded = 0
     areas_loaded = 0
 
-    # ----- Load room triggers -----
+    # ----- Load room triggers, hidden exits, and doors -----
     rooms_dir = world_data_dir / "rooms"
     if rooms_dir.exists():
         yaml_files = list(rooms_dir.glob("**/*.yaml"))
@@ -528,13 +528,34 @@ def load_triggers_from_yaml(world: World, world_data_dir: str | None = None) -> 
                 continue
 
             room_id = room_data.get("id")
-            triggers_data = room_data.get("triggers", [])
-
-            if not room_id or not triggers_data:
+            if not room_id:
                 continue
 
             room = world.rooms.get(room_id)
             if not room:
+                continue
+
+            # Load hidden exits
+            hidden_exits_data = room_data.get("hidden_exits", {})
+            if hidden_exits_data:
+                room.hidden_exits = dict(hidden_exits_data)
+
+            # Load doors
+            doors_data = room_data.get("doors", {})
+            if doors_data:
+                from .world import DoorState
+                for direction, door_info in doors_data.items():
+                    if isinstance(door_info, dict):
+                        room.door_states[direction] = DoorState(
+                            is_open=door_info.get("is_open", True),
+                            is_locked=door_info.get("is_locked", False),
+                            key_item_id=door_info.get("key_item_id"),
+                            door_name=door_info.get("door_name"),
+                        )
+
+            # Load triggers
+            triggers_data = room_data.get("triggers", [])
+            if not triggers_data:
                 continue
 
             # Parse each trigger

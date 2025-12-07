@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..world import PlayerId, RoomId, World, WorldArea, WorldPlayer, WorldRoom
+    from ..world import DoorState, PlayerId, RoomId, World, WorldArea, WorldPlayer, WorldRoom
     from .context import GameContext
 
 
@@ -999,12 +999,14 @@ class TriggerSystem:
         self.action_handlers["fire_trigger"] = self._action_fire_trigger
         # Phase 11 actions - Darkness Events
         self.action_handlers["stumble_in_darkness"] = self._action_stumble_in_darkness
-        self.action_handlers["despawn_item"] = self._action_despawn_item
-        self.action_handlers["give_item"] = self._action_give_item
-        self.action_handlers["take_item"] = self._action_take_item
-        self.action_handlers["enable_trigger"] = self._action_enable_trigger
-        self.action_handlers["disable_trigger"] = self._action_disable_trigger
-        self.action_handlers["fire_trigger"] = self._action_fire_trigger
+        # Door System actions
+        self.action_handlers["reveal_exit"] = self._action_reveal_exit
+        self.action_handlers["hide_exit"] = self._action_hide_exit
+        self.action_handlers["open_door"] = self._action_open_door
+        self.action_handlers["close_door"] = self._action_close_door
+        self.action_handlers["lock_door"] = self._action_lock_door
+        self.action_handlers["unlock_door"] = self._action_unlock_door
+        self.action_handlers["set_door"] = self._action_set_door
 
     def _action_message_player(
         self,
@@ -1349,6 +1351,233 @@ class TriggerSystem:
 
         # Set to None to indicate "closed" - get_effective_exits will filter it
         room.dynamic_exits[direction] = None
+        return []
+
+    # ---------- Door System Actions ----------
+
+    def _action_reveal_exit(
+        self,
+        ctx: TriggerContext,
+        params: dict[str, Any],
+    ) -> list[Event]:
+        """
+        Reveal a hidden exit, making it visible to players.
+
+        Params:
+            direction: The exit direction to reveal
+            target_room: (Optional) Override the target room ID
+
+        This moves the exit from hidden_exits to dynamic_exits.
+        """
+        room = ctx.get_room()
+        if not room:
+            return []
+
+        direction = params.get("direction")
+        if not direction:
+            print("[TriggerSystem] reveal_exit requires direction")
+            return []
+
+        # Check if this is a hidden exit
+        if direction in room.hidden_exits:
+            target = params.get("target_room") or room.hidden_exits[direction]
+            # Add to dynamic exits (making it visible)
+            room.dynamic_exits[direction] = target
+        elif params.get("target_room"):
+            # Not hidden, but we can still add a new exit
+            room.dynamic_exits[direction] = params["target_room"]
+
+        return []
+
+    def _action_hide_exit(
+        self,
+        ctx: TriggerContext,
+        params: dict[str, Any],
+    ) -> list[Event]:
+        """
+        Hide an exit from players (make it secret again).
+
+        Params:
+            direction: The exit direction to hide
+
+        This removes the exit from dynamic_exits if it was revealed.
+        """
+        room = ctx.get_room()
+        if not room:
+            return []
+
+        direction = params.get("direction")
+        if not direction:
+            print("[TriggerSystem] hide_exit requires direction")
+            return []
+
+        # Remove from dynamic exits (if revealed there)
+        if direction in room.dynamic_exits:
+            del room.dynamic_exits[direction]
+
+        return []
+
+    def _action_open_door(
+        self,
+        ctx: TriggerContext,
+        params: dict[str, Any],
+    ) -> list[Event]:
+        """
+        Open a door in the specified direction.
+
+        Params:
+            direction: The exit direction with the door to open
+
+        Note: Only opens unlocked doors. Use unlock_door first for locked doors.
+        """
+        from ..world import DoorState
+
+        room = ctx.get_room()
+        if not room:
+            return []
+
+        direction = params.get("direction")
+        if not direction:
+            print("[TriggerSystem] open_door requires direction")
+            return []
+
+        door = room.door_states.get(direction)
+        if door:
+            if door.is_locked:
+                # Can't open a locked door
+                return []
+            door.is_open = True
+        # If no door exists, nothing to open
+
+        return []
+
+    def _action_close_door(
+        self,
+        ctx: TriggerContext,
+        params: dict[str, Any],
+    ) -> list[Event]:
+        """
+        Close a door in the specified direction.
+
+        Params:
+            direction: The exit direction with the door to close
+        """
+        from ..world import DoorState
+
+        room = ctx.get_room()
+        if not room:
+            return []
+
+        direction = params.get("direction")
+        if not direction:
+            print("[TriggerSystem] close_door requires direction")
+            return []
+
+        door = room.door_states.get(direction)
+        if door:
+            door.is_open = False
+        # If no door exists, nothing to close
+
+        return []
+
+    def _action_lock_door(
+        self,
+        ctx: TriggerContext,
+        params: dict[str, Any],
+    ) -> list[Event]:
+        """
+        Lock a door in the specified direction.
+
+        Params:
+            direction: The exit direction with the door to lock
+            key_item_id: (Optional) Item template ID that can unlock this door
+        """
+        from ..world import DoorState
+
+        room = ctx.get_room()
+        if not room:
+            return []
+
+        direction = params.get("direction")
+        if not direction:
+            print("[TriggerSystem] lock_door requires direction")
+            return []
+
+        door = room.door_states.get(direction)
+        if door:
+            door.is_locked = True
+            door.is_open = False  # Locking also closes the door
+            if params.get("key_item_id"):
+                door.key_item_id = params["key_item_id"]
+        else:
+            # Create a new door state if one doesn't exist
+            room.door_states[direction] = DoorState(
+                is_open=False,
+                is_locked=True,
+                key_item_id=params.get("key_item_id"),
+            )
+
+        return []
+
+    def _action_unlock_door(
+        self,
+        ctx: TriggerContext,
+        params: dict[str, Any],
+    ) -> list[Event]:
+        """
+        Unlock a door in the specified direction.
+
+        Params:
+            direction: The exit direction with the door to unlock
+        """
+        room = ctx.get_room()
+        if not room:
+            return []
+
+        direction = params.get("direction")
+        if not direction:
+            print("[TriggerSystem] unlock_door requires direction")
+            return []
+
+        door = room.door_states.get(direction)
+        if door:
+            door.is_locked = False
+
+        return []
+
+    def _action_set_door(
+        self,
+        ctx: TriggerContext,
+        params: dict[str, Any],
+    ) -> list[Event]:
+        """
+        Set or create a door with specific properties.
+
+        Params:
+            direction: The exit direction for the door
+            is_open: (Optional) Whether the door is open (default: True)
+            is_locked: (Optional) Whether the door is locked (default: False)
+            key_item_id: (Optional) Item template ID that can unlock this door
+            door_name: (Optional) Custom name for the door (e.g., "iron gate")
+        """
+        from ..world import DoorState
+
+        room = ctx.get_room()
+        if not room:
+            return []
+
+        direction = params.get("direction")
+        if not direction:
+            print("[TriggerSystem] set_door requires direction")
+            return []
+
+        room.door_states[direction] = DoorState(
+            is_open=params.get("is_open", True),
+            is_locked=params.get("is_locked", False),
+            key_item_id=params.get("key_item_id"),
+            door_name=params.get("door_name"),
+        )
+
         return []
 
     def _action_set_description(
