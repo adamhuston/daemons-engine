@@ -1,0 +1,35 @@
+# Poison Oak - Toxic shrub
+id: flora_poison_oak
+name: poison oak
+description: A deceptively innocent-looking shrub with three-lobed leaves that cause a painful rash.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+  - coastal
+
+temperature_range: [30, 100]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: false
+
+seasonal_variants:
+  spring: Shiny new leaves emerge on the poison oak, easily mistaken for true oak.
+  summer: The poison oak's glossy leaves blend with the underbrush.
+  fall: Brilliant red and orange leaves make the poison oak dangerously beautiful.
+  winter: Bare stems are hard to identify but still toxic.
+
+dormant_seasons:
+  - winter
+
+danger_level: 2
+danger_effect: poison_rash
+
+provides_cover: true
+cover_bonus: 1
+
+rarity: common
+cluster_size: [2, 6]

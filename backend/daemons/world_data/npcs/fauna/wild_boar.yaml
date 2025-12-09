@@ -1,0 +1,55 @@
+# Wild Boar - Aggressive herbivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_wild_boar
+name: wild boar
+description: >
+  A bristly, tusked swine with a foul temper and powerful build.
+  It snorts aggressively, pawing at the ground.
+npc_type: hostile
+level: 4
+max_health: 65
+armor_class: 14
+strength: 16
+dexterity: 10
+intelligence: 3
+attack_damage_min: 6
+attack_damage_max: 14
+attack_speed: 2.5
+experience_reward: 25
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, swamp, temperate]
+  temperature_tolerance: [20, 85]
+  activity_period: crepuscular
+  diet: omnivore
+  prey_tags: []
+  predator_tags: [wolf, cougar]
+  fauna_tags: [omnivore, boar, prey, aggressive]
+  pack_size: [2, 6]
+  pack_leader_template: npc_dire_boar
+  territorial: true
+  territory_radius: 4
+  migratory: false
+  aggression: 0.6
+  flee_threshold: 0.2
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - aggressive
+  - brave
+loot_table: []
+idle_messages:
+  - "The boar snorts and paws the earth."
+  - "The boar roots around for truffles."
+  - "The boar's tusks gleam menacingly."
+keywords:
+  - boar
+  - wild boar
+  - pig
+  - hog

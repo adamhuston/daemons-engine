@@ -1,0 +1,37 @@
+# Spirea - Delicate flowering shrub
+id: flora_spirea
+name: spirea
+description: A mounding shrub with arching branches covered in clusters of tiny flowers.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - woodland
+  - meadow
+  - grassland
+
+temperature_range: [10, 90]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_spirea_flower
+    quantity: 4
+    chance: 0.7
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: White or pink flower clusters cover the arching branches.
+  summer: Small leaves fill the spirea's graceful form.
+  fall: The spirea's leaves turn bronze or orange.
+  winter: Delicate twigs form a fine tracery.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 1
+
+rarity: common
+cluster_size: [1, 3]

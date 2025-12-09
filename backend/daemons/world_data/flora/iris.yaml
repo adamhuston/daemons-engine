@@ -1,0 +1,38 @@
+# Iris - Elegant wetland flower
+id: flora_iris
+name: iris
+description: An elegant flower with sword-like leaves and distinctive purple blooms.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - wetland
+  - meadow
+  - swamp
+  - riparian
+
+temperature_range: [35, 85]
+light_requirement: full_sun
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_iris_petal
+    quantity: 4
+    chance: 0.7
+  - item_id: item_iris_root
+    quantity: 1
+    chance: 0.4
+harvest_cooldown: 28800
+
+seasonal_variants:
+  spring: Sword-like leaves push up through the wet soil.
+  summer: Regal purple irises bloom along the water's edge.
+  fall: Seed pods develop as the leaves yellow.
+  winter: Dried leaves mark where irises will return.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [3, 8]

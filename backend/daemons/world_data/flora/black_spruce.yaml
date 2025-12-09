@@ -1,0 +1,38 @@
+# Black Spruce - Cold-hardy evergreen
+id: flora_black_spruce
+name: black spruce
+description: A slender evergreen with short, dark needles and small cones.
+flora_type: tree
+
+biome_tags:
+  - boreal
+  - taiga
+  - forest
+  - arctic
+  - mountain
+
+temperature_range: [-20, 70]
+light_requirement: partial_shade
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_spruce_resin
+    quantity: 2
+    chance: 0.6
+  - item_id: item_spruce_needle
+    quantity: 4
+    chance: 0.8
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: The black spruce's dark needles contrast with new pale growth.
+  summer: The spruce stands dark and fragrant in the summer sun.
+  fall: Small cones cluster at the spruce's crown.
+  winter: Snow weighs down the spruce's drooping branches.
+
+provides_cover: true
+cover_bonus: 3
+
+rarity: common
+cluster_size: [2, 5]

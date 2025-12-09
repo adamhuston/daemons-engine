@@ -1,0 +1,52 @@
+# Turkey - Ground bird fauna
+# Phase 17.5: Fauna System
+
+id: npc_turkey
+name: wild turkey
+description: >
+  A large, iridescent ground bird with a bare, wattled head.
+  It gobbles loudly and struts with pompous dignity.
+npc_type: neutral
+level: 2
+max_health: 20
+armor_class: 11
+strength: 8
+dexterity: 12
+intelligence: 3
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 2.0
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [forest, grassland, temperate]
+  temperature_tolerance: [20, 90]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [fox, coyote, bobcat, eagle]
+  fauna_tags: [omnivore, turkey, prey, bird, ground]
+  pack_size: [3, 12]
+  territorial: true
+  territory_radius: 3
+  migratory: false
+  aggression: 0.2
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+  - social
+loot_table: []
+idle_messages:
+  - "The turkey gobbles loudly."
+  - "The turkey struts with its tail fanned."
+  - "The turkey scratches at the ground."
+keywords:
+  - turkey
+  - wild turkey

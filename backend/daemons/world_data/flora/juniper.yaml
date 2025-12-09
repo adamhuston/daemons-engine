@@ -1,0 +1,37 @@
+# Juniper - Hardy evergreen shrub/tree
+id: flora_juniper
+name: juniper tree
+description: A gnarled juniper with scale-like leaves and blue berries.
+flora_type: tree
+
+biome_tags:
+  - desert
+  - mountain
+  - arid
+  - temperate
+
+temperature_range: [0, 100]
+light_requirement: full_sun
+moisture_requirement: dry
+
+harvestable: true
+harvest_items:
+  - item_id: item_juniper_berry
+    quantity: 5
+    chance: 0.7
+  - item_id: item_juniper_wood
+    quantity: 1
+    chance: 0.4
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: New growth tips the juniper's dusty green foliage.
+  summer: Blue berries dot the juniper's aromatic branches.
+  fall: The juniper remains unchanged as other trees fade.
+  winter: Snow dusts the juniper's twisted form.
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: common
+cluster_size: [1, 3]

@@ -1,0 +1,51 @@
+# Mouse - Tiny prey mammal fauna
+# Phase 17.5: Fauna System
+
+id: npc_mouse
+name: mouse
+description: >
+  A tiny gray rodent with round ears and a long tail.
+  It freezes at the slightest sound, whiskers twitching.
+npc_type: neutral
+level: 1
+max_health: 3
+armor_class: 13
+strength: 2
+dexterity: 16
+intelligence: 3
+attack_damage_min: 1
+attack_damage_max: 1
+attack_speed: 1.0
+experience_reward: 1
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, grassland, temperate, cave, any]
+  temperature_tolerance: [20, 90]
+  activity_period: nocturnal
+  diet: omnivore
+  prey_tags: []
+  predator_tags: [owl, hawk, snake, fox, coyote, cat]
+  fauna_tags: [omnivore, mouse, prey, rodent, small]
+  pack_size: [1, 6]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.9
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - cowardly
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The mouse nibbles on a seed."
+  - "The mouse's whiskers twitch nervously."
+  - "The mouse scurries into hiding."
+keywords:
+  - mouse
+  - mice

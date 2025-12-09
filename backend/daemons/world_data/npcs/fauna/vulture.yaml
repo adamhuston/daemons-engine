@@ -1,0 +1,49 @@
+# Vulture - Scavenger bird fauna
+# Phase 17.5: Fauna System
+
+id: npc_vulture
+name: vulture
+description: >
+  A large, bald-headed scavenger with dark, ragged feathers.
+  It circles patiently overhead, waiting for death.
+npc_type: neutral
+level: 2
+max_health: 20
+armor_class: 12
+strength: 8
+dexterity: 12
+intelligence: 4
+attack_damage_min: 2
+attack_damage_max: 6
+attack_speed: 2.0
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [desert, grassland, savanna]
+  temperature_tolerance: [30, 120]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [carrion]
+  predator_tags: []
+  fauna_tags: [carnivore, vulture, scavenger, bird, flying]
+  pack_size: [1, 8]
+  territorial: false
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.0
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - hunts
+  - peaceful
+loot_table: []
+idle_messages:
+  - "The vulture circles slowly overhead."
+  - "The vulture's bald head glistens in the sun."
+  - "The vulture hunches over, waiting."
+keywords:
+  - vulture
+  - buzzard

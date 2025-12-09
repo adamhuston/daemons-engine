@@ -1,0 +1,50 @@
+# Loon - Diving waterfowl fauna
+# Phase 17.5: Fauna System
+
+id: npc_loon
+name: loon
+description: >
+  A striking black and white diving bird with haunting red eyes.
+  Its eerie, yodeling call echoes across the lake.
+npc_type: neutral
+level: 2
+max_health: 18
+armor_class: 12
+strength: 8
+dexterity: 14
+intelligence: 4
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 2.0
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [lake, river, wetland]
+  temperature_tolerance: [30, 75]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [fish]
+  predator_tags: [eagle]
+  fauna_tags: [carnivore, loon, prey, bird, waterfowl, aquatic]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 4
+  migratory: true
+  migration_seasons: [fall, spring]
+  aggression: 0.1
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The loon lets out an eerie, wavering call."
+  - "The loon dives beneath the surface."
+  - "The loon's red eyes gleam eerily."
+keywords:
+  - loon

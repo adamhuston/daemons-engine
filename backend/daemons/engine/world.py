@@ -58,6 +58,41 @@ DEFAULT_ROOM_TYPE_EMOJIS = {
 _room_type_emoji_cache: dict[str, str] = {}
 
 
+def get_article(name: str) -> str:
+    """
+    Get the appropriate indefinite article ('a' or 'an') for a name.
+    
+    Args:
+        name: The noun to get an article for (e.g., "bobcat", "owl", "alpha wolf")
+        
+    Returns:
+        'an' if the name starts with a vowel sound, 'a' otherwise
+    """
+    if not name:
+        return "a"
+    first_char = name.lower()[0]
+    # Basic vowel check - handles most cases
+    # Note: doesn't handle special cases like "hour" or "unicorn"
+    return "an" if first_char in "aeiou" else "a"
+
+
+def with_article(name: str, capitalize: bool = True) -> str:
+    """
+    Return a name with the appropriate indefinite article.
+    
+    Args:
+        name: The noun (e.g., "bobcat", "owl")
+        capitalize: Whether to capitalize the article
+        
+    Returns:
+        The name with article (e.g., "A bobcat", "An owl")
+    """
+    article = get_article(name)
+    if capitalize:
+        article = article.capitalize()
+    return f"{article} {name}"
+
+
 def set_room_type_emojis(emojis: dict[str, str]) -> None:
     """Set the room type emoji cache from database data."""
     global _room_type_emoji_cache
@@ -373,6 +408,38 @@ class WorldArea:
     base_temperature: int = 70
     # Daily temperature variation (+/- degrees based on time of day)
     temperature_variation: int = 20
+
+    # ---------- Phase 17.2: Weather System ----------
+    # Custom weather patterns - dict with weather type probabilities
+    # Format: {"clear": 0.4, "rain": 0.3, "storm": 0.1, "cloudy": 0.2}
+    # If None, uses climate-based defaults
+    weather_patterns: dict[str, float] | None = None
+    # Weather immunity - if True, area has no weather (underground, indoor, etc.)
+    weather_immunity: bool = False
+
+    # ---------- Phase 17.3: Biome Coherence and Seasons ----------
+    # Current season: spring, summer, fall, winter
+    current_season: str = "summer"
+    # Day within current season (1 to days_per_season)
+    season_day: int = 1
+    # How many in-game days per season
+    days_per_season: int = 30
+    # If True, season never changes (frozen in eternal winter, etc.)
+    season_locked: bool = False
+    # Biome coherence data - extended configuration
+    # Format: {"temperature_range": [40, 80], "seasonal_modifiers": {...}, ...}
+    biome_data: dict = field(default_factory=dict)
+    # Flora compatibility tags for Phase 17.4
+    # Format: ["deciduous", "conifer", "grass", "flowering"]
+    flora_tags: list[str] = field(default_factory=list)
+    # Fauna compatibility tags for Phase 17.5
+    # Format: ["woodland", "predator", "prey", "aquatic"]
+    fauna_tags: list[str] = field(default_factory=list)
+
+    # ---------- Phase 17.5: Dynamic NPC/Fauna Spawns ----------
+    # List of spawn definitions with conditions
+    # Format: [{"template_id": "deer", "room_id": "room_1", "spawn_conditions": {...}}, ...]
+    npc_spawns: list[dict] = field(default_factory=list)
 
     # ---------- Phase 5.4: Area Enhancements ----------
     # Level range recommendation for players
@@ -1426,6 +1493,10 @@ class NpcTemplate:
         default_factory=list
     )  # Pre-equipped abilities in slot order
 
+    # Phase 17.5: Fauna properties
+    is_fauna: bool = False  # True if this is a wildlife NPC
+    fauna_data: dict = field(default_factory=dict)  # Fauna-specific properties
+
     # Resolved behavior config (populated at load time from behavior tags)
     resolved_behavior: dict = field(default_factory=dict)
 
@@ -1474,6 +1545,12 @@ class WorldNpc(WorldEntity):
     # Per-NPC behavior timer tracking
     idle_event_id: str | None = None
     wander_event_id: str | None = None
+
+    # Phase 17.5: Fauna-specific state (None for non-fauna NPCs)
+    # Hunger: 0 = full, 100 = starving. Fauna get hungry over time.
+    hunger: int | None = None
+    # Last time hunger was updated (Unix timestamp)
+    last_hunger_update: float | None = None
 
     def __post_init__(self):
         """Ensure entity_type is set correctly."""
@@ -1704,6 +1781,10 @@ class WorldRoom:
     # Items in this room
     items: set[ItemId] = field(default_factory=set)
 
+    # ---------- Phase 17.4: Flora System ----------
+    # Flora instance IDs in this room (loaded from flora_instances table)
+    flora: set[int] = field(default_factory=set)
+
     # ---------- Phase 11: Lighting System ----------
     # Room-specific lighting override (replaces area ambient + time calculation)
     lighting_override: str | None = (
@@ -1864,6 +1945,10 @@ class World:
     # NPC system
     npc_templates: dict[NpcTemplateId, NpcTemplate] = field(default_factory=dict)
     npcs: dict[NpcId, WorldNpc] = field(default_factory=dict)
+
+    # Flora system (Phase 17.4)
+    # Maps flora instance ID -> (template_id, quantity) for synchronous room display
+    flora_instances: dict[int, tuple[str, int]] = field(default_factory=dict)
 
     # Container contents index: container_id -> set of item_ids inside it
     # Provides O(1) lookup for items in containers instead of O(n) world scan

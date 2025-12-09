@@ -75,3 +75,27 @@ class Pacifist(BehaviorScript):
         return BehaviorResult.handled(
             message=f"{ctx.npc.name} cowers but does not fight back."
         )
+
+
+@behavior(
+    name="peaceful",
+    description="NPC is peaceful and won't attack unless provoked (alias for non-aggressive)",
+    priority=70,
+    defaults={
+        "aggro_on_sight": False,
+        "attacks_if_attacked": False,
+    },
+)
+class Peaceful(BehaviorScript):
+    """Peaceful creatures don't initiate combat."""
+    async def on_player_enter(
+        self, ctx: BehaviorContext, player_id: str
+    ) -> BehaviorResult:
+        # Don't aggro on sight
+        return BehaviorResult.was_handled()
+
+    async def on_damaged(
+        self, ctx: BehaviorContext, attacker_id: str, damage: int
+    ) -> BehaviorResult:
+        # Peaceful creatures don't fight back
+        return BehaviorResult.was_handled()

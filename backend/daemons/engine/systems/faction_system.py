@@ -116,7 +116,7 @@ class FactionSystem:
 
         try:
             async with self.db_session_factory() as session:
-                from ..models import Faction
+                from daemons.models import Faction
 
                 # Load all factions
                 result = await session.execute(select(Faction))
@@ -180,6 +180,9 @@ class FactionSystem:
             # Load all YAML files
             faction_definitions = []
             for yaml_file in sorted(factions_path.glob("*.yaml")):
+                # Skip schema/documentation files
+                if yaml_file.name.startswith("_"):
+                    continue
                 with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
                     if data:
@@ -253,7 +256,16 @@ class FactionSystem:
 
         try:
             async with self.db_session_factory() as session:
-                from ..models import Faction
+                from daemons.models import Faction
+                from sqlalchemy import select
+
+                # Check if faction already exists
+                existing = await session.execute(
+                    select(Faction).where(Faction.name == name)
+                )
+                if existing.scalars().first():
+                    # Already exists, skip
+                    return
 
                 faction = Faction(
                     id=faction_id,
@@ -277,7 +289,19 @@ class FactionSystem:
 
         try:
             async with self.db_session_factory() as session:
-                from ..models import FactionNPCMember
+                from daemons.models import FactionNPCMember
+                from sqlalchemy import select
+
+                # Check if membership already exists
+                existing = await session.execute(
+                    select(FactionNPCMember).where(
+                        FactionNPCMember.faction_id == faction_id,
+                        FactionNPCMember.npc_template_id == npc_template_id,
+                    )
+                )
+                if existing.scalars().first():
+                    # Already exists, skip
+                    return
 
                 member = FactionNPCMember(
                     faction_id=faction_id,

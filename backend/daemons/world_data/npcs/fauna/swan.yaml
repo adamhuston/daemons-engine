@@ -1,0 +1,50 @@
+# Swan - Large waterfowl fauna
+# Phase 17.5: Fauna System
+
+id: npc_swan
+name: swan
+description: >
+  A majestic white bird with a long, graceful neck.
+  Its beauty belies a surprisingly aggressive temperament.
+npc_type: neutral
+level: 3
+max_health: 35
+armor_class: 12
+strength: 12
+dexterity: 10
+intelligence: 4
+attack_damage_min: 3
+attack_damage_max: 8
+attack_speed: 2.0
+experience_reward: 15
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [lake, river, wetland]
+  temperature_tolerance: [20, 80]
+  activity_period: diurnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [eagle]
+  fauna_tags: [herbivore, swan, prey, bird, waterfowl]
+  pack_size: [2, 6]
+  territorial: true
+  territory_radius: 4
+  migratory: true
+  migration_seasons: [fall, spring]
+  aggression: 0.5
+  flee_threshold: 0.2
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - brave
+loot_table: []
+idle_messages:
+  - "The swan glides serenely across the water."
+  - "The swan hisses and spreads its wings."
+  - "The swan arches its neck gracefully."
+keywords:
+  - swan

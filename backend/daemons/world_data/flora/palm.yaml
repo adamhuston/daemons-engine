@@ -1,0 +1,37 @@
+# Palm - Tropical tree
+id: flora_palm
+name: palm tree
+description: A tall palm with a crown of large fronds and a fibrous trunk.
+flora_type: tree
+
+biome_tags:
+  - tropical
+  - coastal
+  - desert
+  - oasis
+
+temperature_range: [50, 115]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_palm_frond
+    quantity: 2
+    chance: 0.7
+  - item_id: item_coconut
+    quantity: 2
+    chance: 0.4
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: New fronds unfurl at the palm's crown.
+  summer: The palm sways gracefully in warm ocean breezes.
+  fall: Clusters of fruit hang beneath the palm's crown.
+  winter: The palm endures, unchanged in the mild season.
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: common
+cluster_size: [1, 3]

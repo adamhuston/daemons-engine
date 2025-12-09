@@ -1,0 +1,51 @@
+# Salmon - Migratory fish fauna
+# Phase 17.5: Fauna System
+
+id: npc_salmon
+name: salmon
+description: >
+  A powerful silver fish with a determined gleam in its eye.
+  It fights tirelessly upstream to reach its spawning grounds.
+npc_type: neutral
+level: 2
+max_health: 12
+armor_class: 12
+strength: 8
+dexterity: 14
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 3
+attack_speed: 1.0
+experience_reward: 5
+
+is_fauna: true
+fauna_data:
+  fauna_type: fish
+  biome_tags: [river, coast, ocean]
+  temperature_tolerance: [35, 60]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [eagle, bear, otter]
+  fauna_tags: [omnivore, fish, prey, aquatic, migratory]
+  pack_size: [10, 100]
+  territorial: false
+  migratory: true
+  migration_seasons: [spring, fall]
+  aggression: 0.0
+  flee_threshold: 0.9
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - peaceful
+loot_table: []
+idle_messages:
+  - "The salmon leaps over a small waterfall."
+  - "The salmon surges upstream."
+  - "Dense schools of salmon fill the river."
+keywords:
+  - salmon
+  - fish

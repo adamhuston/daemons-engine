@@ -1,0 +1,53 @@
+# Elk - Large herbivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_elk
+name: elk
+description: >
+  A magnificent elk with a massive rack of antlers and a proud bearing.
+  Its bugling call echoes through the forest.
+npc_type: neutral
+level: 4
+max_health: 80
+armor_class: 13
+strength: 16
+dexterity: 12
+intelligence: 3
+attack_damage_min: 6
+attack_damage_max: 14
+attack_speed: 2.5
+experience_reward: 25
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, mountain, meadow, temperate]
+  temperature_tolerance: [0, 80]
+  activity_period: crepuscular
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [wolf, cougar, bear]
+  fauna_tags: [herbivore, elk, prey, ungulate]
+  pack_size: [2, 8]
+  territorial: true
+  territory_radius: 3
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.2
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The elk raises its majestic antlers."
+  - "The elk lets out a resonant bugle."
+  - "The elk paws at the ground."
+  - "The elk grazes peacefully."
+keywords:
+  - elk
+  - bull elk
+  - stag

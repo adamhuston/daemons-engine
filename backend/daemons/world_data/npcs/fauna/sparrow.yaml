@@ -1,0 +1,51 @@
+# Sparrow - Songbird fauna
+# Phase 17.5: Fauna System
+
+id: npc_sparrow
+name: sparrow
+description: >
+  A small, streaked brown bird with a cheerful chirp.
+  It flits between bushes, ever watchful for danger.
+npc_type: neutral
+level: 1
+max_health: 4
+armor_class: 14
+strength: 3
+dexterity: 16
+intelligence: 3
+attack_damage_min: 1
+attack_damage_max: 1
+attack_speed: 1.0
+experience_reward: 2
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [grassland, temperate, urban, any]
+  temperature_tolerance: [20, 90]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [hawk, owl, cat, snake]
+  fauna_tags: [omnivore, sparrow, prey, bird, songbird, small]
+  pack_size: [5, 30]
+  territorial: false
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.0
+  flee_threshold: 0.7
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - social
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The sparrow chirps brightly."
+  - "The sparrow dust-bathes enthusiastically."
+  - "A flock of sparrows chatters noisily."
+keywords:
+  - sparrow

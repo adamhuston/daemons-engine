@@ -1,0 +1,48 @@
+# Pelican - Large waterfowl fauna
+# Phase 17.5: Fauna System
+
+id: npc_pelican
+name: pelican
+description: >
+  A large white bird with an enormous pouched bill.
+  It plunges into the water to scoop up fish.
+npc_type: neutral
+level: 2
+max_health: 25
+armor_class: 11
+strength: 10
+dexterity: 10
+intelligence: 4
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 2.0
+experience_reward: 10
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [coast, lake, river]
+  temperature_tolerance: [50, 100]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [fish]
+  predator_tags: []
+  fauna_tags: [carnivore, pelican, prey, bird, waterfowl]
+  pack_size: [2, 20]
+  territorial: false
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.0
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - social
+loot_table: []
+idle_messages:
+  - "The pelican scoops fish into its pouch."
+  - "The pelican glides low over the water."
+  - "The pelican preens its waterproof feathers."
+keywords:
+  - pelican

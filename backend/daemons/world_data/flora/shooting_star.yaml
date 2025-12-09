@@ -1,0 +1,39 @@
+# Shooting Star - Alpine wildflower
+id: flora_shooting_star
+name: shooting star
+description: A delicate wildflower with swept-back petals that resemble a shooting star.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - alpine
+  - mountain
+  - meadow
+  - grassland
+
+temperature_range: [30, 70]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_shooting_star_flower
+    quantity: 2
+    chance: 0.6
+  - item_id: item_shooting_star_seed
+    quantity: 4
+    chance: 0.5
+harvest_cooldown: 28800
+
+seasonal_variants:
+  spring: Shooting stars bloom early in moist meadows.
+  summer: The distinctive flowers have gone to seed.
+  fall: Only basal leaves remain close to the ground.
+  winter: Shooting stars lie dormant beneath the snow.
+
+dormant_seasons:
+  - winter
+  - fall
+
+rarity: uncommon
+cluster_size: [2, 8]

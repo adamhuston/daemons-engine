@@ -1,0 +1,159 @@
+# Arctic Biome
+# Frozen tundra and ice fields with extreme cold
+
+biome_id: arctic
+name: Arctic
+description: >
+  A frozen wasteland of endless ice and snow, where the sun barely rises
+  in winter and never sets in summer. Only the hardiest creatures survive
+  here, adapted to temperatures that would kill most beings.
+
+biome_type: ARCTIC
+
+# Temperature configuration
+temperature:
+  base_min: -50  # Extreme winter cold
+  base_max: 45   # Brief summer warmth
+  comfortable_min: 20
+  comfortable_max: 35
+
+# Seasonal modifiers
+seasonal_effects:
+  spring:
+    temperature_modifier: 15
+    precipitation_modifier: 0.8
+    growth_rate: 0.8
+    spawn_rate: 1.0
+    light_hours: 12
+    description: "The long darkness ends. Ice begins to crack and melt at the edges."
+    
+  summer:
+    temperature_modifier: 30
+    precipitation_modifier: 0.6
+    growth_rate: 2.0           # Rapid growth in short summer
+    spawn_rate: 1.5
+    light_hours: 20            # Midnight sun
+    description: "The midnight sun never sets. Life explodes across the tundra."
+    
+  autumn:
+    temperature_modifier: 0
+    precipitation_modifier: 1.0
+    growth_rate: 0.5
+    spawn_rate: 0.8
+    light_hours: 10
+    description: "Days shorten rapidly. Creatures prepare for the long dark."
+    
+  winter:
+    temperature_modifier: -20
+    precipitation_modifier: 1.5  # Heavy snowfall
+    growth_rate: 0.0
+    spawn_rate: 0.3
+    light_hours: 4              # Polar night
+    description: "Endless night and bitter cold. Survival is the only goal."
+
+# Valid weather patterns
+valid_weather:
+  - CLEAR
+  - CLOUDY
+  - OVERCAST
+  - LIGHT_SNOW
+  - SNOW
+  - HEAVY_SNOW
+  - BLIZZARD
+  - FOG
+  - AURORA
+
+# Weather weights
+weather_weights:
+  CLEAR: 20
+  CLOUDY: 25
+  OVERCAST: 15
+  LIGHT_SNOW: 15
+  SNOW: 10
+  HEAVY_SNOW: 5
+  BLIZZARD: 5
+  FOG: 3
+  AURORA: 2
+
+# Valid seasons
+valid_seasons:
+  - SPRING
+  - SUMMER
+  - AUTUMN
+  - WINTER
+
+# Spawn modifiers
+spawn_modifiers:
+  herbivore: 0.5
+  predator: 0.6
+  omnivore: 0.5
+  bird: 0.4       # Migratory only
+  insect: 0.2     # Too cold
+  reptile: 0.0    # No reptiles survive
+  plant: 0.2      # Sparse vegetation
+  fungus: 0.3
+  undead: 1.5     # Cold preserves the dead
+  elemental: 1.4  # Ice elementals thrive
+  beast: 0.6
+  cold_adapted: 2.0  # Specialized creatures
+
+# Spawn types
+spawn_types:
+  common:
+    - arctic_fox
+    - snow_hare
+    - lemming
+    - snowy_owl
+    - seal
+  uncommon:
+    - polar_bear
+    - caribou
+    - musk_ox
+    - wolf_pack
+  rare:
+    - frost_giant
+    - ice_elemental
+    - yeti
+
+# Population limits
+population_limits:
+  herbivore_max: 4
+  predator_max: 2
+  plant_max: 2
+  total_creature_max: 5
+
+# Terrain features
+terrain_features:
+  - ice_sheets
+  - glaciers
+  - tundra
+  - frozen_lakes
+  - ice_caves
+  - permafrost
+
+# Resources
+resources:
+  wood: scarce
+  herbs: rare
+  game: uncommon
+  water: abundant  # Frozen
+  ore: rare
+  ice: abundant
+
+# Hazards
+hazards:
+  - frostbite
+  - hypothermia
+  - blizzard
+  - thin_ice
+  - crevasses
+  - polar_night
+
+# Tags
+tags:
+  - arctic
+  - frozen
+  - cold
+  - ice
+  - tundra
+  - extreme

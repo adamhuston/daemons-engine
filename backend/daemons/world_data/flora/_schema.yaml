@@ -1,0 +1,167 @@
+# Flora YAML Schema
+# This file defines the structure for flora template definitions.
+# Do not remove this file - it is used for validation.
+
+type: object
+required:
+  - id
+  - name
+  - description
+  - flora_type
+
+properties:
+  id:
+    type: string
+    pattern: "^flora_[a-z_]+$"
+    description: "Unique identifier for the flora template"
+
+  name:
+    type: string
+    description: "Display name shown to players"
+
+  description:
+    type: string
+    description: "Default description of the flora"
+
+  flora_type:
+    type: string
+    enum: [tree, shrub, grass, flower, fungus, vine, aquatic]
+    description: "Type category affecting respawn rates and behaviors"
+
+  # Environmental Requirements
+  biome_tags:
+    type: array
+    items:
+      type: string
+    description: "Biome tags this flora is compatible with"
+
+  temperature_range:
+    type: array
+    items:
+      type: integer
+    minItems: 2
+    maxItems: 2
+    default: [32, 100]
+    description: "[min_temp, max_temp] in Fahrenheit"
+
+  light_requirement:
+    type: string
+    enum: [full_sun, partial_shade, shade, any]
+    default: any
+    description: "Light level required for growth"
+
+  moisture_requirement:
+    type: string
+    enum: [arid, dry, moderate, wet, aquatic]
+    default: moderate
+    description: "Moisture level required for growth"
+
+  # Harvesting Properties
+  harvestable:
+    type: boolean
+    default: false
+    description: "Whether players can harvest this flora"
+
+  harvest_items:
+    type: array
+    items:
+      type: object
+      required: [item_id]
+      properties:
+        item_id:
+          type: string
+          description: "Item template ID to grant"
+        quantity:
+          type: integer
+          default: 1
+          description: "Number of items to grant"
+        chance:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 1.0
+          description: "Probability of obtaining this item"
+        skill_bonus:
+          type: string
+          description: "Skill that improves harvest chance"
+
+  harvest_cooldown:
+    type: integer
+    default: 3600
+    description: "Seconds until flora can be harvested again"
+
+  harvest_tool:
+    type: string
+    description: "Required tool item_type (axe, sickle, knife, etc.)"
+
+  harvest_skill:
+    type: string
+    description: "Skill used for harvest check (survival, herbalism, etc.)"
+
+  harvest_dc:
+    type: integer
+    default: 10
+    description: "Difficulty class for skill check if required"
+
+  # Seasonal Properties
+  seasonal_variants:
+    type: object
+    properties:
+      spring:
+        type: string
+        description: "Description during spring"
+      summer:
+        type: string
+        description: "Description during summer"
+      fall:
+        type: string
+        description: "Description during fall"
+      winter:
+        type: string
+        description: "Description during winter"
+
+  dormant_seasons:
+    type: array
+    items:
+      type: string
+      enum: [spring, summer, fall, winter]
+    description: "Seasons when flora cannot be harvested"
+
+  # Gameplay Effects
+  provides_cover:
+    type: boolean
+    default: false
+    description: "Whether flora provides stealth/cover bonus"
+
+  cover_bonus:
+    type: integer
+    default: 2
+    description: "Bonus to stealth checks when using as cover"
+
+  blocks_movement:
+    type: boolean
+    default: false
+    description: "Whether flora blocks movement through room"
+
+  blocks_directions:
+    type: array
+    items:
+      type: string
+      enum: [north, south, east, west, up, down]
+    description: "Specific directions blocked by dense flora"
+
+  # Spawning Properties
+  rarity:
+    type: string
+    enum: [common, uncommon, rare, very_rare]
+    default: common
+    description: "Affects spawn frequency"
+
+  cluster_size:
+    type: array
+    items:
+      type: integer
+    minItems: 2
+    maxItems: 2
+    default: [1, 3]
+    description: "[min, max] number of plants per spawn cluster"

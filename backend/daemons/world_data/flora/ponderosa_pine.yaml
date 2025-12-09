@@ -1,0 +1,39 @@
+# Ponderosa Pine - Large western pine
+id: flora_ponderosa_pine
+name: ponderosa pine
+description: A towering pine with thick, puzzle-piece bark that smells of vanilla.
+flora_type: tree
+
+biome_tags:
+  - temperate
+  - mountain
+  - forest
+
+temperature_range: [0, 95]
+light_requirement: full_sun
+moisture_requirement: dry
+
+harvestable: true
+harvest_items:
+  - item_id: item_pine_resin
+    quantity: 3
+    chance: 0.7
+  - item_id: item_pine_cone
+    quantity: 2
+    chance: 0.6
+  - item_id: item_pine_bark
+    quantity: 2
+    chance: 0.5
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Long needles burst from the ponderosa's distinctive buds.
+  summer: The pine's vanilla-scented bark warms in the sun.
+  fall: The ponderosa stands tall as deciduous trees change color.
+  winter: Snow outlines the ponderosa's orange-barked branches.
+
+provides_cover: true
+cover_bonus: 3
+
+rarity: common
+cluster_size: [1, 4]

@@ -1,0 +1,37 @@
+# Fireweed - Pioneer wildflower
+id: flora_fireweed
+name: fireweed
+description: A tall plant with spires of magenta flowers that colonizes disturbed ground.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - boreal
+  - mountain
+  - forest
+
+temperature_range: [20, 80]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_fireweed_flower
+    quantity: 4
+    chance: 0.7
+  - item_id: item_fireweed_leaf
+    quantity: 3
+    chance: 0.6
+harvest_cooldown: 14400
+
+seasonal_variants:
+  spring: Young shoots emerge from the ground.
+  summer: Tall spires of magenta flowers blaze with color.
+  fall: Fluffy seeds drift from opening pods.
+  winter: Dried stalks mark where the fireweed grew.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [5, 20]

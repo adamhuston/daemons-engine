@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from daemons.engine.world import RoomId, World, WorldArea, WorldRoom
+    from daemons.engine.systems.weather import WeatherSystem
+    from daemons.engine.systems.biome import BiomeSystem
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +135,9 @@ class TemperatureState:
     base_temperature: int  # Area base before modifiers
     time_modifier: int  # Time-of-day adjustment
     biome_modifier: int  # Biome-based adjustment
-    is_override: bool  # True if room override was applied
+    weather_modifier: int = 0  # Weather-based adjustment (Phase 17.2)
+    seasonal_modifier: int = 0  # Season-based adjustment (Phase 17.3)
+    is_override: bool = False  # True if room override was applied
 
 
 class TemperatureSystem:
@@ -144,8 +148,15 @@ class TemperatureSystem:
     and conditions for trigger evaluation.
     """
 
-    def __init__(self, world: "World"):
+    def __init__(
+        self,
+        world: "World",
+        weather_system: "WeatherSystem | None" = None,
+        biome_system: "BiomeSystem | None" = None,
+    ):
         self.world = world
+        self.weather_system = weather_system  # Phase 17.2: Optional weather integration
+        self.biome_system = biome_system  # Phase 17.3: Optional biome integration
         logger.info("TemperatureSystem initialized")
 
     def get_temperature_level(self, temperature: int) -> TemperatureLevel:
@@ -179,7 +190,7 @@ class TemperatureSystem:
 
         Resolution order:
         1. Room temperature_override (if set) - ignores all other calculations
-        2. Area base_temperature + time modifier + biome modifier
+        2. Area base_temperature + time modifier + biome modifier + weather modifier + seasonal modifier
 
         Args:
             room: The WorldRoom to calculate temperature for
@@ -197,6 +208,8 @@ class TemperatureSystem:
                 base_temperature=temp,
                 time_modifier=0,
                 biome_modifier=0,
+                weather_modifier=0,
+                seasonal_modifier=0,
                 is_override=True,
             )
 
@@ -220,8 +233,24 @@ class TemperatureSystem:
             time_period = self._get_time_period(area, current_time)
             time_modifier = TIME_TEMPERATURE_MODIFIERS.get(time_period, 0)
 
+        # Phase 17.2: Calculate weather modifier (if weather system available)
+        weather_modifier = 0
+        if self.weather_system and area and not getattr(area, "weather_immunity", False):
+            # WeatherSystem uses area_id, not area object
+            area_id = area.id if hasattr(area, "id") else room.area_id
+            effects = self.weather_system.get_weather_effects(area_id)
+            weather_modifier = effects.get("temperature_modifier", 0)
+
+        # Phase 17.3: Calculate seasonal modifier (if biome system available)
+        seasonal_modifier = 0
+        if self.biome_system and area and biome.lower() not in TEMPERATURE_IMMUNE_BIOMES:
+            current_season = getattr(area, "current_season", "spring") or "spring"
+            seasonal_modifier = self._get_seasonal_temperature_modifier(
+                biome, current_season
+            )
+
         # Calculate final temperature
-        final_temp = base_temp + biome_modifier + time_modifier
+        final_temp = base_temp + biome_modifier + time_modifier + weather_modifier + seasonal_modifier
 
         return TemperatureState(
             temperature=final_temp,
@@ -229,6 +258,8 @@ class TemperatureSystem:
             base_temperature=base_temp,
             time_modifier=time_modifier,
             biome_modifier=biome_modifier,
+            weather_modifier=weather_modifier,
+            seasonal_modifier=seasonal_modifier,
             is_override=False,
         )
 
@@ -294,6 +325,49 @@ class TemperatureSystem:
             return "evening"
         else:
             return "night"
+
+    def _get_seasonal_temperature_modifier(
+        self,
+        biome: str,
+        season: str,
+    ) -> int:
+        """
+        Get the seasonal temperature modifier for a biome.
+
+        Uses the BiomeSystem to get accurate seasonal modifiers,
+        or falls back to defaults if not available.
+
+        Args:
+            biome: The biome type (lowercase)
+            season: The current season (lowercase)
+
+        Returns:
+            Temperature modifier in Fahrenheit
+        """
+        # Default seasonal modifiers if biome system not available
+        DEFAULT_SEASONAL_MODIFIERS = {
+            "spring": -5,
+            "summer": 10,
+            "autumn": -5,
+            "winter": -20,
+        }
+
+        if self.biome_system:
+            try:
+                from .biome import BiomeType, Season
+
+                biome_type = BiomeType[biome.upper()]
+                season_enum = Season[season.upper()]
+                modifiers = self.biome_system.get_seasonal_modifiers(
+                    biome_type, season_enum
+                )
+                if modifiers:
+                    return int(modifiers.temperature_modifier)
+            except (KeyError, ImportError):
+                pass  # Fall through to defaults
+
+        # Use default seasonal modifiers
+        return DEFAULT_SEASONAL_MODIFIERS.get(season.lower(), 0)
 
     def get_temperature_effects(self, temperature: int) -> dict:
         """

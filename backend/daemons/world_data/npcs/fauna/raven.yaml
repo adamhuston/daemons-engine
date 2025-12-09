@@ -1,0 +1,53 @@
+# Raven - Intelligent scavenger fauna
+# Phase 17.5: Fauna System
+
+id: npc_raven
+name: raven
+description: >
+  A large, glossy black bird with keen intelligence in its eyes.
+  Its croaking call is said to be an ill omen.
+npc_type: neutral
+level: 2
+max_health: 15
+armor_class: 14
+strength: 6
+dexterity: 16
+intelligence: 8
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 1.5
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [forest, mountain, coast, desert, any]
+  temperature_tolerance: [-10, 100]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect, mouse, carrion]
+  predator_tags: [eagle, hawk, owl]
+  fauna_tags: [omnivore, raven, scavenger, bird, flying, intelligent]
+  pack_size: [1, 6]
+  territorial: false
+  migratory: false
+  aggression: 0.1
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_frequently
+  - social
+loot_table: []
+idle_messages:
+  - "The raven caws ominously."
+  - "The raven tilts its head, watching you."
+  - "The raven picks at something on the ground."
+  - "The raven seems almost amused."
+keywords:
+  - raven
+  - crow
+  - corvid

@@ -8,6 +8,7 @@ room_type: cave
 lighting_override: '40'
 exits:
   north: room_cave_tunnel_1
+  south: room_0_2_0
   up: dark_caves_room_1764960397085
 on_enter_effect: A chill emanates from the cave depths.
 on_exit_effect: null

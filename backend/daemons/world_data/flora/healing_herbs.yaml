@@ -1,0 +1,41 @@
+# Healing Herbs - Uncommon medicinal plant
+id: flora_healing_herbs
+name: healing herbs
+description: A cluster of fragrant herbs with known medicinal properties.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - forest
+  - plains
+  - mountain_meadow
+
+temperature_range: [40, 85]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_healing_herbs
+    quantity: 2
+    chance: 0.8
+    skill_bonus: herbalism
+  - item_id: item_rare_herb
+    quantity: 1
+    chance: 0.1
+    skill_bonus: herbalism
+harvest_cooldown: 14400  # 4 hours
+harvest_skill: herbalism
+harvest_dc: 12
+
+seasonal_variants:
+  spring: Young healing herbs push through the soil, their leaves unfurling.
+  summer: Vibrant healing herbs bloom with small, aromatic flowers.
+  fall: Mature healing herbs ready for harvest, their leaves at peak potency.
+  winter: Withered remnants of healing herbs poke through the snow.
+
+dormant_seasons:
+  - winter
+
+rarity: uncommon
+cluster_size: [1, 3]

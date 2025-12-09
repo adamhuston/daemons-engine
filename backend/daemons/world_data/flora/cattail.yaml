@@ -1,0 +1,39 @@
+# Cattail - Wetland plant
+id: flora_cattail
+name: cattail
+description: A tall wetland plant with sword-like leaves and distinctive brown flower spikes.
+flora_type: grass
+
+biome_tags:
+  - wetland
+  - swamp
+  - riparian
+
+temperature_range: [20, 95]
+light_requirement: full_sun
+moisture_requirement: aquatic
+
+harvestable: true
+harvest_items:
+  - item_id: item_cattail_root
+    quantity: 2
+    chance: 0.6
+  - item_id: item_cattail_fluff
+    quantity: 3
+    chance: 0.7
+  - item_id: item_cattail_stalk
+    quantity: 2
+    chance: 0.8
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: New shoots emerge from the water.
+  summer: Brown flower spikes top the tall green stalks.
+  fall: Fluffy seeds drift from the dried spikes.
+  winter: Brown stalks stand above the frozen water.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [5, 20]

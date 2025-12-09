@@ -1,0 +1,52 @@
+# Alpha Wolf - Pack leader variant
+# Phase 17.5: Fauna System
+
+id: npc_alpha_wolf
+name: alpha wolf
+description: >
+  A massive gray wolf with a scarred muzzle and commanding presence.
+  Its eyes burn with fierce intelligence as it leads its pack.
+npc_type: hostile
+level: 6
+max_health: 95
+armor_class: 14
+strength: 16
+dexterity: 14
+intelligence: 5
+attack_damage_min: 8
+attack_damage_max: 16
+attack_speed: 2.5
+experience_reward: 45
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, tundra, mountain, taiga]
+  temperature_tolerance: [0, 80]
+  activity_period: nocturnal
+  diet: carnivore
+  prey_tags: [deer, rabbit, prey, herbivore, elk]
+  predator_tags: []
+  fauna_tags: [carnivore, wolf, predator, canine, alpha]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 7
+  migratory: false
+  aggression: 0.9
+  flee_threshold: 0.15
+
+behavior:
+  - ambient
+  - hunts
+  - aggressive
+  - brave
+  - social
+loot_table: []
+idle_messages:
+  - "The alpha wolf throws back its head and howls."
+  - "The alpha wolf surveys its territory with keen eyes."
+  - "The alpha wolf's scars tell tales of many battles."
+keywords:
+  - wolf
+  - alpha
+  - pack leader

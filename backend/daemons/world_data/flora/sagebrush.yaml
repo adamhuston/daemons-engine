@@ -1,0 +1,35 @@
+# Sagebrush - Aromatic desert shrub
+id: flora_sagebrush
+name: sagebrush
+description: A silvery-gray shrub with aromatic leaves that fills the dry air with its scent.
+flora_type: shrub
+
+biome_tags:
+  - desert
+  - arid
+  - grassland
+  - plains
+  - mountain
+
+temperature_range: [-10, 105]
+light_requirement: full_sun
+moisture_requirement: arid
+
+harvestable: true
+harvest_items:
+  - item_id: item_sage_leaf
+    quantity: 5
+    chance: 0.8
+harvest_cooldown: 14400
+
+seasonal_variants:
+  spring: New silvery leaves emerge on the sagebrush.
+  summer: The sagebrush's pungent scent fills the hot air.
+  fall: Tiny yellow flowers bloom on the sagebrush.
+  winter: The hardy sagebrush endures cold desert nights.
+
+provides_cover: true
+cover_bonus: 1
+
+rarity: common
+cluster_size: [3, 8]

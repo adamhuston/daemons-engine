@@ -1,0 +1,50 @@
+# Otter - Aquatic mammal fauna
+# Phase 17.5: Fauna System
+
+id: npc_otter
+name: otter
+description: >
+  A sleek, playful creature with webbed feet and bright, curious eyes.
+  It slides along the riverbank with joyful abandon.
+npc_type: neutral
+level: 1
+max_health: 18
+armor_class: 13
+strength: 8
+dexterity: 16
+intelligence: 5
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 1.5
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [river, wetland, coast]
+  temperature_tolerance: [20, 80]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [fish, crab, frog]
+  predator_tags: [eagle, coyote, wolf]
+  fauna_tags: [carnivore, otter, prey, aquatic, playful]
+  pack_size: [2, 6]
+  territorial: false
+  migratory: false
+  aggression: 0.1
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - social
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The otter slides down the muddy bank."
+  - "The otter floats on its back, cracking a shell."
+  - "The otter chirps playfully."
+keywords:
+  - otter
+  - river otter

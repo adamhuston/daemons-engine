@@ -353,3 +353,190 @@ ai_behavior: string (optional, default: null)
 #   - champion
 #   - undead
 #   - warrior
+
+# =============================================================================
+# PHASE 17.5: FAUNA SYSTEM
+# =============================================================================
+# NPCs can be marked as fauna for ecological wildlife simulation.
+# Fauna have special spawning rules, activity periods, and migration behaviors.
+
+# Fauna Fields (Phase 17.5)
+# =========================
+is_fauna: bool (optional, default: false)
+  # Marks this NPC as wildlife fauna rather than a humanoid/monster
+  # Fauna follow different spawning and behavior rules
+  # Example: true
+
+fauna_data: dictionary (optional, default: null)
+  # Fauna-specific properties for ecological behavior
+  # Only used when is_fauna: true
+  # Contains the following fields:
+
+fauna_type: string (required for fauna)
+  # Biological classification
+  # Options: "mammal", "bird", "reptile", "amphibian", "fish", "insect", "arachnid"
+  # Example: "mammal"
+
+biome_tags: array of strings
+  # Biomes where this fauna naturally spawns
+  # Should match biome fauna_tags from biome definitions
+  # Example: ["forest", "grassland"]
+
+temperature_tolerance: array [min, max]
+  # Temperature range (Fahrenheit) the fauna can survive
+  # Example: [20, 90]
+
+activity_period: string (default: "always")
+  # When the fauna is active
+  # Options: "diurnal" (day), "nocturnal" (night), "crepuscular" (dawn/dusk), "always"
+  # Example: "crepuscular"
+
+diet: string (default: "herbivore")
+  # Ecological role for predator-prey dynamics
+  # Options: "herbivore", "carnivore", "omnivore", "scavenger"
+  # Example: "herbivore"
+
+prey_tags: array of strings
+  # Fauna tags this creature hunts (carnivores/omnivores)
+  # Example: ["prey", "rabbit", "deer"]
+
+predator_tags: array of strings
+  # Fauna tags of creatures that hunt this one
+  # Used for fleeing behavior
+  # Example: ["wolf", "bear", "carnivore"]
+
+fauna_tags: array of strings
+  # Tags for this fauna (for matching prey_tags/predator_tags)
+  # Example: ["herbivore", "deer", "prey", "ungulate"]
+
+pack_size: array [min, max]
+  # How many spawn together (default: [1, 1] for solitary)
+  # Example: [3, 7] for wolf packs
+
+pack_leader_template: string (optional)
+  # Template ID for pack leader variant (e.g., alpha wolf)
+  # Example: "npc_alpha_wolf"
+
+territorial: bool (default: false)
+  # Whether fauna defends territory
+  # Example: true
+
+territory_radius: int (default: 3)
+  # Rooms from spawn point for territory (when territorial)
+  # Example: 5
+
+migratory: bool (default: false)
+  # Whether fauna migrates seasonally
+  # Example: true
+
+migration_seasons: array of strings
+  # Seasons when fauna is absent (migrated away)
+  # Options: "spring", "summer", "fall", "winter"
+  # Example: ["winter"]
+
+migration_tendency: float (default: 0.05)
+  # Chance per tick to explore/migrate to adjacent areas
+  # Example: 0.1
+
+aggression: float (default: 0.0)
+  # Likelihood to attack players (0.0-1.0)
+  # 0.0 = passive, 1.0 = attacks on sight
+  # Example: 0.7 for wolves
+
+flee_threshold: float (default: 0.25)
+  # Health percentage at which fauna flees
+  # Example: 0.5 (flee at 50% health)
+
+# Complete Example: Herbivore Fauna
+# =================================
+# id: npc_deer
+# name: Deer
+# description: >
+#   A graceful woodland deer with a soft brown coat and alert dark eyes.
+#   It watches you warily, ready to bolt at the first sign of danger.
+# npc_type: neutral
+# level: 2
+# max_health: 40
+# armor_class: 12
+# strength: 10
+# dexterity: 16
+# intelligence: 2
+# attack_damage_min: 3
+# attack_damage_max: 6
+# attack_speed: 2.0
+# experience_reward: 10
+# is_fauna: true                              # <-- Phase 17.5: Mark as fauna
+# fauna_data:                                 # <-- Phase 17.5: Fauna properties
+#   fauna_type: mammal
+#   biome_tags: [forest, grassland, meadow]
+#   temperature_tolerance: [20, 90]
+#   activity_period: crepuscular              # Active at dawn/dusk
+#   diet: herbivore
+#   prey_tags: []                             # Doesn't hunt
+#   predator_tags: [wolf, bear, cougar]       # Flees from these
+#   fauna_tags: [herbivore, deer, prey, ungulate]
+#   pack_size: [1, 4]                         # Small groups
+#   territorial: false
+#   migratory: true
+#   migration_seasons: [winter]               # Gone in winter
+#   aggression: 0.0                           # Never attacks
+#   flee_threshold: 0.5                       # Flees at 50% health
+# behavior:
+#   - peaceful
+#   - cowardly
+# loot_table: []                              # Abstract death - no loot
+# idle_messages:
+#   - "The deer raises its head, ears swiveling."
+#   - "The deer nibbles on some grass."
+#   - "The deer's tail twitches nervously."
+# keywords:
+#   - deer
+#   - doe
+#   - buck
+
+# Complete Example: Predator Fauna
+# ================================
+# id: npc_wolf
+# name: Wolf
+# description: >
+#   A powerful gray wolf with thick fur and piercing amber eyes.
+#   It moves with quiet confidence, muscles rippling beneath its coat.
+# npc_type: hostile
+# level: 4
+# max_health: 65
+# armor_class: 13
+# strength: 14
+# dexterity: 14
+# intelligence: 4
+# attack_damage_min: 6
+# attack_damage_max: 12
+# attack_speed: 2.5
+# experience_reward: 25
+# is_fauna: true                              # <-- Phase 17.5: Mark as fauna
+# fauna_data:                                 # <-- Phase 17.5: Fauna properties
+#   fauna_type: mammal
+#   biome_tags: [forest, tundra, mountain]
+#   temperature_tolerance: [0, 80]
+#   activity_period: nocturnal                # Active at night
+#   diet: carnivore
+#   prey_tags: [deer, rabbit, prey]           # Hunts these
+#   predator_tags: []                         # Apex predator
+#   fauna_tags: [carnivore, wolf, predator, canine]
+#   pack_size: [3, 7]                         # Runs in packs
+#   pack_leader_template: npc_alpha_wolf
+#   territorial: true
+#   territory_radius: 5
+#   migratory: false
+#   aggression: 0.7                           # Usually attacks
+#   flee_threshold: 0.2                       # Brave - flees at 20%
+# behavior:
+#   - aggressive
+#   - social
+# loot_table: []                              # Abstract death - no loot
+# idle_messages:
+#   - "The wolf's ears perk up at a distant sound."
+#   - "The wolf licks its chops."
+#   - "A low growl rumbles in the wolf's throat."
+# keywords:
+#   - wolf
+#   - canine

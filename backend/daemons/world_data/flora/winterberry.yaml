@@ -1,0 +1,37 @@
+# Winterberry - Winter-fruiting shrub
+id: flora_winterberry
+name: winterberry
+description: A deciduous holly with bright red berries that persist through winter.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - wetland
+  - forest
+  - swamp
+
+temperature_range: [0, 85]
+light_requirement: partial_shade
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_winterberry
+    quantity: 4
+    chance: 0.7
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Small leaves emerge on the winterberry's dark stems.
+  summer: Green leaves fill the shrub; small flowers attract bees.
+  fall: Leaves turn yellow and drop, revealing red berries.
+  winter: Brilliant red berries stand out against the snow.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 1
+
+rarity: uncommon
+cluster_size: [1, 3]

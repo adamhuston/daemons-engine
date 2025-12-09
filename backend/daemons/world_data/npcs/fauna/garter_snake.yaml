@@ -1,0 +1,49 @@
+# Garter Snake - Harmless reptile fauna
+# Phase 17.5: Fauna System
+
+id: npc_garter_snake
+name: garter snake
+description: >
+  A slender green-striped snake that moves through the grass.
+  It's harmless to humans but deadly to small creatures.
+npc_type: neutral
+level: 1
+max_health: 8
+armor_class: 12
+strength: 4
+dexterity: 16
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 3
+attack_speed: 1.5
+experience_reward: 5
+
+is_fauna: true
+fauna_data:
+  fauna_type: reptile
+  biome_tags: [grassland, forest, wetland]
+  temperature_tolerance: [40, 95]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [frog, insect, mouse]
+  predator_tags: [hawk, eagle, owl, fox]
+  fauna_tags: [carnivore, snake, prey, reptile]
+  pack_size: [1, 1]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.6
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The garter snake slithers through the grass."
+  - "The garter snake basks in a sunny spot."
+keywords:
+  - snake
+  - garter snake
+  - serpent

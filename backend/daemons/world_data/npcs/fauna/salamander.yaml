@@ -1,0 +1,49 @@
+# Salamander - Amphibian fauna
+# Phase 17.5: Fauna System
+
+id: npc_salamander
+name: salamander
+description: >
+  A slender, secretive amphibian with smooth, moist skin.
+  It hides beneath logs and stones in damp places.
+npc_type: neutral
+level: 1
+max_health: 5
+armor_class: 11
+strength: 3
+dexterity: 12
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 2.0
+experience_reward: 2
+
+is_fauna: true
+fauna_data:
+  fauna_type: amphibian
+  biome_tags: [forest, wetland, cave]
+  temperature_tolerance: [40, 70]
+  activity_period: nocturnal
+  diet: carnivore
+  prey_tags: [insect]
+  predator_tags: [snake, bird, raccoon]
+  fauna_tags: [carnivore, salamander, prey, amphibian]
+  pack_size: [1, 2]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.7
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - peaceful
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The salamander emerges from beneath a log."
+  - "The salamander's skin ripples with color."
+  - "The salamander catches a beetle."
+keywords:
+  - salamander

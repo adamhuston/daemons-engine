@@ -1,0 +1,49 @@
+# Crab - Coastal fauna
+# Phase 17.5: Fauna System
+
+id: npc_crab
+name: crab
+description: >
+  An armored crustacean with powerful pincers and beady eyes on stalks.
+  It scuttles sideways across the rocks.
+npc_type: neutral
+level: 1
+max_health: 12
+armor_class: 15
+strength: 8
+dexterity: 10
+intelligence: 1
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 2.0
+experience_reward: 5
+
+is_fauna: true
+fauna_data:
+  fauna_type: crustacean
+  biome_tags: [coast, beach, tidal]
+  temperature_tolerance: [40, 85]
+  activity_period: crepuscular
+  diet: omnivore
+  prey_tags: []
+  predator_tags: [eagle, otter, raccoon]
+  fauna_tags: [omnivore, crab, prey, crustacean, aquatic]
+  pack_size: [1, 6]
+  territorial: false
+  migratory: false
+  aggression: 0.2
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The crab waves its pincers defensively."
+  - "The crab burrows into the sand."
+  - "The crab scuttles sideways."
+keywords:
+  - crab

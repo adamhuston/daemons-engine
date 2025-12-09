@@ -1,0 +1,37 @@
+# Oregon Grape - Evergreen shrub
+id: flora_oregon_grape
+name: Oregon grape
+description: An evergreen shrub with holly-like leaves and clusters of tart blue berries.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+  - mountain
+
+temperature_range: [10, 85]
+light_requirement: shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_oregon_grape
+    quantity: 4
+    chance: 0.7
+  - item_id: item_oregon_grape_root
+    quantity: 1
+    chance: 0.3
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: Yellow flower clusters brighten the shrub's spiny leaves.
+  summer: Blue berries develop among the glossy green leaves.
+  fall: Some leaves turn bronze or red in cooler weather.
+  winter: The evergreen shrub provides winter color.
+
+provides_cover: true
+cover_bonus: 1
+
+rarity: common
+cluster_size: [2, 4]

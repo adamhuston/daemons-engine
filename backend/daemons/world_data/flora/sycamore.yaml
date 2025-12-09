@@ -1,0 +1,40 @@
+# Sycamore - Large mottled-bark tree
+id: flora_sycamore
+name: sycamore tree
+description: A massive sycamore with distinctive mottled bark in cream, gray, and green.
+flora_type: tree
+
+biome_tags:
+  - temperate
+  - riparian
+  - forest
+  - wetland
+
+temperature_range: [15, 100]
+light_requirement: full_sun
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_sycamore_bark
+    quantity: 2
+    chance: 0.6
+  - item_id: item_sycamore_seed
+    quantity: 3
+    chance: 0.5
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Large lobed leaves unfurl on the sycamore's pale branches.
+  summer: The sycamore's broad canopy shades the stream bank.
+  fall: Brown leaves drop to reveal the striking patchwork bark.
+  winter: The sycamore's ghostly white upper branches stand stark.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 4
+
+rarity: uncommon
+cluster_size: [1, 2]

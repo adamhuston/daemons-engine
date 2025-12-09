@@ -1,0 +1,49 @@
+# Shrew - Tiny insectivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_shrew
+name: shrew
+description: >
+  A tiny, hyperactive creature with a pointed snout and tiny eyes.
+  It moves in quick, frantic bursts, never still for long.
+npc_type: neutral
+level: 1
+max_health: 3
+armor_class: 13
+strength: 2
+dexterity: 18
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 0.5
+experience_reward: 1
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, grassland, wetland]
+  temperature_tolerance: [30, 80]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [insect]
+  predator_tags: [owl, hawk, snake, fox]
+  fauna_tags: [carnivore, shrew, prey, small]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 1
+  migratory: false
+  aggression: 0.3
+  flee_threshold: 0.7
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The shrew darts frantically through the leaves."
+  - "The shrew's tiny heart beats visibly fast."
+  - "The shrew squeaks aggressively."
+keywords:
+  - shrew

@@ -1,0 +1,52 @@
+# Swallow - Swift bird fauna
+# Phase 17.5: Fauna System
+
+id: npc_swallow
+name: swallow
+description: >
+  A graceful bird with a forked tail and swept-back wings.
+  It swoops and dives, catching insects on the wing.
+npc_type: neutral
+level: 1
+max_health: 5
+armor_class: 16
+strength: 3
+dexterity: 20
+intelligence: 4
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 0.5
+experience_reward: 3
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [meadow, wetland, temperate, any]
+  temperature_tolerance: [40, 95]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [insect]
+  predator_tags: [hawk, falcon]
+  fauna_tags: [carnivore, swallow, prey, bird, flying]
+  pack_size: [2, 20]
+  territorial: true
+  territory_radius: 2
+  migratory: true
+  migration_seasons: [fall, spring]
+  aggression: 0.1
+  flee_threshold: 0.6
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - social
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The swallow swoops gracefully."
+  - "The swallow catches a fly mid-air."
+  - "Swallows twitter as they wheel overhead."
+keywords:
+  - swallow
+  - barn swallow

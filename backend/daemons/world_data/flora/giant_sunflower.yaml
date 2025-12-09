@@ -1,0 +1,37 @@
+# Giant Sunflower - Towering yellow flower
+id: flora_giant_sunflower
+name: giant sunflower
+description: A towering plant with a massive yellow flower head that follows the sun.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - grassland
+  - plains
+  - meadow
+
+temperature_range: [45, 100]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_sunflower_seed
+    quantity: 10
+    chance: 0.8
+  - item_id: item_sunflower_petal
+    quantity: 5
+    chance: 0.6
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Young sunflower plants grow rapidly toward the sky.
+  summer: Massive golden flower heads turn to face the sun.
+  fall: Heavy seed heads droop, attracting birds.
+  winter: Dried stalks stand where the sunflowers grew.
+
+dormant_seasons:
+  - winter
+
+rarity: uncommon
+cluster_size: [2, 6]

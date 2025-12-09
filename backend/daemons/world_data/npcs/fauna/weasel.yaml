@@ -1,0 +1,51 @@
+# Weasel - Small predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_weasel
+name: weasel
+description: >
+  A long, slender creature with a russet coat and fierce black eyes.
+  It moves with sinuous, predatory grace.
+npc_type: neutral
+level: 2
+max_health: 15
+armor_class: 14
+strength: 8
+dexterity: 18
+intelligence: 4
+attack_damage_min: 2
+attack_damage_max: 6
+attack_speed: 1.0
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, grassland, temperate]
+  temperature_tolerance: [10, 80]
+  activity_period: crepuscular
+  diet: carnivore
+  prey_tags: [mouse, rabbit, bird]
+  predator_tags: [owl, hawk, fox, coyote]
+  fauna_tags: [carnivore, weasel, predator, small]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 2
+  migratory: false
+  aggression: 0.4
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The weasel stands on its hind legs, alert."
+  - "The weasel's body ripples as it moves."
+  - "The weasel's eyes gleam with predatory hunger."
+keywords:
+  - weasel
+  - stoat
+  - ermine

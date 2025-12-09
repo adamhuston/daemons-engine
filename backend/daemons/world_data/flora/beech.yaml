@@ -1,0 +1,39 @@
+# Beech - Smooth-barked deciduous tree
+id: flora_beech
+name: beech tree
+description: A stately beech with smooth gray bark and copper-colored leaves.
+flora_type: tree
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+
+temperature_range: [20, 85]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_beechnut
+    quantity: 4
+    chance: 0.6
+  - item_id: item_beech_wood
+    quantity: 1
+    chance: 0.4
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Delicate green leaves emerge from the beech's silvery buds.
+  summer: The beech's dense foliage creates deep shade beneath.
+  fall: Copper and bronze leaves cling to the beech well into autumn.
+  winter: Pale bark gleams on the leafless beech.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 3
+
+rarity: common
+cluster_size: [1, 3]

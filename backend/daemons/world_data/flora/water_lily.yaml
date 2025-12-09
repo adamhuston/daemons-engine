@@ -1,0 +1,42 @@
+# Water Lily - Classic pond flower
+id: flora_water_lily
+name: water lily
+description: An elegant aquatic plant with floating leaves and beautiful white or pink flowers.
+flora_type: aquatic
+
+biome_tags:
+  - wetland
+  - temperate
+  - tropical
+  - lake
+  - pond
+  - swamp
+
+temperature_range: [45, 95]
+light_requirement: full_sun
+moisture_requirement: aquatic
+
+harvestable: true
+harvest_items:
+  - item_id: item_lily_pad
+    quantity: 2
+    chance: 0.8
+  - item_id: item_water_lily_flower
+    quantity: 1
+    chance: 0.5
+  - item_id: item_lily_root
+    quantity: 1
+    chance: 0.3
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: New lily pads unfurl on the water's surface.
+  summer: Pristine water lilies bloom across the pond.
+  fall: The lily pads begin to yellow and sink.
+  winter: Only the roots survive beneath the ice.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [3, 12]

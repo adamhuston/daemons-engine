@@ -1,0 +1,52 @@
+# Rattlesnake - Venomous reptile fauna
+# Phase 17.5: Fauna System
+
+id: npc_rattlesnake
+name: rattlesnake
+description: >
+  A coiled serpent with distinctive diamond patterns and a rattling tail.
+  Its forked tongue flicks the air, sensing your presence.
+npc_type: hostile
+level: 3
+max_health: 20
+armor_class: 13
+strength: 8
+dexterity: 16
+intelligence: 2
+attack_damage_min: 4
+attack_damage_max: 10
+attack_speed: 1.5
+experience_reward: 18
+
+is_fauna: true
+fauna_data:
+  fauna_type: reptile
+  biome_tags: [desert, scrubland, grassland, rocky]
+  temperature_tolerance: [50, 120]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [mouse, rabbit, bird, prey]
+  predator_tags: [hawk, eagle]
+  fauna_tags: [carnivore, snake, predator, venomous, reptile]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 1
+  migratory: false
+  aggression: 0.4
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - lurks
+loot_table: []
+idle_messages:
+  - "The rattlesnake's tail buzzes a warning."
+  - "The rattlesnake coils tighter."
+  - "The rattlesnake's tongue flickers rapidly."
+keywords:
+  - snake
+  - rattlesnake
+  - rattler
+  - serpent

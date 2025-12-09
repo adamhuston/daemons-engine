@@ -1,0 +1,52 @@
+# Trout - River fish fauna
+# Phase 17.5: Fauna System
+
+id: npc_trout
+name: trout
+description: >
+  A speckled fish with silvery scales darting through clear water.
+  It flashes beneath the surface, catching the light.
+npc_type: neutral
+level: 1
+max_health: 8
+armor_class: 12
+strength: 4
+dexterity: 16
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 1.0
+experience_reward: 3
+
+is_fauna: true
+fauna_data:
+  fauna_type: fish
+  biome_tags: [river, stream, mountain]
+  temperature_tolerance: [35, 65]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [eagle, bear, otter]
+  fauna_tags: [omnivore, fish, prey, aquatic]
+  pack_size: [3, 15]
+  territorial: false
+  migratory: true
+  migration_seasons: [spring, fall]
+  aggression: 0.0
+  flee_threshold: 0.9
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - peaceful
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The trout swims against the current."
+  - "The trout rises to catch a fly."
+  - "Schools of trout dart through the shallows."
+keywords:
+  - trout
+  - fish

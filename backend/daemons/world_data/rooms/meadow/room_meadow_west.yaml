@@ -9,6 +9,7 @@ room_type: outdoor
 # No lighting_override - uses area default
 exits:
   east: room_meadow_center
+  west: room_0_2_0
 on_enter_effect: The scent of flowers fills the air.
 on_exit_effect: null
 

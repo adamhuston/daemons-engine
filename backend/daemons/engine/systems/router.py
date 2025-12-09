@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 # Type alias for event
 Event = dict[str, Any]
-CommandHandler = Callable[..., list[Event]]  # (engine, player_id, args)
+CommandHandler = Callable[..., list[Event]]  # (engine, player_id, args, cmd_name)
 
 
 @dataclass
@@ -221,8 +221,9 @@ class CommandRouter:
         meta = self.commands[cmd_name]
 
         # Call handler with arguments (await if it's a coroutine)
+        # Pass cmd_name as 4th argument for handlers that need it (e.g., emotes)
         try:
-            result = meta.handler(self.engine, player_id, args)
+            result = meta.handler(self.engine, player_id, args, cmd_name)
             # Check if the handler is async (returns a coroutine)
             if hasattr(result, "__await__"):
                 return await result

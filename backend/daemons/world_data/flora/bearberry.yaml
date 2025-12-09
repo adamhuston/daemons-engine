@@ -1,0 +1,37 @@
+# Bearberry - Low-growing evergreen shrub
+id: flora_bearberry
+name: bearberry
+description: A mat-forming shrub with small leathery leaves and bright red berries.
+flora_type: shrub
+
+biome_tags:
+  - boreal
+  - mountain
+  - arctic
+  - forest
+
+temperature_range: [-20, 75]
+light_requirement: full_sun
+moisture_requirement: dry
+
+harvestable: true
+harvest_items:
+  - item_id: item_bearberry
+    quantity: 4
+    chance: 0.7
+  - item_id: item_bearberry_leaf
+    quantity: 3
+    chance: 0.6
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: Small pink flowers dot the bearberry's trailing stems.
+  summer: The bearberry's leathery leaves gleam in the sun.
+  fall: Bright red berries stand out against the green leaves.
+  winter: The bearberry remains green beneath the snow.
+
+provides_cover: false
+cover_bonus: 0
+
+rarity: common
+cluster_size: [2, 5]

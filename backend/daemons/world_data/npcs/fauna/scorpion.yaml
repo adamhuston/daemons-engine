@@ -1,0 +1,48 @@
+# Scorpion - Desert venomous fauna
+# Phase 17.5: Fauna System
+
+id: npc_scorpion
+name: scorpion
+description: >
+  A pale, armored arachnid with pincers and a curled, venomous tail.
+  It skitters across the sand with deadly intent.
+npc_type: hostile
+level: 2
+max_health: 12
+armor_class: 14
+strength: 6
+dexterity: 14
+intelligence: 1
+attack_damage_min: 3
+attack_damage_max: 8
+attack_speed: 1.5
+experience_reward: 12
+
+is_fauna: true
+fauna_data:
+  fauna_type: arachnid
+  biome_tags: [desert, cave]
+  temperature_tolerance: [60, 130]
+  activity_period: nocturnal
+  diet: carnivore
+  prey_tags: [insect, mouse]
+  predator_tags: []
+  fauna_tags: [carnivore, scorpion, predator, venomous, arachnid]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 1
+  migratory: false
+  aggression: 0.5
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - lurks
+loot_table: []
+idle_messages:
+  - "The scorpion raises its stinger menacingly."
+  - "The scorpion's pincers click together."
+  - "The scorpion burrows into the sand."
+keywords:
+  - scorpion

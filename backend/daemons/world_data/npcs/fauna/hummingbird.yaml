@@ -1,0 +1,50 @@
+# Hummingbird - Tiny bird fauna
+# Phase 17.5: Fauna System
+
+id: npc_hummingbird
+name: hummingbird
+description: >
+  A tiny, iridescent bird with wings that blur in motion.
+  It hovers miraculously in place, sipping nectar from flowers.
+npc_type: neutral
+level: 1
+max_health: 3
+armor_class: 18
+strength: 1
+dexterity: 20
+intelligence: 3
+attack_damage_min: 1
+attack_damage_max: 1
+attack_speed: 0.5
+experience_reward: 2
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [forest, meadow, temperate, tropical]
+  temperature_tolerance: [50, 95]
+  activity_period: diurnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [hawk, snake, cat]
+  fauna_tags: [herbivore, hummingbird, prey, bird, small, flying]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 1
+  migratory: true
+  migration_seasons: [fall, spring]
+  aggression: 0.3
+  flee_threshold: 0.6
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The hummingbird hovers, wings a blur."
+  - "The hummingbird darts to a new flower."
+  - "The hummingbird's feathers gleam with iridescence."
+keywords:
+  - hummingbird

@@ -1,0 +1,41 @@
+# Frost Flower - Rare arctic flower
+id: flora_frost_flower
+name: frost flower
+description: A delicate crystalline flower that blooms only in extreme cold.
+flora_type: flower
+
+biome_tags:
+  - arctic
+  - tundra
+  - mountain_peak
+
+temperature_range: [-20, 32]
+light_requirement: any
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_frost_petals
+    quantity: 2
+    chance: 0.6
+    skill_bonus: herbalism
+  - item_id: item_ice_essence
+    quantity: 1
+    chance: 0.1
+    skill_bonus: alchemy
+harvest_cooldown: 43200  # 12 hours
+harvest_skill: herbalism
+harvest_dc: 16
+
+seasonal_variants:
+  spring: {}  # Doesn't exist in spring
+  summer: {}  # Doesn't exist in summer
+  fall: Tiny frost flowers begin to form as temperatures drop.
+  winter: Exquisite frost flowers bloom in intricate crystalline patterns.
+
+dormant_seasons:
+  - spring
+  - summer
+
+rarity: rare
+cluster_size: [1, 2]

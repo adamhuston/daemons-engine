@@ -1,0 +1,49 @@
+# Beaver - Semi-aquatic herbivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_beaver
+name: beaver
+description: >
+  A large rodent with glossy brown fur and a broad, flat tail.
+  It gnaws industriously on a piece of wood.
+npc_type: neutral
+level: 2
+max_health: 30
+armor_class: 12
+strength: 12
+dexterity: 10
+intelligence: 4
+attack_damage_min: 3
+attack_damage_max: 7
+attack_speed: 2.0
+experience_reward: 10
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [wetland, forest, river]
+  temperature_tolerance: [10, 80]
+  activity_period: crepuscular
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [wolf, coyote, bear]
+  fauna_tags: [herbivore, beaver, prey, rodent, aquatic]
+  pack_size: [2, 6]
+  territorial: true
+  territory_radius: 2
+  migratory: false
+  aggression: 0.1
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - flees_predators
+  - peaceful
+  - grazes
+loot_table: []
+idle_messages:
+  - "The beaver slaps its tail on the water."
+  - "The beaver gnaws on a branch."
+  - "The beaver dives beneath the surface."
+keywords:
+  - beaver

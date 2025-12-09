@@ -1,0 +1,55 @@
+# Deer - Herbivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_deer
+name: deer
+description: >
+  A graceful woodland deer with a soft brown coat and alert dark eyes.
+  It watches you warily, ready to bolt at the first sign of danger.
+npc_type: neutral
+level: 2
+max_health: 40
+armor_class: 12
+strength: 10
+dexterity: 16
+intelligence: 2
+attack_damage_min: 3
+attack_damage_max: 6
+attack_speed: 2.0
+experience_reward: 10
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, grassland, meadow, temperate]
+  temperature_tolerance: [20, 90]
+  activity_period: crepuscular
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [wolf, cougar, bear, carnivore]
+  fauna_tags: [herbivore, deer, prey, ungulate]
+  pack_size: [1, 4]
+  territorial: false
+  migratory: true
+  migration_seasons: [winter]
+  migration_tendency: 0.1
+  aggression: 0.0
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - peaceful
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The deer raises its head, ears swiveling."
+  - "The deer nibbles on some grass."
+  - "The deer's tail twitches nervously."
+  - "The deer stamps a hoof impatiently."
+keywords:
+  - deer
+  - doe
+  - buck
+  - fawn

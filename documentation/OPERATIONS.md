@@ -156,7 +156,7 @@ pip install pre-commit ruff black isort mypy safety
 ```bash
 cd backend
 alembic upgrade head
-uvicorn app.main:app --reload
+uvicorn daemons.main:app --reload
 ```
 
 ### Run Tests
@@ -168,7 +168,7 @@ cd backend
 pytest
 
 # With coverage
-pytest --cov=app --cov-report=html
+pytest --cov=daemons --cov-report=html
 
 # By category
 pytest -m unit          # Unit tests

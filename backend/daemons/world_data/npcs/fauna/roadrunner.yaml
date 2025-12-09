@@ -1,0 +1,49 @@
+# Roadrunner - Desert ground bird fauna
+# Phase 17.5: Fauna System
+
+id: npc_roadrunner
+name: roadrunner
+description: >
+  A lanky, crested bird with a long tail and swift legs.
+  It sprints across the desert floor with surprising speed.
+npc_type: neutral
+level: 2
+max_health: 15
+armor_class: 14
+strength: 6
+dexterity: 18
+intelligence: 4
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 1.0
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [desert, scrubland]
+  temperature_tolerance: [50, 120]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [snake, lizard, insect, mouse]
+  predator_tags: [hawk, coyote]
+  fauna_tags: [carnivore, roadrunner, predator, bird, ground]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 3
+  migratory: false
+  aggression: 0.2
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The roadrunner sprints across the sand."
+  - "The roadrunner snaps up a lizard."
+  - "The roadrunner's crest raises alertly."
+keywords:
+  - roadrunner

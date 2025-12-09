@@ -1,0 +1,52 @@
+# Blue Jay - Songbird fauna
+# Phase 17.5: Fauna System
+
+id: npc_bluejay
+name: blue jay
+description: >
+  A bold blue bird with a distinctive crest and black markings.
+  Its harsh, scolding call echoes through the trees.
+npc_type: neutral
+level: 1
+max_health: 8
+armor_class: 14
+strength: 4
+dexterity: 16
+intelligence: 5
+attack_damage_min: 1
+attack_damage_max: 3
+attack_speed: 1.0
+experience_reward: 3
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [forest, temperate]
+  temperature_tolerance: [20, 90]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [hawk, owl, snake]
+  fauna_tags: [omnivore, bluejay, prey, bird, songbird]
+  pack_size: [1, 4]
+  territorial: true
+  territory_radius: 2
+  migratory: false
+  aggression: 0.2
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The blue jay screeches a warning."
+  - "The blue jay flashes its brilliant feathers."
+  - "The blue jay mimics another bird's call."
+keywords:
+  - jay
+  - blue jay
+  - bluejay

@@ -91,6 +91,37 @@ class Quiet(BehaviorScript):
 
 
 @behavior(
+    name="ambient",
+    description="Fauna occasionally emits ambient idle messages (low priority, doesn't block other behaviors)",
+    priority=200,  # Very low priority - runs last, after hunting/grazing/fleeing
+    defaults={
+        "idle_enabled": True,
+        "idle_chance": 0.25,  # 25% chance
+        "idle_interval_min": 20.0,
+        "idle_interval_max": 60.0,
+    },
+)
+class Ambient(BehaviorScript):
+    """Ambient idle messages for fauna - runs after other behaviors."""
+
+    async def on_idle_tick(self, ctx: BehaviorContext) -> BehaviorResult:
+        if not ctx.config.get("idle_enabled", True):
+            return BehaviorResult.nothing()
+
+        chance = ctx.config.get("idle_chance", 0.25)
+        if random.random() > chance:
+            return BehaviorResult.nothing()
+
+        messages = ctx.template.idle_messages if ctx.template else []
+        if not messages:
+            return BehaviorResult.nothing()
+
+        message = random.choice(messages)
+        # Return was_handled to broadcast the message
+        return BehaviorResult.was_handled(message=message)
+
+
+@behavior(
     name="silent",
     description="NPC never says idle messages",
     priority=50,  # Higher priority to suppress other idle behaviors

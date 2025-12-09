@@ -1,0 +1,38 @@
+# Water Hyacinth - Floating aquatic flower
+id: flora_water_hyacinth
+name: water hyacinth
+description: A free-floating aquatic plant with beautiful lavender flowers and bulbous leaves.
+flora_type: aquatic
+
+biome_tags:
+  - wetland
+  - tropical
+  - subtropical
+  - swamp
+  - lake
+
+temperature_range: [60, 100]
+light_requirement: full_sun
+moisture_requirement: aquatic
+
+harvestable: true
+harvest_items:
+  - item_id: item_water_hyacinth_flower
+    quantity: 3
+    chance: 0.7
+  - item_id: item_aquatic_fiber
+    quantity: 5
+    chance: 0.8
+harvest_cooldown: 14400
+
+seasonal_variants:
+  spring: Water hyacinths begin to spread across warm waters.
+  summer: Lavender flowers bloom above floating green rosettes.
+  fall: The plants begin to die back in cooling waters.
+  winter: Only fragments survive in warmer depths.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [5, 20]

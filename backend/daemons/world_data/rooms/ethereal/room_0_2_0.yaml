@@ -8,6 +8,8 @@ room_type: ethereal
 exits:
   south: room_0_1_0
   east: room_1_2_0
+  west: room_meadow_west
   up: room_0_2_1
+  down: room_cave_entrance
 on_enter_effect: null
 on_exit_effect: The ethereal clouds part and swirl around you as you pass.

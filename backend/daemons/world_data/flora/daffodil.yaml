@@ -1,0 +1,35 @@
+# Daffodil - Spring flower
+id: flora_daffodil
+name: daffodil
+description: A cheerful spring flower with a trumpet-shaped center and golden petals.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - woodland
+  - meadow
+
+temperature_range: [30, 70]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_daffodil
+    quantity: 3
+    chance: 0.8
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Golden daffodils nod in the spring breeze.
+  summer: The daffodils have faded, leaving strappy leaves.
+  fall: No sign remains of the dormant daffodils.
+  winter: The bulbs rest underground, waiting for warmth.
+
+dormant_seasons:
+  - summer
+  - fall
+  - winter
+
+rarity: common
+cluster_size: [3, 10]

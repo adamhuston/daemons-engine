@@ -12,10 +12,15 @@ starting_minute: 0
 
 # Environmental properties
 
-biome: 1
+biome: underground
 climate: mild
 ambient_lighting: dim  # Low base light (20 in AMBIENT_LIGHTING_VALUES)
 weather_profile: stable
+weather_immunity: true  # Underground, no weather effects
+
+# Temperature - caves maintain cool, stable temps year-round
+base_temperature: 55  # Cool underground temperature
+temperature_variation: 5  # Very stable, minimal daily variation
 
 # Gameplay properties
 danger_level: 5

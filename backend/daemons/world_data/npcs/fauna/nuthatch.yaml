@@ -1,0 +1,50 @@
+# Nuthatch - Songbird fauna
+# Phase 17.5: Fauna System
+
+id: npc_nuthatch
+name: nuthatch
+description: >
+  A small blue-gray bird that creeps headfirst down tree trunks.
+  Its nasal call sounds like a tiny horn.
+npc_type: neutral
+level: 1
+max_health: 5
+armor_class: 14
+strength: 3
+dexterity: 16
+intelligence: 4
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 1.0
+experience_reward: 2
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [forest, temperate]
+  temperature_tolerance: [10, 80]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [hawk, owl, snake]
+  fauna_tags: [omnivore, nuthatch, prey, bird, songbird, small]
+  pack_size: [1, 4]
+  territorial: true
+  territory_radius: 1
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.6
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The nuthatch walks headfirst down the trunk."
+  - "The nuthatch wedges a seed into bark."
+  - "The nuthatch calls with a nasal 'yank yank.'"
+keywords:
+  - nuthatch

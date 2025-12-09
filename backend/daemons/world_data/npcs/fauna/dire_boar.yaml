@@ -1,0 +1,52 @@
+# Dire Boar - Pack leader fauna
+# Phase 17.5: Fauna System
+
+id: npc_dire_boar
+name: dire boar
+description: >
+  A massive, scarred boar with enormous tusks and a murderous glint in its eyes.
+  This beast rules its herd with brutal strength.
+npc_type: hostile
+level: 6
+max_health: 100
+armor_class: 15
+strength: 20
+dexterity: 10
+intelligence: 3
+attack_damage_min: 10
+attack_damage_max: 20
+attack_speed: 2.5
+experience_reward: 50
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, swamp, temperate]
+  temperature_tolerance: [20, 85]
+  activity_period: crepuscular
+  diet: omnivore
+  prey_tags: []
+  predator_tags: []
+  fauna_tags: [omnivore, boar, aggressive, apex, leader]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 6
+  migratory: false
+  aggression: 0.8
+  flee_threshold: 0.1
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - aggressive
+  - brave
+loot_table: []
+idle_messages:
+  - "The dire boar bellows a challenge."
+  - "The dire boar's massive tusks drip with foam."
+  - "The dire boar stamps the ground, leaving deep gouges."
+keywords:
+  - boar
+  - dire boar
+  - giant boar

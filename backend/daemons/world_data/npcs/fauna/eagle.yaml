@@ -1,0 +1,52 @@
+# Eagle - Apex avian predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_eagle
+name: eagle
+description: >
+  A majestic raptor with a white head and powerful talons.
+  Its piercing gaze surveys the land from high above.
+npc_type: neutral
+level: 4
+max_health: 35
+armor_class: 16
+strength: 12
+dexterity: 18
+intelligence: 5
+attack_damage_min: 6
+attack_damage_max: 12
+attack_speed: 1.5
+experience_reward: 25
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [mountain, forest, coast, river]
+  temperature_tolerance: [0, 90]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [fish, rabbit, mouse, snake, bird, prey]
+  predator_tags: []
+  fauna_tags: [carnivore, eagle, predator, raptor, bird, flying]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 10
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.2
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - wanders_sometimes
+  - brave
+loot_table: []
+idle_messages:
+  - "The eagle screeches from its lofty perch."
+  - "The eagle circles high overhead."
+  - "The eagle's keen eyes scan the ground below."
+keywords:
+  - eagle
+  - bald eagle
+  - raptor

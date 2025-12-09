@@ -16,6 +16,8 @@ colorama==0.4.6
 
 fastapi==0.122.0
 
+flet>=0.21.0
+
 greenlet==3.2.4
 
 h11==0.16.0

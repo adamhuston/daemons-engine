@@ -1,0 +1,37 @@
+# Ice Plant - Cold-climate succulent
+id: flora_ice_plant
+name: ice plant
+description: A hardy succulent with glistening leaves that thrives in cold, arid conditions.
+flora_type: flower
+
+biome_tags:
+  - arctic
+  - alpine
+  - tundra
+  - cold
+  - mountain
+
+temperature_range: [0, 55]
+light_requirement: full_sun
+moisture_requirement: dry
+
+harvestable: true
+harvest_items:
+  - item_id: item_ice_plant_leaf
+    quantity: 4
+    chance: 0.7
+  - item_id: item_frost_sap
+    quantity: 1
+    chance: 0.3
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: Ice plants spread across rocky ground with crystalline leaves.
+  summer: Delicate flowers bloom briefly in the cool mountain air.
+  fall: The leaves take on a reddish-purple tinge.
+  winter: Ice plants remain green beneath a coating of frost.
+
+dormant_seasons: []
+
+rarity: uncommon
+cluster_size: [4, 12]

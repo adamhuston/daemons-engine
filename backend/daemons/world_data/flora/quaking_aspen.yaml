@@ -1,0 +1,40 @@
+# Quaking Aspen - Trembling deciduous tree
+id: flora_quaking_aspen
+name: quaking aspen
+description: A slender aspen with smooth white bark and leaves that tremble in the slightest breeze.
+flora_type: tree
+
+biome_tags:
+  - temperate
+  - mountain
+  - boreal
+  - forest
+
+temperature_range: [-10, 85]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_aspen_bark
+    quantity: 2
+    chance: 0.6
+  - item_id: item_aspen_wood
+    quantity: 1
+    chance: 0.4
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Soft green leaves emerge on the aspen's pale branches.
+  summer: The aspen's leaves shimmer and whisper in every breeze.
+  fall: Brilliant gold leaves set the aspen grove ablaze with color.
+  winter: White bark gleams like bone against the winter sky.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: common
+cluster_size: [3, 8]

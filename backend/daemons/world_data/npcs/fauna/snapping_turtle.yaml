@@ -1,0 +1,52 @@
+# Snapping Turtle - Aggressive turtle fauna
+# Phase 17.5: Fauna System
+
+id: npc_snapping_turtle
+name: snapping turtle
+description: >
+  A massive, prehistoric-looking turtle with a spiked shell and powerful beak.
+  Its lightning-fast strike can sever fingers.
+npc_type: hostile
+level: 3
+max_health: 40
+armor_class: 18
+strength: 16
+dexterity: 6
+intelligence: 2
+attack_damage_min: 6
+attack_damage_max: 14
+attack_speed: 2.5
+experience_reward: 20
+
+is_fauna: true
+fauna_data:
+  fauna_type: reptile
+  biome_tags: [wetland, river, swamp]
+  temperature_tolerance: [40, 90]
+  activity_period: crepuscular
+  diet: omnivore
+  prey_tags: [fish, frog, bird, snake]
+  predator_tags: [alligator]
+  fauna_tags: [omnivore, turtle, predator, reptile, aquatic, defensive]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 2
+  migratory: false
+  aggression: 0.5
+  flee_threshold: 0.2
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - lurks
+loot_table: []
+idle_messages:
+  - "The snapping turtle's beak opens menacingly."
+  - "The snapping turtle glares with ancient malice."
+  - "The snapping turtle's mossy shell breaks the surface."
+keywords:
+  - turtle
+  - snapping turtle
+  - snapper

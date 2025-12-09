@@ -1,0 +1,49 @@
+# Armadillo - Armored mammal fauna
+# Phase 17.5: Fauna System
+
+id: npc_armadillo
+name: armadillo
+description: >
+  A peculiar armored creature with a leathery shell and pointed snout.
+  It roots through the dirt, searching for grubs.
+npc_type: neutral
+level: 1
+max_health: 18
+armor_class: 16
+strength: 8
+dexterity: 8
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 4
+attack_speed: 2.0
+experience_reward: 5
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [grassland, desert, scrubland]
+  temperature_tolerance: [40, 100]
+  activity_period: nocturnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [coyote, cougar]
+  fauna_tags: [omnivore, armadillo, prey, defensive, armored]
+  pack_size: [1, 1]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - peaceful
+loot_table: []
+idle_messages:
+  - "The armadillo snuffles through the leaves."
+  - "The armadillo curls into a defensive ball."
+  - "The armadillo's claws scrape at the dirt."
+keywords:
+  - armadillo

@@ -1,0 +1,41 @@
+# Desert Cactus - Common desert flora
+id: flora_desert_cactus
+name: desert cactus
+description: A tall, spiny cactus adapted to the harsh desert climate.
+flora_type: shrub
+
+biome_tags:
+  - desert
+  - arid
+  - badlands
+
+temperature_range: [50, 120]
+light_requirement: full_sun
+moisture_requirement: arid
+
+harvestable: true
+harvest_items:
+  - item_id: item_cactus_fruit
+    quantity: 2
+    chance: 0.5
+  - item_id: item_cactus_water
+    quantity: 1
+    chance: 0.7
+    skill_bonus: survival
+harvest_cooldown: 28800  # 8 hours
+harvest_tool: knife
+
+seasonal_variants:
+  spring: A tall cactus with small buds forming at its top.
+  summer: A blooming cactus crowned with bright desert flowers.
+  fall: A cactus bearing ripe, colorful fruit.
+  winter: A dormant cactus, its spines glistening with morning dew.
+
+# Deserts don't really have dormant seasons for cacti
+dormant_seasons: []
+
+blocks_movement: false
+provides_cover: false
+
+rarity: common
+cluster_size: [1, 3]

@@ -1,0 +1,40 @@
+# Willow - Graceful water-loving shrub
+id: flora_willow
+name: willow
+description: A graceful shrub with long, slender leaves and flexible branches.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - riparian
+  - wetland
+  - swamp
+
+temperature_range: [10, 95]
+light_requirement: full_sun
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_willow_bark
+    quantity: 3
+    chance: 0.7
+  - item_id: item_willow_wand
+    quantity: 2
+    chance: 0.5
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Fuzzy catkins appear before the narrow leaves emerge.
+  summer: Long leaves trail in the breeze near the water.
+  fall: Yellow leaves drift down to the water's surface.
+  winter: Flexible red or yellow stems brighten the winter scene.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: common
+cluster_size: [2, 5]

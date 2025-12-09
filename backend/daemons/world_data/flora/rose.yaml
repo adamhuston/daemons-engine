@@ -1,0 +1,41 @@
+# Rose - Thorny flowering shrub
+id: flora_rose
+name: wild rose
+description: A thorny shrub with fragrant pink flowers and bright red rose hips.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - grassland
+  - woodland
+  - plains
+  - meadow
+
+temperature_range: [10, 95]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_rose_hip
+    quantity: 4
+    chance: 0.7
+  - item_id: item_rose_petal
+    quantity: 3
+    chance: 0.5
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: Pink buds open into fragrant wild roses.
+  summer: The rose bush is covered in sweet-smelling blooms.
+  fall: Bright red rose hips replace the faded flowers.
+  winter: Thorny canes bear dried rose hips through winter.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 1
+
+rarity: common
+cluster_size: [1, 4]

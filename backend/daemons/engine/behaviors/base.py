@@ -65,6 +65,9 @@ class BehaviorContext:
     # Callback to broadcast messages to room
     broadcast: Callable[[str, str], None] | None = None  # (room_id, message)
 
+    # Phase 17.5: Fauna system reference for fauna behaviors
+    fauna_system: Any = None
+
     def get_room(self):
         """Get the NPC's current room."""
         return self.world.rooms.get(self.npc.room_id)

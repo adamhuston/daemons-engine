@@ -1,0 +1,52 @@
+# Grizzly Bear - Apex predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_grizzly_bear
+name: grizzly bear
+description: >
+  A massive grizzly bear with distinctive silver-tipped fur and a prominent hump.
+  Its sheer size and power command respect from all who encounter it.
+npc_type: hostile
+level: 8
+max_health: 180
+armor_class: 15
+strength: 22
+dexterity: 8
+intelligence: 4
+attack_damage_min: 14
+attack_damage_max: 28
+attack_speed: 3.5
+experience_reward: 75
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, mountain, tundra, taiga]
+  temperature_tolerance: [-10, 75]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [fish, deer, prey, herbivore]
+  predator_tags: []
+  fauna_tags: [omnivore, bear, predator, apex]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 6
+  migratory: false
+  aggression: 0.6
+  flee_threshold: 0.1
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - aggressive
+  - brave
+loot_table: []
+idle_messages:
+  - "The grizzly rises on its hind legs, towering impressively."
+  - "The grizzly lets out a deep, rumbling growl."
+  - "The grizzly sniffs the air, scenting for food."
+keywords:
+  - bear
+  - grizzly
+  - grizzly bear

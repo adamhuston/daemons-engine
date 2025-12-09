@@ -168,6 +168,37 @@ class TimeEventManager:
         """Number of events currently scheduled."""
         return len(self._event_ids)
 
+    # ---------- World Time Helpers ----------
+
+    def get_hour(self, area_id: str | None = None) -> int:
+        """
+        Get the current game hour (0-23).
+
+        Args:
+            area_id: Optional area ID to get area-specific time.
+                    If None or area not found, uses global world time.
+
+        Returns:
+            Current hour of day (0-23)
+        """
+        world = self.ctx.world
+
+        # Try to get area-specific time
+        if area_id and hasattr(world, "areas"):
+            area = world.areas.get(area_id)
+            if area and hasattr(area, "area_time"):
+                time_scale = getattr(area, "time_scale", 1.0)
+                _, hour, _ = area.area_time.get_current_time(time_scale)
+                return hour
+
+        # Fall back to global world time
+        if hasattr(world, "world_time"):
+            _, hour, _ = world.world_time.get_current_time()
+            return hour
+
+        # Ultimate fallback: return noon
+        return 12
+
     # ---------- Internal Loop ----------
 
     async def _run_loop(self) -> None:

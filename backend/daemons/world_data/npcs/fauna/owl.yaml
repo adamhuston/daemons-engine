@@ -1,0 +1,49 @@
+# Owl - Nocturnal avian predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_owl
+name: owl
+description: >
+  A silent hunter with large, luminous eyes and soft feathers.
+  Its head swivels with unnatural ease.
+npc_type: neutral
+level: 3
+max_health: 25
+armor_class: 14
+strength: 10
+dexterity: 16
+intelligence: 6
+attack_damage_min: 4
+attack_damage_max: 10
+attack_speed: 2.0
+experience_reward: 15
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [forest, temperate, swamp]
+  temperature_tolerance: [0, 85]
+  activity_period: nocturnal
+  diet: carnivore
+  prey_tags: [mouse, rabbit, snake, prey]
+  predator_tags: []
+  fauna_tags: [carnivore, owl, predator, raptor, bird, flying, nocturnal]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 4
+  migratory: false
+  aggression: 0.2
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - lurks
+loot_table: []
+idle_messages:
+  - "The owl hoots softly in the darkness."
+  - "The owl's head rotates unnervingly."
+  - "The owl blinks its enormous eyes."
+keywords:
+  - owl
+  - great horned owl

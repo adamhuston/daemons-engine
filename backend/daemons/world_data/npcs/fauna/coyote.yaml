@@ -1,0 +1,51 @@
+# Coyote - Medium predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_coyote
+name: coyote
+description: >
+  A lean, scraggly canine with a gray-brown coat and cunning eyes.
+  Its high-pitched yipping echoes across the landscape.
+npc_type: neutral
+level: 3
+max_health: 40
+armor_class: 13
+strength: 10
+dexterity: 16
+intelligence: 5
+attack_damage_min: 4
+attack_damage_max: 9
+attack_speed: 2.0
+experience_reward: 18
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [desert, grassland, scrubland, forest]
+  temperature_tolerance: [10, 110]
+  activity_period: nocturnal
+  diet: omnivore
+  prey_tags: [rabbit, mouse, bird, prey]
+  predator_tags: [cougar, wolf]
+  fauna_tags: [omnivore, coyote, predator, canine]
+  pack_size: [1, 4]
+  territorial: true
+  territory_radius: 5
+  migratory: false
+  aggression: 0.4
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_frequently
+  - social
+loot_table: []
+idle_messages:
+  - "The coyote lets out a series of yips."
+  - "The coyote sniffs at the ground."
+  - "The coyote's ears flatten as it watches you."
+keywords:
+  - coyote

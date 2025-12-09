@@ -1,0 +1,40 @@
+# Elderberry - Medicinal berry shrub
+id: flora_elderberry
+name: elderberry bush
+description: A large shrub with compound leaves and flat-topped clusters of dark berries.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+  - riparian
+
+temperature_range: [15, 95]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_elderberry
+    quantity: 6
+    chance: 0.8
+  - item_id: item_elderflower
+    quantity: 3
+    chance: 0.5
+harvest_cooldown: 14400
+
+seasonal_variants:
+  spring: Creamy white flower clusters cover the elderberry.
+  summer: Dark purple berries hang in heavy clusters.
+  fall: Yellow leaves contrast with remaining berry clusters.
+  winter: Pithy stems stand bare through the cold months.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: common
+cluster_size: [1, 3]

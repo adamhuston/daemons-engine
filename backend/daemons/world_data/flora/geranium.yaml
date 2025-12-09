@@ -1,0 +1,36 @@
+# Geranium - Wild woodland flower
+id: flora_geranium
+name: wild geranium
+description: A woodland flower with pink five-petaled blooms and deeply lobed leaves.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+
+temperature_range: [35, 85]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_geranium_flower
+    quantity: 3
+    chance: 0.7
+  - item_id: item_geranium_root
+    quantity: 1
+    chance: 0.4
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: Pink flowers appear above the lobed foliage.
+  summer: The geranium continues blooming in shady spots.
+  fall: Seed pods launch their seeds when ripe.
+  winter: The plant dies back to its rootstock.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [2, 8]

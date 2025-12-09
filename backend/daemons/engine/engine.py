@@ -43,6 +43,7 @@ from .world import (
     WorldPlayer,
     WorldRoom,
     get_room_emoji,
+    with_article,
 )
 
 Event = dict[str, Any]
@@ -151,8 +152,79 @@ class WorldEngine:
         self.temperature_system = TemperatureSystem(world)
         self.ctx.temperature_system = self.temperature_system
 
+        # Phase 17.2: Weather system
+        from daemons.engine.systems.weather import WeatherSystem
+
+        self.weather_system = WeatherSystem(world)
+        self.ctx.weather_system = self.weather_system
+
+        # Link weather system to temperature system for temperature modifiers
+        self.temperature_system.weather_system = self.weather_system
+
+        # Phase 17.3: Biome and Season system
+        from daemons.engine.systems.biome import BiomeSystem, SeasonSystem
+
+        self.biome_system = BiomeSystem(world)
+        self.ctx.biome_system = self.biome_system
+        self.season_system = SeasonSystem(world, self.biome_system)
+        self.ctx.season_system = self.season_system
+
+        # Phase 17.4: Flora system
+        from daemons.engine.systems.flora import FloraSystem
+
+        self.flora_system = FloraSystem(
+            world=world,
+            biome_system=self.biome_system,
+            temperature_system=self.temperature_system,
+            weather_system=self.weather_system,
+        )
+        self.ctx.flora_system = self.flora_system
+
+        # Phase 17.5: Fauna system
+        from daemons.engine.systems.fauna import FaunaSystem
+
+        self.fauna_system = FaunaSystem(
+            world=world,
+            biome_system=self.biome_system,
+            temperature_system=self.temperature_system,
+            time_manager=self.time_manager,
+        )
+        self.ctx.fauna_system = self.fauna_system
+
+        # Phase 17.6: Spawn condition evaluator
+        from daemons.engine.systems.spawn_conditions import SpawnConditionEvaluator
+
+        self.spawn_evaluator = SpawnConditionEvaluator(
+            world=world,
+            time_manager=self.time_manager,
+            temperature_system=self.temperature_system,
+            weather_system=self.weather_system,
+            biome_system=self.biome_system,
+            flora_system=self.flora_system,
+            fauna_system=self.fauna_system,
+        )
+        self.ctx.spawn_evaluator = self.spawn_evaluator
+
+        # Phase 17.6: Population manager
+        from daemons.engine.systems.population import PopulationManager
+
+        self.population_manager = PopulationManager(
+            world=world,
+            fauna_system=self.fauna_system,
+            flora_system=self.flora_system,
+            spawn_evaluator=self.spawn_evaluator,
+        )
+        self.ctx.population_manager = self.population_manager
+        # Connect fauna system to population manager
+        self.fauna_system.population_manager = self.population_manager
+
+        # Phase 17.6: Ecosystem tick configuration
+        self._ecosystem_tick_count = 0
+        self._ecosystem_tick_interval = 5.0  # Seconds between ecosystem ticks
+
         # Phase 12.1: Schema registry for CMS integration
         import os
+
 
         from daemons.engine.systems.schema_registry import SchemaRegistry
 
@@ -238,7 +310,7 @@ class WorldEngine:
         for cmd_name, direction in directions.items():
             # Create a closure to capture the direction for each handler
             def make_move_handler(dir_name):
-                def handler(engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+                def handler(engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
                     return self._move_player(player_id, dir_name)
 
                 return handler
@@ -307,6 +379,7 @@ class WorldEngine:
             handler=self._emote_handler,
             names=[
                 "smile",
+                "grin",
                 "nod",
                 "laugh",
                 "cringe",
@@ -314,6 +387,22 @@ class WorldEngine:
                 "frown",
                 "wink",
                 "lookaround",
+                # Classic MUD emotes
+                "nudge",
+                "poke",
+                "point",
+                "scowl",
+                "sneer",
+                "flex",
+                "stretch",
+                "fidget",
+                "eyebrow",
+                # Additional classics
+                "shrug",
+                "sigh",
+                "wave",
+                "bow",
+                "cackle",
             ],
             category="social",
             description="Show an emote",
@@ -378,6 +467,16 @@ class WorldEngine:
             category="inventory",
             description="Use a consumable item",
             usage="<item_name>",
+        )
+
+        # Phase 17.4: Harvest command
+        self.command_router.register_handler(
+            primary_name="harvest",
+            handler=self._harvest_handler,
+            names=["harvest", "gather", "pick"],
+            category="interaction",
+            description="Harvest resources from flora",
+            usage="<plant_name>",
         )
 
         # Combat commands
@@ -569,6 +668,36 @@ class WorldEngine:
             usage="",
         )
 
+        # Phase 17.2: Weather command
+        self.command_router.register_handler(
+            primary_name="weather",
+            handler=self._weather_handler,
+            names=["weather"],
+            category="info",
+            description="Check the weather in current area",
+            usage="",
+        )
+
+        # Phase 17.3: Season command
+        self.command_router.register_handler(
+            primary_name="season",
+            handler=self._season_handler,
+            names=["season", "seasons"],
+            category="info",
+            description="Check the current season in the area",
+            usage="",
+        )
+
+        # Time command - show current in-game time
+        self.command_router.register_handler(
+            primary_name="time",
+            handler=self._time_handler,
+            names=["time"],
+            category="info",
+            description="Check the current in-game time",
+            usage="",
+        )
+
         self.command_router.register_handler(
             primary_name="inspect",
             handler=self._inspect_handler,
@@ -744,53 +873,59 @@ class WorldEngine:
     # ---------- Command wrapper adapters (convert CommandRouter signature) ----------
 
     def _show_stats_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for stats command."""
         return self._show_stats(player_id)
 
     def _sleep_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Handler for sleep command - enter sleeping state for faster regeneration."""
         return self._sleep(player_id)
 
-    def _wake_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _wake_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Handler for wake command - exit sleeping state."""
         return self._wake(player_id)
 
-    def _say_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _say_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Adapter for say command."""
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Say what?")]
         return self._say(player_id, args)
 
     def _emote_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for emote commands."""
-        return self._emote(player_id, args)
+        # Use cmd_name (the actual command typed, e.g., "smile") as the emote
+        # If args is provided, combine with cmd_name for targeted emotes (e.g., "point moose")
+        if args.strip():
+            emote = f"{cmd_name} {args.strip()}"
+        else:
+            emote = cmd_name
+        return self._emote(player_id, emote)
 
     def _inventory_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for inventory command."""
         return self._inventory(player_id)
 
-    def _get_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _get_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Adapter for get/take command."""
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Get what?")]
         return self._get(player_id, args)
 
-    def _drop_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _drop_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Adapter for drop command."""
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Drop what?")]
         return self._drop(player_id, args)
 
     def _equip_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for equip command."""
         if not args or not args.strip():
@@ -798,45 +933,54 @@ class WorldEngine:
         return self._equip(player_id, args)
 
     def _unequip_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for unequip command."""
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Unequip what?")]
         return self._unequip(player_id, args)
 
-    def _use_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _use_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Adapter for use/consume command."""
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Use what?")]
         return self._use(player_id, args)
 
+    async def _harvest_handler(
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
+    ) -> list[Event]:
+        """Adapter for harvest/gather/pick command (Phase 17.4)."""
+        if not args or not args.strip():
+            return [self._msg_to_player(player_id, "Harvest what?")]
+        return await self._harvest(player_id, args)
+
     async def _attack_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for attack command."""
         if not args or not args.strip():
             return [self._msg_to_player(player_id, "Attack whom?")]
         return await self._attack(player_id, args)
 
+
     def _stop_combat_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for stop combat command."""
         return self._stop_combat(player_id, flee=False)
 
-    def _flee_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _flee_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Adapter for flee command."""
         return self._stop_combat(player_id, flee=True)
 
     def _show_combat_status_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for combat status command."""
         return self._show_combat_status(player_id)
 
     def _show_effects_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for effects command."""
         return self._show_effects(player_id)
@@ -844,7 +988,7 @@ class WorldEngine:
     # Phase 9: Ability command handlers
 
     async def _cast_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for cast ability command."""
         if not args or not args.strip():
@@ -852,19 +996,19 @@ class WorldEngine:
         return await self._cast_ability(player_id, args)
 
     def _abilities_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for abilities/skills command. Use 'list' to show locked abilities."""
         show_locked = args.strip().lower() == "list"
         return self._show_abilities(player_id, show_locked=show_locked)
 
     def _resources_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Adapter for resources command."""
         return self._show_resources(player_id)
 
-    def _heal_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _heal_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Adapter for heal command. Requires GAME_MASTER role."""
         # Permission check
         if not self._check_permission(player_id, "MODIFY_STATS"):
@@ -878,7 +1022,7 @@ class WorldEngine:
             return [self._msg_to_player(player_id, "Heal whom?")]
         return self._heal(player_id, args)
 
-    def _hurt_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _hurt_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Adapter for hurt command. Requires GAME_MASTER role."""
         # Permission check
         if not self._check_permission(player_id, "MODIFY_STATS"):
@@ -895,7 +1039,7 @@ class WorldEngine:
     # ---------- Phase 8: Admin command handlers ----------
 
     def _lightlevel_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[GM] Check the light level in the current room and show contributing sources."""
         if not self._check_permission(player_id, "TELEPORT"):
@@ -1032,7 +1176,7 @@ class WorldEngine:
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
     def _temperature_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Check the temperature in the current room."""
         player = self.world.players.get(player_id)
@@ -1081,6 +1225,13 @@ class WorldEngine:
             if state.time_modifier != 0:
                 sign = "+" if state.time_modifier > 0 else ""
                 lines.append(f"  Time of day: {sign}{state.time_modifier}°F")
+            if state.weather_modifier != 0:
+                sign = "+" if state.weather_modifier > 0 else ""
+                lines.append(f"  Weather: {sign}{state.weather_modifier}°F")
+            if state.seasonal_modifier != 0:
+                season = getattr(area, "current_season", "unknown") if area else "unknown"
+                sign = "+" if state.seasonal_modifier > 0 else ""
+                lines.append(f"  Season ({season}): {sign}{state.seasonal_modifier}°F")
             lines.append(f"  Final: {state.temperature}°F")
 
         # Effects warning
@@ -1102,7 +1253,241 @@ class WorldEngine:
 
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
-    def _who_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _weather_handler(
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
+    ) -> list[Event]:
+        """Check the weather in the current area."""
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "Player not found.")]
+
+        room = self.world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are not in a valid room.")]
+
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+
+        # Get weather system
+        if not hasattr(self, "weather_system") or not self.weather_system:
+            return [self._msg_to_player(player_id, "Weather system not available.")]
+
+        area = self.world.areas.get(room.area_id) if room.area_id else None
+        if not area:
+            return [self._msg_to_player(player_id, "You are not in a valid area.")]
+
+        # Get weather using area_id
+        area_id = room.area_id
+        weather_state = self.weather_system.get_current_weather(area_id)
+
+        # Build weather report
+        lines = ["🌤️ Weather Report"]
+        lines.append("=" * 40)
+
+        # Main weather display
+        weather_display = self.weather_system.format_weather_display(area_id)
+        lines.append(weather_display)
+        lines.append("")
+
+        # Weather details
+        lines.append("Conditions:")
+        lines.append(f"  Weather: {weather_state.weather_type.value.title()}")
+        lines.append(f"  Intensity: {weather_state.intensity.value.title()}")
+        if weather_state.time_remaining > 0:
+            mins = weather_state.time_remaining // 60
+            lines.append(f"  Changing in: ~{mins} minutes")
+
+        # Effects
+        effects = self.weather_system.get_weather_effects(area_id)
+        if effects["visibility_modifier"] < 0:
+            lines.append("")
+            lines.append("Effects:")
+            lines.append(f"  👁️ Visibility: {effects['visibility_modifier']}")
+        if effects["movement_modifier"] < 1.0:
+            penalty = int((1 - effects["movement_modifier"]) * 100)
+            lines.append(f"  🦶 Movement slowed by {penalty}%")
+        if effects["ranged_penalty"] > 0:
+            lines.append(f"  🏹 Ranged penalty: -{effects['ranged_penalty']}%")
+        if effects["casting_penalty"] > 0:
+            lines.append(f"  ✨ Casting penalty: -{effects['casting_penalty']}%")
+        if effects["temperature_modifier"] != 0:
+            sign = "+" if effects["temperature_modifier"] > 0 else ""
+            lines.append(f"  🌡️ Temperature: {sign}{effects['temperature_modifier']}°F")
+
+        # Area immunity check
+        if hasattr(area, "weather_immunity") and area.weather_immunity:
+            lines.append("")
+            lines.append("🏠 This area is sheltered from weather effects.")
+
+        lines.append("=" * 40)
+
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    def _season_handler(
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
+    ) -> list[Event]:
+        """Check the current season in the area."""
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "Player not found.")]
+
+        room = self.world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are not in a valid room.")]
+
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+
+        area = self.world.areas.get(room.area_id) if room.area_id else None
+        if not area:
+            return [self._msg_to_player(player_id, "You are not in a valid area.")]
+
+        # Get season information
+        current_season = getattr(area, "current_season", "spring") or "spring"
+        days_per_season = getattr(area, "days_per_season", 7) or 7
+        biome = getattr(area, "biome", "temperate") or "temperate"
+
+        # Season display formatting
+        season_icons = {
+            "spring": "🌸",
+            "summer": "☀️",
+            "autumn": "🍂",
+            "winter": "❄️",
+        }
+        season_descriptions = {
+            "spring": "New growth emerges as nature awakens.",
+            "summer": "The land basks in warmth and long days.",
+            "autumn": "Leaves turn as the world prepares for rest.",
+            "winter": "Cold grips the land in icy embrace.",
+        }
+
+        season_icon = season_icons.get(current_season.lower(), "🌍")
+        season_desc = season_descriptions.get(
+            current_season.lower(), "The season is unremarkable."
+        )
+
+        # Build season report
+        lines = [f"{season_icon} Season Report"]
+        lines.append("=" * 40)
+        lines.append(f"Current Season: {current_season.title()}")
+        lines.append(f"Area: {area.name}")
+        lines.append(f"Biome: {biome.title()}")
+        lines.append("")
+        lines.append(f'"{season_desc}"')
+
+        # Get seasonal modifiers if biome system is available
+        if hasattr(self, "biome_system") and self.biome_system:
+            try:
+                from .systems.biome import BiomeType, Season
+
+                biome_type = BiomeType[biome.upper()]
+                season_enum = Season[current_season.upper()]
+                modifiers = self.biome_system.get_seasonal_modifiers(
+                    biome_type, season_enum
+                )
+                if modifiers:
+                    lines.append("")
+                    lines.append("Seasonal Effects:")
+                    if modifiers.temperature_modifier != 0:
+                        sign = "+" if modifiers.temperature_modifier > 0 else ""
+                        lines.append(
+                            f"  🌡️ Temperature: {sign}{modifiers.temperature_modifier}°F"
+                        )
+                    if modifiers.precipitation_modifier != 1.0:
+                        pct = int((modifiers.precipitation_modifier - 1) * 100)
+                        sign = "+" if pct > 0 else ""
+                        lines.append(f"  💧 Precipitation: {sign}{pct}%")
+                    if modifiers.growth_rate != 1.0:
+                        pct = int((modifiers.growth_rate - 1) * 100)
+                        sign = "+" if pct > 0 else ""
+                        lines.append(f"  🌱 Growth Rate: {sign}{pct}%")
+                    if modifiers.spawn_rate != 1.0:
+                        pct = int((modifiers.spawn_rate - 1) * 100)
+                        sign = "+" if pct > 0 else ""
+                        lines.append(f"  🐾 Creature Activity: {sign}{pct}%")
+                    lines.append(f"  ☀️ Daylight: {modifiers.light_hours} hours")
+            except (KeyError, ImportError):
+                pass  # Biome system not fully available
+
+        lines.append("=" * 40)
+
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    def _time_handler(
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
+    ) -> list[Event]:
+        """Check the current in-game time."""
+        player = self.world.players.get(player_id)
+        if not player:
+            return [self._msg_to_player(player_id, "Player not found.")]
+
+        room = self.world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are not in a valid room.")]
+
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+
+        area = self.world.areas.get(room.area_id) if room.area_id else None
+        if not area:
+            return [self._msg_to_player(player_id, "You are not in a valid area.")]
+
+        # Get time information from area
+        if not hasattr(area, "area_time"):
+            return [self._msg_to_player(player_id, "Time system not available.")]
+
+        area_time = area.area_time
+        time_scale = getattr(area, "time_scale", 1.0) or 1.0
+
+        # Get current time components
+        current_day, current_hour, current_minute = area_time.get_current_time(
+            time_scale
+        )
+        time_of_day = area_time.get_time_of_day(time_scale)
+        time_emoji = area_time.get_time_emoji(time_scale)
+
+        # Time of day icons
+        phase_icons = {
+            "dawn": "🌅",
+            "morning": "🌄",
+            "afternoon": "☀️",
+            "dusk": "🌆",
+            "evening": "🌃",
+            "night": "🌙",
+        }
+        phase_icon = phase_icons.get(time_of_day, "🕐")
+
+        # Build time report
+        lines = [f"{phase_icon} Time"]
+        lines.append("=" * 40)
+        lines.append(f"{current_hour:02d}:{current_minute:02d}")
+        lines.append(f"Time of Day: {time_of_day.title()}")
+        lines.append("")
+
+        # Add flavor text
+        phase_descriptions = {
+            "dawn": "The sun rises in the east, painting the sky in hues of orange and pink.",
+            "morning": "The morning sun shines brightly, warming the land.",
+            "afternoon": "The sun reaches its peak overhead.",
+            "dusk": "The sun begins to set, casting long shadows.",
+            "evening": "Twilight settles over the land as stars begin to appear.",
+            "night": "Darkness blankets the land under a canopy of stars.",
+        }
+        desc = phase_descriptions.get(time_of_day, "")
+        if desc:
+            lines.append(f'"{desc}"')
+
+        lines.append("=" * 40)
+
+        return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    def _who_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """[Mod] List all online players with their locations."""
         if not self._check_permission(player_id, "KICK_PLAYER"):
             return [
@@ -1131,7 +1516,7 @@ class WorldEngine:
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
     def _where_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Mod] Find a player's location."""
         if not self._check_permission(player_id, "KICK_PLAYER"):
@@ -1173,7 +1558,7 @@ class WorldEngine:
             self._msg_to_player(player_id, f"📍 {target.name}: {location} [{status}]")
         ]
 
-    def _goto_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _goto_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """[GM] Teleport to a room or player."""
         if not self._check_permission(player_id, "TELEPORT"):
             return [
@@ -1240,7 +1625,7 @@ class WorldEngine:
         ]
 
     def _summon_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[GM] Summon a player to your location."""
         if not self._check_permission(player_id, "TELEPORT"):
@@ -1314,7 +1699,7 @@ class WorldEngine:
         return events
 
     def _spawn_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[GM] Spawn an NPC or item in the current room."""
         if not self._check_permission(player_id, "SPAWN_NPC"):
@@ -1424,7 +1809,7 @@ class WorldEngine:
             ]
 
     def _despawn_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[GM] Despawn an NPC in the current room."""
         if not self._check_permission(player_id, "SPAWN_NPC"):
@@ -1464,7 +1849,7 @@ class WorldEngine:
             self._msg_to_player(player_id, f"{npc_name} vanishes in a puff of smoke.")
         ]
 
-    def _give_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _give_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """[GM] Give an item to a player."""
         if not self._check_permission(player_id, "SPAWN_ITEM"):
             return [
@@ -1548,7 +1933,7 @@ class WorldEngine:
         return events
 
     def _inspect_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[GM] Get detailed info on a target (player, NPC, or item)."""
         if not self._check_permission(player_id, "MODIFY_STATS"):
@@ -1629,7 +2014,7 @@ class WorldEngine:
         ]
 
     def _broadcast_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Admin] Broadcast a message to all connected players."""
         if not self._check_permission(player_id, "SERVER_COMMANDS"):
@@ -1671,7 +2056,7 @@ class WorldEngine:
         return events
 
     def _kick_command_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Mod] Kick a player from the game."""
         if not self._check_permission(player_id, "KICK_PLAYER"):
@@ -1737,7 +2122,7 @@ class WorldEngine:
 
         return events
 
-    def _mute_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _mute_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """[Mod] Mute a player (prevent speaking)."""
         if not self._check_permission(player_id, "KICK_PLAYER"):
             return [
@@ -1778,7 +2163,7 @@ class WorldEngine:
         return events
 
     def _unmute_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Mod] Unmute a player."""
         if not self._check_permission(player_id, "KICK_PLAYER"):
@@ -1818,7 +2203,7 @@ class WorldEngine:
 
         return events
 
-    def _warn_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _warn_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """[Mod] Warn a player."""
         if not self._check_permission(player_id, "KICK_PLAYER"):
             return [
@@ -1867,7 +2252,7 @@ class WorldEngine:
         return events
 
     def _revive_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[GM] Revive a dead player."""
         if not self._check_permission(player_id, "MODIFY_STATS"):
@@ -1936,7 +2321,7 @@ class WorldEngine:
         return events
 
     def _invis_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Mod] Make a player invisible (admin mode)."""
         if not self._check_permission(player_id, "KICK_PLAYER"):
@@ -1990,7 +2375,7 @@ class WorldEngine:
         return events
 
     def _visible_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Mod] Make a player visible (remove invisibility)."""
         if not self._check_permission(player_id, "KICK_PLAYER"):
@@ -2041,7 +2426,7 @@ class WorldEngine:
         return events
 
     def _reload_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Admin] Reload game content from YAML files."""
         if not self._check_permission(player_id, "SERVER_COMMANDS"):
@@ -2082,7 +2467,7 @@ class WorldEngine:
         return events
 
     def _ban_command_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Admin] Ban a player account."""
         if not self._check_permission(player_id, "MANAGE_ACCOUNTS"):
@@ -2139,7 +2524,7 @@ class WorldEngine:
         return events
 
     def _unban_command_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Admin] Unban a player account."""
         if not self._check_permission(player_id, "MANAGE_ACCOUNTS"):
@@ -2192,7 +2577,7 @@ class WorldEngine:
         return events
 
     def _setstat_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[GM] Set a player's stat to a specific value."""
         if not self._check_permission(player_id, "MODIFY_STATS"):
@@ -2302,7 +2687,7 @@ class WorldEngine:
 
         return events
 
-    def _quit_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _quit_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Handle quit command - sends disconnect signal to client."""
         self.world.players.get(player_id)
 
@@ -2323,13 +2708,13 @@ class WorldEngine:
     # ---------- Quest command handlers (Phase X) ----------
 
     def _journal_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Show the player's quest journal."""
         return self.quest_system.get_quest_log(player_id)
 
     def _quest_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Show details of a specific quest."""
         if not args or not args.strip():
@@ -2339,7 +2724,7 @@ class WorldEngine:
         return self.quest_system.get_quest_details(player_id, args.strip())
 
     def _abandon_handler(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """Abandon a quest."""
         if not args or not args.strip():
@@ -2350,7 +2735,7 @@ class WorldEngine:
             ]
         return self.quest_system.abandon_quest(player_id, args.strip())
 
-    def _talk_handler(self, engine: Any, player_id: PlayerId, args: str) -> list[Event]:
+    def _talk_handler(self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = "") -> list[Event]:
         """Talk to an NPC to start dialogue."""
         if not args or not args.strip():
             return [
@@ -2440,6 +2825,9 @@ class WorldEngine:
         # Initialize per-NPC behavior timers
         self._init_npc_behaviors()
 
+        # Phase 17.5: Initialize fauna state (hunger) for all fauna NPCs
+        self._init_fauna_state()
+
         # Initialize room and area trigger timers
         self.trigger_system.initialize_all_timers()
 
@@ -2449,6 +2837,9 @@ class WorldEngine:
 
         # Phase 10.1: Schedule periodic cleanup of stale groups
         self._schedule_stale_group_cleanup()
+
+        # Phase 17.6: Schedule ecosystem tick for flora respawns, fauna spawns, etc.
+        self._schedule_ecosystem_tick()
 
     def _schedule_stale_group_cleanup(self) -> None:
         """Schedule recurring cleanup of stale groups (inactive 30+ minutes)."""
@@ -2753,6 +3144,284 @@ class WorldEngine:
             event_id="regeneration_tick",
         )
 
+    def _schedule_ecosystem_tick(self) -> None:
+        """
+        Schedule recurring ecosystem tick for Phase 17.4-17.6.
+
+        Handles:
+        - Flora respawns (hybrid: tick-based + event-triggered)
+        - Fauna spawns based on conditions
+        - Population dynamics and predation
+        - Cross-area migration
+
+        Performance: Adjust self._ecosystem_tick_interval to tune tick frequency.
+        """
+
+        async def ecosystem_tick():
+            """Process all ecosystem updates."""
+            import random
+
+            self._ecosystem_tick_count += 1
+
+            try:
+                # Get loaded areas
+                for area_id, area in self.world.areas.items():
+                    # Skip areas with no players nearby (optimization)
+                    if not self._has_players_in_area(area_id):
+                        continue
+
+                    if not self._db_session_factory:
+                        continue
+
+                    async with self._db_session_factory() as session:
+                        # Phase 17.4: Flora respawns (every tick)
+                        if hasattr(self, "flora_system") and self.flora_system:
+                            await self._process_flora_respawns(area_id, session)
+
+                        # Phase 17.5/17.6: Fauna spawns (every 3rd tick)
+                        if self._ecosystem_tick_count % 3 == 0:
+                            if hasattr(self, "fauna_system") and self.fauna_system:
+                                await self._process_fauna_spawns(area_id, session)
+
+                        # Phase 17.5: Fauna behaviors (grazing, hunting) now run through
+                        # standard NPC behavior system via idle/wander ticks.
+                        # The 'grazes', 'hunts', 'flees_predators' behaviors in
+                        # engine/behaviors/fauna.py handle this.
+
+                        # Phase 17.6: Population dynamics (every 5th tick)
+                        # This updates fauna hunger and applies predation
+                        if self._ecosystem_tick_count % 5 == 0:
+                            if hasattr(self, "population_manager") and self.population_manager:
+                                await self._process_population_dynamics(area_id, session)
+
+                        # Phase 17.5: Fauna migration (every 10th tick)
+                        if self._ecosystem_tick_count % 10 == 0:
+                            if hasattr(self, "fauna_system") and self.fauna_system:
+                                await self._process_fauna_migration(area_id, session)
+
+            except Exception as e:
+                logger.error(f"Error in ecosystem tick: {e}", exc_info=True)
+
+            # Reschedule next tick
+            self._schedule_ecosystem_tick()
+
+        # Schedule tick at configured interval
+        self.schedule_event(
+            delay_seconds=self._ecosystem_tick_interval,
+            callback=ecosystem_tick,
+            event_id="ecosystem_tick",
+        )
+
+    def _has_players_in_area(self, area_id: str) -> bool:
+        """Check if any players are in an area."""
+        for player in self.world.players.values():
+            if not player.is_connected:
+                continue
+            room = self.world.rooms.get(player.room_id)
+            if room and getattr(room, "area_id", None) == area_id:
+                return True
+        return False
+
+    async def _process_flora_respawns(
+        self, area_id: str, session
+    ) -> None:
+        """Process flora respawns for an area."""
+        if not self.flora_system:
+            return
+
+        try:
+            # Process respawns for depleted flora
+            await self.flora_system.process_respawns(area_id, session)
+            
+            # Also spawn initial flora for rooms that have none
+            area = self.world.areas.get(area_id)
+            if not area:
+                return
+                
+            for room_id in area.room_ids:
+                room = self.world.rooms.get(room_id)
+                if not room:
+                    continue
+                    
+                # Check if room has any flora
+                existing = await self.flora_system.get_room_flora(room_id, session)
+                if not existing:
+                    # Spawn initial flora for this room
+                    await self.flora_system.spawn_flora_for_room(room, area, session)
+                    
+            await session.commit()
+        except Exception as e:
+            logger.error(f"Error processing flora respawns in {area_id}: {e}")
+
+    async def _process_fauna_spawns(
+        self, area_id: str, session
+    ) -> None:
+        """
+        Process fauna spawns based on biome compatibility.
+
+        Modeled after _process_flora_respawns - iterates rooms and spawns
+        appropriate fauna based on biome, activity period, and population limits.
+        """
+        if not self.fauna_system:
+            return
+
+        try:
+            area = self.world.areas.get(area_id)
+            if not area:
+                return
+
+            # Iterate rooms in area and spawn fauna where needed
+            for room_id in getattr(area, "room_ids", []):
+                room = self.world.rooms.get(room_id)
+                if not room:
+                    continue
+
+                # Check if room already has fauna at capacity
+                # (spawn_fauna_for_room handles this check, but skip for efficiency)
+                current_fauna = sum(
+                    1 for npc in self.world.npcs.values()
+                    if npc.room_id == room_id and self.fauna_system.is_fauna(npc)
+                )
+
+                # Get area fauna density limit
+                density = getattr(area, "fauna_density", "moderate")
+                density_limits = {
+                    "sparse": 2,
+                    "moderate": 4,
+                    "dense": 8,
+                    "lush": 12,
+                }
+                max_fauna = density_limits.get(density, 4)
+
+                if current_fauna >= max_fauna:
+                    continue
+
+                # Spawn fauna for room (biome-based)
+                spawned = await self.fauna_system.spawn_fauna_for_room(
+                    room, area, session
+                )
+
+                # Announce spawns to players in room
+                for npc in spawned:
+                    if self._has_players_in_room(room_id):
+                        # Format NPC name with article if lowercase (fauna)
+                        npc_display = with_article(npc.name) if npc.name and npc.name[0].islower() else npc.name
+                        await self._dispatch_events([
+                            self._msg_to_room(
+                                room_id,
+                                f"{npc_display} appears.",
+                            )
+                        ])
+
+        except Exception as e:
+            logger.error(f"Error processing fauna spawns in {area_id}: {e}")
+
+    def _has_players_in_room(self, room_id: str) -> bool:
+        """Check if any players are in a room."""
+        for player in self.world.players.values():
+            if player.room_id == room_id and player.is_connected:
+                return True
+        return False
+
+    async def _process_population_dynamics(
+        self, area_id: str, session
+    ) -> None:
+        """Process population dynamics (predation, population control)."""
+        if not self.population_manager:
+            return
+
+        try:
+            # Update hunger for all fauna (drives predation and grazing)
+            self.population_manager.update_fauna_hunger(area_id)
+
+            # Apply predation
+            result = await self.population_manager.apply_predation(area_id, session)
+
+            # Broadcast predation messages to relevant rooms
+            for msg in result.messages:
+                # These are flavor messages, could be broadcasted to rooms
+                pass
+
+            # Apply population control
+            await self.population_manager.apply_population_control(area_id, session)
+
+        except Exception as e:
+            logger.error(f"Error processing population dynamics in {area_id}: {e}")
+
+    async def _process_fauna_migration(
+        self, area_id: str, session
+    ) -> None:
+        """Process fauna migration between rooms and areas."""
+        if not self.fauna_system:
+            return
+
+        try:
+            fauna_in_area = self.fauna_system.get_fauna_in_area(area_id)
+
+            for npc in fauna_in_area:
+                # Check if fauna should migrate
+                new_room_id = await self.fauna_system.consider_migration(
+                    npc, npc.room_id, session
+                )
+
+                if new_room_id and new_room_id != npc.room_id:
+                    # Move fauna to new room
+                    old_room = self.world.rooms.get(npc.room_id)
+                    new_room = self.world.rooms.get(new_room_id)
+
+                    if old_room and new_room:
+                        # Remove from old room
+                        if hasattr(old_room, "npc_ids"):
+                            if npc.id in old_room.npc_ids:
+                                old_room.npc_ids.remove(npc.id)
+
+                        # Add to new room
+                        if hasattr(new_room, "npc_ids"):
+                            new_room.npc_ids.append(npc.id)
+
+                        # Update NPC's room_id
+                        npc.room_id = new_room_id
+
+                        # Format NPC name with article if lowercase (fauna)
+                        npc_display = with_article(npc.name) if npc.name and npc.name[0].islower() else npc.name
+
+                        # Announce if players present
+                        if self._has_players_in_room(old_room.id):
+                            await self._dispatch_events([
+                                self._msg_to_room(
+                                    old_room.id,
+                                    f"{npc_display} wanders away.",
+                                )
+                            ])
+                        if self._has_players_in_room(new_room.id):
+                            await self._dispatch_events([
+                                self._msg_to_room(
+                                    new_room.id,
+                                    f"{npc_display} wanders in.",
+                                )
+                            ])
+
+        except Exception as e:
+            logger.error(f"Error processing fauna migration in {area_id}: {e}")
+
+    async def _process_fauna_behaviors(
+        self, area_id: str, session
+    ) -> None:
+        """
+        DEPRECATED: Fauna behaviors now use the standard NPC behavior system.
+
+        Fauna NPCs should have behaviors like 'grazes', 'hunts', 'flees_predators'
+        in their template's behavior list. These are processed through the
+        normal _schedule_npc_idle() mechanism.
+
+        This method is kept for backwards compatibility but is no longer called.
+        """
+        logger.warning(
+            "[FaunaBehavior] _process_fauna_behaviors is deprecated. "
+            "Fauna now use standard NPC behavior system."
+        )
+        return
+
     def _get_npc_respawn_time(self, npc: WorldNpc) -> int:
         """
         Resolve the respawn time for an NPC.
@@ -2788,6 +3457,37 @@ class WorldEngine:
             if npc.is_alive():
                 self._schedule_npc_idle(npc_id)
                 self._schedule_npc_wander(npc_id)
+
+    def _init_fauna_state(self) -> None:
+        """
+        Initialize fauna-specific state (hunger) for all fauna NPCs.
+        Called once on engine startup after fauna_system is available.
+        
+        Fauna start with hunger between 20-50 (slightly hungry).
+        Non-fauna NPCs are skipped (hunger remains None).
+        """
+        import random
+        import time as time_module
+
+        if not self.fauna_system:
+            return
+
+        fauna_count = 0
+        for npc_id, npc in self.world.npcs.items():
+            if not npc.is_alive():
+                continue
+
+            # Check if this NPC is fauna
+            fauna_props = self.fauna_system.get_fauna_properties(npc.template_id)
+            if not fauna_props:
+                continue
+
+            # Initialize hunger (randomized starting value)
+            npc.hunger = random.randint(20, 50)
+            npc.last_hunger_update = time_module.time()
+            fauna_count += 1
+
+        logger.info(f"[FaunaInit] Initialized hunger for {fauna_count} fauna NPCs")
 
     def _schedule_npc_idle(self, npc_id: str) -> None:
         """
@@ -3149,6 +3849,7 @@ class WorldEngine:
             template=template,
             config=template.resolved_behavior,
             broadcast=lambda room_id, msg: None,  # We handle messages via BehaviorResult
+            fauna_system=self.fauna_system if hasattr(self, 'fauna_system') else None,
         )
 
     async def _run_behavior_hook(
@@ -3251,13 +3952,15 @@ class WorldEngine:
                             "down": "up",
                         }
                         from_dir = opposite.get(result.move_direction, "somewhere")
+                        # Format NPC name with article if lowercase (fauna)
+                        npc_display = with_article(npc.name) if npc.name and npc.name[0].islower() else npc.name
                         # Use "from above/below" for vertical movement
                         if from_dir == "up":
-                            arrival_msg = f"{npc.name} arrives from above."
+                            arrival_msg = f"{npc_display} arrives from above."
                         elif from_dir == "down":
-                            arrival_msg = f"{npc.name} arrives from below."
+                            arrival_msg = f"{npc_display} arrives from below."
                         else:
-                            arrival_msg = f"{npc.name} arrives from the {from_dir}."
+                            arrival_msg = f"{npc_display} arrives from the {from_dir}."
                         events.append(self._msg_to_room(result.move_to, arrival_msg))
 
         # Dispatch all events
@@ -4038,6 +4741,48 @@ class WorldEngine:
 
     # ---------- Concrete command handlers ----------
 
+    def _format_room_flora(self, room: WorldRoom) -> str:
+        """
+        Format flora in a room for display.
+
+        Uses the flora_instances cache in World to get template_id and quantity.
+        Uses flora_system to get template names.
+        """
+        if not room.flora:
+            return ""
+
+        world = self.world
+
+        # Group flora by template name
+        grouped: dict[str, int] = {}
+        for flora_id in room.flora:
+            if flora_id in world.flora_instances:
+                template_id, quantity = world.flora_instances[flora_id]
+                # Get template name from flora_system
+                if hasattr(self, "flora_system") and self.flora_system:
+                    template = self.flora_system.get_template(template_id)
+                    if template:
+                        name = template.name
+                        grouped[name] = grouped.get(name, 0) + quantity
+
+        if not grouped:
+            return ""
+
+        # Format as natural language
+        parts = []
+        for name, count in grouped.items():
+            if count > 1:
+                parts.append(f"{count} {name}s")
+            else:
+                parts.append(f"a {name}")
+
+        if len(parts) == 1:
+            return f"You see {parts[0]} here."
+        elif len(parts) == 2:
+            return f"You see {parts[0]} and {parts[1]} here."
+        else:
+            return f"You see {', '.join(parts[:-1])}, and {parts[-1]} here."
+
     def _format_room_entities(
         self,
         room: WorldRoom,
@@ -4099,12 +4844,18 @@ class WorldEngine:
                 )
 
         # Format NPCs (no disposition indicator in room listing)
+        # Use "A/An <name> is here." for fauna/lowercase names
         any_npcs = any(npcs for npcs in npcs_by_type.values())
         if any_npcs:
             lines.append("")
             for npc_type, npc_names in npcs_by_type.items():
                 for name in npc_names:
-                    lines.append(f"{name} is here.")
+                    # If name starts with lowercase, it's a common noun (fauna) - use article
+                    if name and name[0].islower():
+                        lines.append(f"{with_article(name)} is here.")
+                    else:
+                        # Proper noun (named NPC) - no article
+                        lines.append(f"{name} is here.")
 
         return lines
 
@@ -4395,12 +5146,12 @@ class WorldEngine:
         return events
 
     def _handle_look_command(
-        self, engine: Any, player_id: PlayerId, args: str
+        self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """
         Unified look command handler for CommandRouter.
 
-        Signature matches CommandRouter's expected handler signature: (engine, player_id, args)
+        Signature matches CommandRouter's expected handler signature: (engine, player_id, args, cmd_name)
         Delegates to existing look methods: _look() or _look_at_target()
         """
         if args and args.strip():
@@ -4473,6 +5224,20 @@ class WorldEngine:
                 )
                 lines.append("")
                 lines.append(f"Temperature: {temp_display}")
+
+        # Phase 17.2: Show weather for notable conditions
+        if hasattr(self, "weather_system") and self.weather_system:
+            area_id = room.area_id if room.area_id else None
+            if area_id and self.weather_system.should_show_weather(area_id):
+                weather_display = self.weather_system.format_weather_display(area_id)
+                lines.append(f"Weather: {weather_display}")
+
+        # Phase 17.4: Show flora in the room
+        if room.flora and self.lighting_system.can_see_item_details(light_level):
+            flora_desc = self._format_room_flora(room)
+            if flora_desc:
+                lines.append("")
+                lines.append(flora_desc)
 
         # List all entities (players and NPCs) in the same room
         # Filter by visibility
@@ -5134,6 +5899,7 @@ class WorldEngine:
     def _emote(self, player_id: PlayerId, emote: str) -> list[Event]:
         """
         Player performs an emote; everyone in the same room sees the third-person version.
+        Supports targeted emotes like 'nudge <target>' and 'poke <target>'.
         """
         world = self.world
 
@@ -5161,9 +5927,69 @@ class WorldEngine:
                 )
             ]
 
+        # Parse emote and optional target
+        parts = emote.split(maxsplit=1)
+        emote_name = parts[0].lower() if parts else ""
+        target_arg = parts[1].strip() if len(parts) > 1 else ""
+
+        # Targeted emotes that require/accept a target (players/NPCs only)
+        targeted_emotes = {"nudge", "poke", "wave", "bow", "wink", "nod"}
+
+        # Direction names for "point" emote
+        direction_names = {
+            "n": "north", "north": "north",
+            "s": "south", "south": "south",
+            "e": "east", "east": "east",
+            "w": "west", "west": "west",
+            "ne": "northeast", "northeast": "northeast",
+            "nw": "northwest", "northwest": "northwest",
+            "se": "southeast", "southeast": "southeast",
+            "sw": "southwest", "southwest": "southwest",
+            "u": "up", "up": "up",
+            "d": "down", "down": "down",
+        }
+
+        # Try to find target using the Targetable protocol
+        target_name = None
+        point_direction = None
+
+        if target_arg:
+            if emote_name == "point":
+                # "point" can target directions, players, NPCs, or items
+                if target_arg.lower() in direction_names:
+                    point_direction = direction_names[target_arg.lower()]
+                else:
+                    # Try to find a targetable (include items for point)
+                    target, target_type = self._find_targetable_in_room(
+                        room.id,
+                        target_arg,
+                        include_players=True,
+                        include_npcs=True,
+                        include_items=True,
+                    )
+                    if target:
+                        target_name = target.name
+                    else:
+                        return [self._msg_to_player(player_id, f"You don't see '{target_arg}' here.")]
+            elif emote_name in targeted_emotes:
+                # Other targeted emotes only target players/NPCs
+                target, target_type = self._find_targetable_in_room(
+                    room.id,
+                    target_arg,
+                    include_players=True,
+                    include_npcs=True,
+                    include_items=False,
+                )
+                if target:
+                    target_name = target.name
+                else:
+                    return [self._msg_to_player(player_id, f"You don't see '{target_arg}' here.")]
+
         # Define first-person and third-person messages for each emote
+        # For targeted emotes, we'll build the message with the target name
         emote_map = {
             "smile": ("😊 You smile.", f"😊 {player.name} smiles."),
+            "grin": ("😁 You grin.", f"😁 {player.name} grins."),
             "nod": ("🙂‍↕️ You nod.", f"🙂‍↕️ {player.name} nods."),
             "laugh": ("😄 You laugh.", f"😄 {player.name} laughs."),
             "cringe": ("😖 You cringe.", f"😖 {player.name} cringes."),
@@ -5171,10 +5997,46 @@ class WorldEngine:
             "frown": ("🙁 You frown.", f"🙁 {player.name} frowns."),
             "wink": ("😉 You wink.", f"😉 {player.name} winks."),
             "lookaround": ("👀 You look around.", f"👀 {player.name} looks around."),
+            # Classic MUD emotes
+            "nudge": ("🫵 You nudge the air.", f"🫵 {player.name} nudges the air."),
+            "poke": ("👉 You poke the air.", f"👉 {player.name} pokes the air."),
+            "point": ("👆 You point.", f"👆 {player.name} points."),
+            "scowl": ("😠 You scowl.", f"😠 {player.name} scowls."),
+            "sneer": ("😤 You sneer.", f"😤 {player.name} sneers."),
+            "flex": ("💪 You flex your muscles.", f"💪 {player.name} flexes impressively."),
+            "stretch": ("🙆 You stretch your limbs.", f"🙆 {player.name} stretches."),
+            "fidget": ("😬 You fidget nervously.", f"😬 {player.name} fidgets nervously."),
+            "eyebrow": ("🤨 You raise an eyebrow.", f"🤨 {player.name} raises an eyebrow."),
+            # Additional classics
+            "shrug": ("🤷 You shrug.", f"🤷 {player.name} shrugs."),
+            "sigh": ("😮‍💨 You sigh.", f"😮‍💨 {player.name} sighs."),
+            "wave": ("👋 You wave.", f"👋 {player.name} waves."),
+            "bow": ("🙇 You bow gracefully.", f"🙇 {player.name} bows gracefully."),
+            "cackle": ("🦹 You cackle with glee.", f"🦹 {player.name} cackles with glee."),
         }
 
+        # Override messages for targeted emotes
+        if point_direction:
+            # Point at a direction
+            emote_map["point"] = (
+                f"👆 You point {point_direction}.",
+                f"👆 {player.name} points {point_direction}.",
+            )
+        elif target_name:
+            targeted_messages = {
+                "nudge": (f"🫵 You nudge {target_name}.", f"🫵 {player.name} nudges {target_name}."),
+                "poke": (f"👉 You poke {target_name}.", f"👉 {player.name} pokes {target_name}."),
+                "point": (f"👆 You point at {target_name}.", f"👆 {player.name} points at {target_name}."),
+                "wave": (f"👋 You wave at {target_name}.", f"👋 {player.name} waves at {target_name}."),
+                "bow": (f"🙇 You bow to {target_name}.", f"🙇 {player.name} bows to {target_name}."),
+                "wink": (f"😉 You wink at {target_name}.", f"😉 {player.name} winks at {target_name}."),
+                "nod": (f"🙂‍↕️ You nod at {target_name}.", f"🙂‍↕️ {player.name} nods at {target_name}."),
+            }
+            if emote_name in targeted_messages:
+                emote_map[emote_name] = targeted_messages[emote_name]
+
         first_person, third_person = emote_map.get(
-            emote, ("You do something.", f"{player.name} does something.")
+            emote_name, ("You do something.", f"{player.name} does something.")
         )
 
         events: list[Event] = []
@@ -7045,3 +7907,128 @@ class WorldEngine:
         lines.append("")
 
         return [self._msg_to_player(player_id, "\n".join(lines))]
+
+    # === Phase 17.4: Flora/Harvest Commands ===
+
+    async def _harvest(self, player_id: PlayerId, target_name: str) -> list[Event]:
+        """
+        Harvest resources from flora in the current room.
+
+        Args:
+            player_id: The player harvesting
+            target_name: Name of the flora to harvest
+
+        Returns:
+            List of events
+        """
+        world = self.world
+
+        if player_id not in world.players:
+            return [self._msg_to_player(player_id, "You have no form.")]
+
+        player = world.players[player_id]
+
+        # Check if dead
+        if not player.is_alive():
+            return [self._msg_to_player(player_id, "You can't harvest while dead.")]
+
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+
+        # Check if flora system is available
+        if not hasattr(self, "flora_system") or not self.flora_system:
+            return [self._msg_to_player(player_id, "Flora system not available.")]
+
+        room = world.rooms.get(player.room_id)
+        if not room:
+            return [self._msg_to_player(player_id, "You are nowhere.")]
+
+        # Get flora in room (need database session)
+        if not self.state_tracker or not self.state_tracker._session_factory:
+            return [
+                self._msg_to_player(player_id, "Cannot access flora (no database).")
+            ]
+
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        async with self.state_tracker._session_factory() as session:
+            flora_list = await self.flora_system.get_room_flora(room.id, session)
+
+            if not flora_list:
+                return [
+                    self._msg_to_player(player_id, "There is nothing to harvest here.")
+                ]
+
+            # Find matching flora by name
+            target_lower = target_name.lower().strip()
+            matched_instance = None
+            matched_template = None
+
+            for instance in flora_list:
+                template = self.flora_system.get_template(instance.template_id)
+                if template and target_lower in template.name.lower():
+                    matched_instance = instance
+                    matched_template = template
+                    break
+
+            if not matched_instance or not matched_template:
+                return [
+                    self._msg_to_player(
+                        player_id, f"You don't see any '{target_name}' here."
+                    )
+                ]
+
+            # Get current season for dormancy check
+            current_season = None
+            if hasattr(self, "season_system") and self.season_system:
+                area = self._get_area_for_room(room.id)
+                if area:
+                    current_season = self.season_system.get_season(area.id)
+
+            # Check if player can harvest
+            equipped_tool = self._get_equipped_tool_type(player)
+            can_harvest, reason = self.flora_system.can_harvest(
+                player_id, matched_instance, equipped_tool, current_season
+            )
+
+            if not can_harvest:
+                return [self._msg_to_player(player_id, reason)]
+
+            # Perform harvest
+            result = await self.flora_system.harvest(
+                player_id, matched_instance, session
+            )
+
+            await session.commit()
+
+            events = [self._msg_to_player(player_id, result.message)]
+
+            # Broadcast to room
+            if result.success:
+                events.append(
+                    self._room_broadcast(
+                        room.id,
+                        f"{player.name} harvests from a {matched_template.name}.",
+                        exclude_player=player_id,
+                    )
+                )
+
+            return events
+
+    def _get_equipped_tool_type(self, player) -> str | None:
+        """Get the item_type of the player's equipped tool (for harvest checks)."""
+        if not player.character_sheet:
+            return None
+
+        # Check main hand for tool
+        main_hand = player.character_sheet.equipment.get("main_hand")
+        if main_hand:
+            item = self.world.items.get(main_hand)
+            if item:
+                template = self.world.item_templates.get(item.template_id)
+                if template:
+                    return template.item_type
+        return None
+

@@ -1,0 +1,37 @@
+# Kentucky Bluegrass - Classic lawn grass
+id: flora_kentucky_bluegrass
+name: kentucky bluegrass
+description: A fine-bladed grass prized for its dense, lush growth and blue-green color.
+flora_type: grass
+
+biome_tags:
+  - temperate
+  - grassland
+  - meadow
+  - plains
+
+temperature_range: [30, 85]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_grass_blade
+    quantity: 8
+    chance: 0.9
+  - item_id: item_bluegrass_seed
+    quantity: 3
+    chance: 0.4
+harvest_cooldown: 3600
+
+seasonal_variants:
+  spring: Fresh bluegrass creates a soft carpet of blue-green.
+  summer: Dense grass forms a thick, springy lawn.
+  fall: The bluegrass takes on golden-brown tones.
+  winter: Dormant bluegrass lies flat under frost.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [10, 30]

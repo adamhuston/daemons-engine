@@ -1,0 +1,49 @@
+# Horned Toad - Desert lizard fauna
+# Phase 17.5: Fauna System
+
+id: npc_horned_toad
+name: horned toad
+description: >
+  A flat, spiny lizard with a crown of horns and camouflaged scales.
+  Despite its name, it's actually a lizard, not a toad.
+npc_type: neutral
+level: 1
+max_health: 8
+armor_class: 15
+strength: 4
+dexterity: 10
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 2.0
+experience_reward: 3
+
+is_fauna: true
+fauna_data:
+  fauna_type: reptile
+  biome_tags: [desert, scrubland]
+  temperature_tolerance: [60, 120]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [insect]
+  predator_tags: [hawk, snake, roadrunner, coyote]
+  fauna_tags: [carnivore, lizard, prey, reptile, defensive]
+  pack_size: [1, 1]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - peaceful
+loot_table: []
+idle_messages:
+  - "The horned toad freezes, blending with the sand."
+  - "The horned toad puffs up defensively."
+  - "The horned toad flicks its tongue at an ant."
+keywords:
+  - horned toad
+  - horned lizard

@@ -1,0 +1,39 @@
+# Loblolly Pine - Common southern pine
+id: flora_loblolly_pine
+name: loblolly pine
+description: A tall pine with long needles and rough, plated bark.
+flora_type: tree
+
+biome_tags:
+  - temperate
+  - forest
+  - coastal
+
+temperature_range: [20, 100]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_pine_resin
+    quantity: 2
+    chance: 0.7
+  - item_id: item_pine_cone
+    quantity: 3
+    chance: 0.6
+  - item_id: item_pine_needle
+    quantity: 5
+    chance: 0.8
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Pale green candles of new growth tip the pine's branches.
+  summer: The loblolly pine stands tall in the humid air.
+  fall: Brown needles drop as new green growth persists.
+  winter: The pine remains green through the mild winter.
+
+provides_cover: true
+cover_bonus: 3
+
+rarity: common
+cluster_size: [2, 5]

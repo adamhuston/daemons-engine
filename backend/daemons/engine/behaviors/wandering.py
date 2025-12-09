@@ -3,6 +3,14 @@
 import random
 
 from .base import BehaviorContext, BehaviorResult, BehaviorScript, behavior
+from ..world import with_article
+
+
+def _format_npc_name(name: str) -> str:
+    """Format NPC name with article if it's a common noun (lowercase)."""
+    if name and name[0].islower():
+        return with_article(name)
+    return name
 
 
 @behavior(
@@ -30,10 +38,11 @@ class WandersRarely(BehaviorScript):
             return BehaviorResult.nothing()
 
         direction, dest_room = exit_info
+        npc_name = _format_npc_name(ctx.npc.name)
         return BehaviorResult.move(
             direction=direction,
             room_id=dest_room,
-            message=f"{ctx.npc.name} wanders {direction}.",
+            message=f"{npc_name} wanders {direction}.",
         )
 
 
@@ -62,10 +71,11 @@ class WandersSometimes(BehaviorScript):
             return BehaviorResult.nothing()
 
         direction, dest_room = exit_info
+        npc_name = _format_npc_name(ctx.npc.name)
         return BehaviorResult.move(
             direction=direction,
             room_id=dest_room,
-            message=f"{ctx.npc.name} wanders {direction}.",
+            message=f"{npc_name} wanders {direction}.",
         )
 
 
@@ -94,10 +104,11 @@ class WandersFrequently(BehaviorScript):
             return BehaviorResult.nothing()
 
         direction, dest_room = exit_info
+        npc_name = _format_npc_name(ctx.npc.name)
         return BehaviorResult.move(
             direction=direction,
             room_id=dest_room,
-            message=f"{ctx.npc.name} wanders {direction}.",
+            message=f"{npc_name} wanders {direction}.",
         )
 
 

@@ -1,0 +1,38 @@
+# Sedge - Wetland grass-like plant
+id: flora_sedge
+name: sedge
+description: A grass-like plant with triangular stems that thrives in wet areas.
+flora_type: grass
+
+biome_tags:
+  - wetland
+  - swamp
+  - riparian
+  - marsh
+  - temperate
+  - boreal
+
+temperature_range: [25, 80]
+light_requirement: partial_shade
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_sedge_fiber
+    quantity: 6
+    chance: 0.8
+  - item_id: item_sedge_root
+    quantity: 2
+    chance: 0.4
+harvest_cooldown: 7200
+
+seasonal_variants:
+  spring: Fresh sedge grows in clumps near the water.
+  summer: Dense sedge meadows ripple like water.
+  fall: Golden sedge rustles in the autumn wind.
+  winter: Brown sedge tussocks stand in frozen wetlands.
+
+dormant_seasons: []
+
+rarity: common
+cluster_size: [8, 25]

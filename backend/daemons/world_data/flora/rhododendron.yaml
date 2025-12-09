@@ -1,0 +1,34 @@
+# Rhododendron - Large flowering shrub
+id: flora_rhododendron
+name: rhododendron
+description: A large evergreen shrub with leathery leaves and showy flower clusters.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - forest
+  - mountain
+  - woodland
+
+temperature_range: [15, 85]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_rhododendron_flower
+    quantity: 3
+    chance: 0.6
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Large flower clusters in pink, white, or purple adorn the shrub.
+  summer: Dark green leathery leaves fill the rhododendron.
+  fall: The evergreen shrub remains unchanged.
+  winter: Curled leaves protect the rhododendron from cold.
+
+provides_cover: true
+cover_bonus: 3
+
+rarity: uncommon
+cluster_size: [1, 3]

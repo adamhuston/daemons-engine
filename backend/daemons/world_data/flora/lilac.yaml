@@ -1,0 +1,36 @@
+# Lilac - Fragrant flowering shrub
+id: flora_lilac
+name: lilac bush
+description: A beloved shrub with heart-shaped leaves and fragrant purple flower clusters.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - woodland
+  - plains
+
+temperature_range: [5, 90]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_lilac_flower
+    quantity: 4
+    chance: 0.7
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: Fragrant purple flower clusters perfume the air.
+  summer: Heart-shaped leaves fill the lilac's arching branches.
+  fall: The lilac's leaves turn dull purple before dropping.
+  winter: Gray stems bear next year's flower buds.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: uncommon
+cluster_size: [1, 2]

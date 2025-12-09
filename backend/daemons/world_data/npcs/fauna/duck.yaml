@@ -1,0 +1,52 @@
+# Mallard Duck - Waterfowl fauna
+# Phase 17.5: Fauna System
+
+id: npc_duck
+name: mallard duck
+description: >
+  A common duck with a distinctive green head and yellow bill.
+  It dabbles in the shallows, tail pointed skyward.
+npc_type: neutral
+level: 1
+max_health: 15
+armor_class: 11
+strength: 6
+dexterity: 12
+intelligence: 3
+attack_damage_min: 1
+attack_damage_max: 3
+attack_speed: 2.0
+experience_reward: 5
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [wetland, river, lake, coast]
+  temperature_tolerance: [20, 85]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [fox, coyote, eagle, hawk]
+  fauna_tags: [omnivore, duck, prey, bird, waterfowl]
+  pack_size: [3, 20]
+  territorial: false
+  migratory: true
+  migration_seasons: [fall, spring]
+  aggression: 0.0
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - social
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The duck quacks contentedly."
+  - "The duck dabbles for food underwater."
+  - "A line of ducklings follows their mother."
+keywords:
+  - duck
+  - mallard

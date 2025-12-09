@@ -1,0 +1,35 @@
+# Bluebell - Woodland flower
+id: flora_bluebell
+name: bluebell
+description: A delicate flower with nodding blue bells on slender stems.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+
+temperature_range: [35, 75]
+light_requirement: shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_bluebell
+    quantity: 3
+    chance: 0.8
+harvest_cooldown: 14400
+
+seasonal_variants:
+  spring: Carpets of blue flowers cover the forest floor.
+  summer: The bluebells have faded, leaving strap-like leaves.
+  fall: The bluebell bulbs rest dormant underground.
+  winter: No sign of the bluebells remains above ground.
+
+dormant_seasons:
+  - summer
+  - fall
+  - winter
+
+rarity: common
+cluster_size: [5, 15]

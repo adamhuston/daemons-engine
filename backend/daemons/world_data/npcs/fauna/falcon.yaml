@@ -1,0 +1,51 @@
+# Falcon - Raptor fauna
+# Phase 17.5: Fauna System
+
+id: npc_falcon
+name: falcon
+description: >
+  A swift, sleek raptor with pointed wings and fierce eyes.
+  It stoops from incredible heights, striking with devastating speed.
+npc_type: neutral
+level: 4
+max_health: 30
+armor_class: 16
+strength: 10
+dexterity: 20
+intelligence: 5
+attack_damage_min: 5
+attack_damage_max: 12
+attack_speed: 1.0
+experience_reward: 20
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [mountain, grassland, coast, any]
+  temperature_tolerance: [10, 100]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [bird, mouse, rabbit]
+  predator_tags: [eagle]
+  fauna_tags: [carnivore, falcon, predator, raptor, bird, flying]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 8
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.2
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The falcon circles high overhead."
+  - "The falcon's keen eyes scan for prey."
+  - "The falcon dives at incredible speed."
+keywords:
+  - falcon
+  - peregrine

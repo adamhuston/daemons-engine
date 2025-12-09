@@ -1,0 +1,35 @@
+# Glowing Mushrooms - Rare underground fungus
+id: flora_glowing_mushrooms
+name: glowing mushrooms
+description: Bioluminescent fungi that emit a soft, eerie glow.
+flora_type: fungus
+
+biome_tags:
+  - underground
+  - cave
+  - swamp
+
+temperature_range: [40, 70]
+light_requirement: shade
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_glowing_mushroom
+    quantity: 3
+    chance: 0.7
+  - item_id: item_spore_sample
+    quantity: 1
+    chance: 0.2
+    skill_bonus: alchemy
+harvest_cooldown: 21600  # 6 hours
+harvest_skill: survival
+harvest_dc: 14
+
+# Underground - no seasonal variants
+seasonal_variants: {}
+dormant_seasons: []
+
+provides_cover: false
+rarity: rare
+cluster_size: [3, 8]

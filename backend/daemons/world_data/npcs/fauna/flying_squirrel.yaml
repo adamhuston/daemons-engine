@@ -1,0 +1,49 @@
+# Flying Squirrel - Gliding nocturnal mammal fauna
+# Phase 17.5: Fauna System
+
+id: npc_flying_squirrel
+name: flying squirrel
+description: >
+  A small, large-eyed squirrel with flaps of skin between its legs.
+  It glides silently from tree to tree in the moonlight.
+npc_type: neutral
+level: 1
+max_health: 6
+armor_class: 15
+strength: 3
+dexterity: 18
+intelligence: 4
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 1.0
+experience_reward: 3
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, temperate]
+  temperature_tolerance: [20, 80]
+  activity_period: nocturnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [owl, snake, fox]
+  fauna_tags: [herbivore, squirrel, prey, rodent, gliding, nocturnal]
+  pack_size: [1, 4]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.8
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The flying squirrel's huge eyes gleam in the dark."
+  - "The flying squirrel glides between the trees."
+  - "The flying squirrel nibbles on a nut."
+keywords:
+  - squirrel
+  - flying squirrel

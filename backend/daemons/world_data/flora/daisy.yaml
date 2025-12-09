@@ -1,0 +1,34 @@
+# Daisy - Common meadow flower
+id: flora_daisy
+name: daisy
+description: A simple flower with white petals surrounding a cheerful yellow center.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - meadow
+  - grassland
+  - plains
+
+temperature_range: [35, 90]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_daisy
+    quantity: 4
+    chance: 0.8
+harvest_cooldown: 7200
+
+seasonal_variants:
+  spring: Daisies begin to appear in sunny meadows.
+  summer: White daisies dot the grass like scattered stars.
+  fall: The last daisies bloom before frost.
+  winter: The plants rest dormant below ground.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [5, 20]

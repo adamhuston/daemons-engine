@@ -1,0 +1,52 @@
+# Moose - Large herbivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_moose
+name: moose
+description: >
+  An enormous moose with broad, flat antlers and a distinctive dewlap.
+  Despite its ungainly appearance, it can be surprisingly aggressive.
+npc_type: neutral
+level: 6
+max_health: 130
+armor_class: 14
+strength: 20
+dexterity: 8
+intelligence: 3
+attack_damage_min: 10
+attack_damage_max: 22
+attack_speed: 3.0
+experience_reward: 40
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, wetland, tundra, taiga]
+  temperature_tolerance: [-20, 70]
+  activity_period: diurnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [wolf]
+  fauna_tags: [herbivore, moose, prey, ungulate]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 4
+  migratory: false
+  aggression: 0.4
+  flee_threshold: 0.2
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - wanders_sometimes
+  - brave
+loot_table: []
+idle_messages:
+  - "The moose chews on some bark."
+  - "The moose shakes its massive antlers."
+  - "The moose snorts loudly."
+  - "The moose wades into shallow water."
+keywords:
+  - moose
+  - bull moose

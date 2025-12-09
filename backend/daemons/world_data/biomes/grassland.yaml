@@ -1,0 +1,169 @@
+# Grassland Biome
+# Open plains and meadows with tall grasses and wildflowers
+
+biome_id: grassland
+name: Grassland
+description: >
+  Wide open plains covered in tall grasses and wildflowers.
+  Rolling hills stretch to the horizon under vast blue skies.
+  Herds of grazing animals roam freely across the landscape.
+
+biome_type: TEMPERATE
+
+# Temperature configuration
+temperature:
+  base_min: 35
+  base_max: 95
+  comfortable_min: 55
+  comfortable_max: 80
+
+# Seasonal modifiers
+seasonal_effects:
+  spring:
+    temperature_modifier: 0
+    precipitation_modifier: 1.3
+    growth_rate: 1.8
+    spawn_rate: 1.4
+    light_hours: 13
+    description: "Spring rains bring fresh green growth and wildflower blooms."
+    
+  summer:
+    temperature_modifier: 15
+    precipitation_modifier: 0.5
+    growth_rate: 0.8
+    spawn_rate: 1.0
+    light_hours: 15
+    description: "The meadow basks in warm sunshine, grasses turning golden."
+    
+  autumn:
+    temperature_modifier: -5
+    precipitation_modifier: 0.7
+    growth_rate: 0.3
+    spawn_rate: 0.7
+    light_hours: 11
+    description: "Amber waves of grass sway in the cool autumn breeze."
+    
+  winter:
+    temperature_modifier: -20
+    precipitation_modifier: 1.1
+    growth_rate: 0.0
+    spawn_rate: 0.3
+    light_hours: 9
+    description: "Snow blankets the dormant meadow in peaceful silence."
+
+# Valid weather patterns
+valid_weather:
+  - CLEAR
+  - CLOUDY
+  - OVERCAST
+  - LIGHT_RAIN
+  - RAIN
+  - HEAVY_RAIN
+  - THUNDERSTORM
+  - LIGHT_SNOW
+  - SNOW
+
+# Weather weights
+weather_weights:
+  CLEAR: 40
+  CLOUDY: 20
+  OVERCAST: 10
+  LIGHT_RAIN: 10
+  RAIN: 8
+  HEAVY_RAIN: 4
+  THUNDERSTORM: 5
+  LIGHT_SNOW: 2
+  SNOW: 1
+
+valid_seasons:
+  - SPRING
+  - SUMMER
+  - AUTUMN
+  - WINTER
+
+# Spawn modifiers
+spawn_modifiers:
+  herbivore: 1.5    # Open grazing land
+  predator: 0.8     # Less cover for predators
+  omnivore: 1.0
+  bird: 1.4         # Ground-nesting birds, raptors
+  insect: 1.3       # Butterflies, bees
+  plant: 1.2        # Wildflowers and grasses
+  fungus: 0.6       # Less shade for mushrooms
+  undead: 0.3       # Sunlight deters undead
+  elemental: 0.5
+  fey: 1.0
+  beast: 1.3        # Rabbits, deer, foxes
+
+# Spawn types
+spawn_types:
+  common:
+    - rabbit
+    - deer
+    - squirrel
+    - fox
+    - hawk
+    - songbird
+    - butterfly
+  uncommon:
+    - wolf
+    - coyote
+    - eagle
+    - wild_boar
+  rare:
+    - unicorn
+    - giant_eagle
+
+# Population limits
+population_limits:
+  herbivore_max: 8
+  predator_max: 2
+  plant_max: 15
+  total_creature_max: 10
+
+# Terrain features
+terrain_features:
+  - tall_grass
+  - wildflower_patches
+  - rolling_hills
+  - small_streams
+  - lone_trees
+
+# Resources
+resources:
+  wood: scarce
+  herbs: abundant
+  game: common
+  water: uncommon
+  ore: rare
+
+# Hazards
+hazards:
+  - prairie_fire
+  - hidden_burrows
+  - sudden_storms
+
+# Tags
+tags:
+  - grassland
+  - meadow
+  - plains
+  - open
+  - temperate
+
+# Flora compatibility tags
+flora_tags:
+  - temperate
+  - plains
+  - grassland
+  - meadow
+  - woodland
+  - forest
+
+# Fauna compatibility tags
+fauna_tags:
+  - grassland
+  - plains
+  - temperate
+  - woodland
+  - forest

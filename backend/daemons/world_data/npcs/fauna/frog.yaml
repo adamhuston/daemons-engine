@@ -1,0 +1,50 @@
+# Frog - Small amphibian fauna
+# Phase 17.5: Fauna System
+
+id: npc_frog
+name: frog
+description: >
+  A small green frog with bulging eyes and powerful hind legs.
+  Its croaking chorus fills the wetlands.
+npc_type: neutral
+level: 1
+max_health: 5
+armor_class: 12
+strength: 4
+dexterity: 14
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 1.0
+experience_reward: 2
+
+is_fauna: true
+fauna_data:
+  fauna_type: amphibian
+  biome_tags: [wetland, swamp, river, forest]
+  temperature_tolerance: [40, 90]
+  activity_period: crepuscular
+  diet: carnivore
+  prey_tags: [insect]
+  predator_tags: [snake, hawk, owl, fish]
+  fauna_tags: [carnivore, frog, prey, amphibian, aquatic]
+  pack_size: [1, 6]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.8
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - peaceful
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The frog croaks loudly."
+  - "The frog's throat inflates rhythmically."
+  - "The frog catches an insect with its tongue."
+keywords:
+  - frog
+  - toad

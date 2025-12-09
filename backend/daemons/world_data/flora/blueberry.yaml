@@ -1,0 +1,37 @@
+# Blueberry - Fruit-bearing shrub
+id: flora_blueberry
+name: blueberry bush
+description: A low shrub with oval leaves and clusters of sweet blue berries.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+  - boreal
+
+temperature_range: [10, 85]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_blueberry
+    quantity: 6
+    chance: 0.8
+harvest_cooldown: 14400
+
+seasonal_variants:
+  spring: White bell-shaped flowers hang from the blueberry bush.
+  summer: Ripe blue berries weigh down the bush's branches.
+  fall: The blueberry's leaves turn brilliant shades of red.
+  winter: Bare twigs mark where the dormant bush waits for spring.
+
+dormant_seasons:
+  - winter
+
+provides_cover: false
+cover_bonus: 0
+
+rarity: common
+cluster_size: [2, 5]

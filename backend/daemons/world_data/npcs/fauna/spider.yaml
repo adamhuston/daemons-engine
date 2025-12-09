@@ -1,0 +1,50 @@
+# Spider - Web-building fauna
+# Phase 17.5: Fauna System
+
+id: npc_spider
+name: giant spider
+description: >
+  A large, hairy arachnid with multiple glistening eyes.
+  Webs of sticky silk hang nearby, catching the light.
+npc_type: hostile
+level: 3
+max_health: 25
+armor_class: 13
+strength: 10
+dexterity: 16
+intelligence: 2
+attack_damage_min: 4
+attack_damage_max: 10
+attack_speed: 1.5
+experience_reward: 18
+
+is_fauna: true
+fauna_data:
+  fauna_type: arachnid
+  biome_tags: [forest, cave, swamp]
+  temperature_tolerance: [40, 90]
+  activity_period: nocturnal
+  diet: carnivore
+  prey_tags: [insect, bird, mouse]
+  predator_tags: []
+  fauna_tags: [carnivore, spider, predator, venomous, arachnid]
+  pack_size: [1, 3]
+  territorial: true
+  territory_radius: 2
+  migratory: false
+  aggression: 0.6
+  flee_threshold: 0.3
+
+behavior:
+  - ambient
+  - hunts
+  - lurks
+  - aggressive
+loot_table: []
+idle_messages:
+  - "The spider's many eyes gleam in the darkness."
+  - "The spider tends to its intricate web."
+  - "The spider's legs twitch in anticipation."
+keywords:
+  - spider
+  - giant spider

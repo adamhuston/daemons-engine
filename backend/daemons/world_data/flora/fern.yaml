@@ -1,0 +1,40 @@
+# Fern - Shade-loving plant
+id: flora_fern
+name: fern
+description: A graceful plant with delicate fronds that unfurl from tight spirals.
+flora_type: grass
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+  - swamp
+
+temperature_range: [35, 85]
+light_requirement: shade
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_fiddlehead
+    quantity: 3
+    chance: 0.5
+  - item_id: item_fern_frond
+    quantity: 2
+    chance: 0.7
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: Tightly coiled fiddleheads unfurl into lacy fronds.
+  summer: Lush green fronds carpet the forest floor.
+  fall: The fern fronds turn brown and wither.
+  winter: The rhizomes rest dormant underground.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 1
+
+rarity: common
+cluster_size: [3, 10]

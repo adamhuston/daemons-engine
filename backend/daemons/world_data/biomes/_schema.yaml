@@ -1,0 +1,187 @@
+# Biome Definition Schema
+# Reference for content creators defining biomes
+# Used by BiomeSystem for environmental coherence validation
+
+# Required Fields
+# ===============
+id: string
+  # Unique identifier for the biome (prefix with 'biome_')
+  # Example: "biome_temperate_forest", "biome_arctic_tundra"
+
+name: string
+  # Display name of the biome
+  # Example: "Temperate Forest", "Arctic Tundra"
+
+description: string
+  # Flavor text describing the biome's characteristics
+  # Example: "A lush forest of deciduous trees with moderate rainfall..."
+
+# Environmental Ranges
+# ====================
+temperature_range: array of 2 integers
+  # [min, max] comfortable temperature range in Fahrenheit
+  # Areas outside this range should have lore justification
+  # Example: [40, 75] for temperate forest
+
+climate_types: array of strings
+  # Compatible climate types for this biome
+  # Options: "tropical", "dry", "temperate", "continental", "polar"
+  # Example: ["temperate", "continental"]
+
+# Weather Configuration
+# ====================
+weather_patterns: dictionary
+  # Default weather probabilities for this biome
+  # Keys: clear, cloudy, overcast, rain, storm, snow, fog, wind
+  # Values: probability (0.0 to 1.0, must sum to 1.0)
+  # Example:
+  #   clear: 0.35
+  #   cloudy: 0.25
+  #   rain: 0.25
+  #   storm: 0.10
+  #   fog: 0.05
+
+seasonal_weather_modifiers: dictionary
+  # How seasons affect weather probabilities
+  # Keys: spring, summer, fall, winter
+  # Values: dict of weather type adjustments (+/- probabilities)
+  # Example:
+  #   spring:
+  #     rain: +0.15
+  #     clear: -0.10
+  #   winter:
+  #     snow: +0.30
+  #     rain: -0.20
+
+# Seasonal Modifiers
+# ==================
+seasonal_temperature_modifiers: dictionary
+  # Temperature adjustments by season (in Fahrenheit)
+  # Keys: spring, summer, fall, winter
+  # Example:
+  #   spring: -5
+  #   summer: +10
+  #   fall: -5
+  #   winter: -25
+
+seasonal_descriptions: dictionary (optional)
+  # Flavor text for each season
+  # Keys: spring, summer, fall, winter
+  # Example:
+  #   spring: "New growth emerges from thawing ground..."
+  #   summer: "The forest is lush and vibrant..."
+  #   fall: "Leaves turn brilliant reds and golds..."
+  #   winter: "Snow blankets the dormant forest..."
+
+# Flora/Fauna Compatibility (Phase 17.4-17.5)
+# ===========================================
+flora_tags: array of strings
+  # Tags for compatible plant types
+  # Standard tags: deciduous, conifer, grass, shrub, flowering, 
+  #               aquatic, fungus, moss, fern, vine, cactus
+  # Example: ["deciduous", "conifer", "shrub", "flowering", "fungus"]
+
+fauna_tags: array of strings
+  # Tags for compatible animal types
+  # Standard tags: woodland, grassland, aquatic, avian, predator, 
+  #               prey, nocturnal, burrowing, migratory
+  # Example: ["woodland", "predator", "prey", "avian"]
+
+# Spawn Modifiers (Phase 17.5-17.6)
+# =================================
+spawn_modifiers: dictionary (optional)
+  # How biome affects creature spawning
+  # Keys: seasonal or conditional spawn adjustments
+  # Example:
+  #   spring:
+  #     fauna_spawn_multiplier: 1.2  # More animals in spring
+  #     flora_growth_rate: 1.5       # Plants grow faster
+  #   winter:
+  #     fauna_spawn_multiplier: 0.6  # Fewer animals visible
+  #     migration_active: true       # Migratory fauna leave
+
+# Gameplay Modifiers
+# ==================
+danger_modifier: integer (default: 0)
+  # Added to area danger_level
+  # Example: -1 (safer biome), +2 (more dangerous)
+
+magic_affinity: string (optional)
+  # Affects magic_intensity in areas
+  # Options: "none", "low", "moderate", "high", "extreme"
+  # Example: "moderate"
+
+movement_modifier: float (default: 1.0)
+  # Multiplier for movement speed in this biome
+  # < 1.0 = slower (dense forest, swamp)
+  # > 1.0 = faster (open plains, roads)
+  # Example: 0.9 (slightly slowed by undergrowth)
+
+visibility_modifier: float (default: 1.0)
+  # Multiplier for visibility range
+  # < 1.0 = reduced (dense forest, fog-prone)
+  # > 1.0 = increased (open plains, high altitude)
+  # Example: 0.8 (forest canopy limits visibility)
+
+# Transition Rules (optional)
+# ===========================
+adjacent_biomes: array of strings (optional)
+  # Biomes that can naturally border this one
+  # Used for world generation and validation
+  # Example: ["biome_grassland", "biome_boreal_forest", "biome_mountain"]
+
+transition_zones: dictionary (optional)
+  # How this biome transitions to adjacent biomes
+  # Example:
+  #   biome_grassland:
+  #     name: "Forest Edge"
+  #     description: "Trees thin out into open grassland"
+
+# Example Complete Biome
+# ======================
+# id: biome_temperate_forest
+# name: Temperate Forest
+# description: >
+#   A lush forest of deciduous and evergreen trees, with moderate 
+#   rainfall and distinct seasons. Home to diverse wildlife.
+# 
+# temperature_range: [40, 75]
+# climate_types: [temperate, continental]
+# 
+# weather_patterns:
+#   clear: 0.30
+#   cloudy: 0.25
+#   rain: 0.25
+#   storm: 0.08
+#   fog: 0.07
+#   wind: 0.05
+# 
+# seasonal_temperature_modifiers:
+#   spring: -5
+#   summer: +10
+#   fall: -5
+#   winter: -25
+# 
+# seasonal_weather_modifiers:
+#   spring:
+#     rain: +0.10
+#   summer:
+#     clear: +0.10
+#   fall:
+#     fog: +0.10
+#   winter:
+#     snow: +0.20
+#     rain: -0.15
+# 
+# flora_tags: [deciduous, conifer, shrub, flowering, fungus, fern]
+# fauna_tags: [woodland, predator, prey, avian, nocturnal]
+# 
+# seasonal_descriptions:
+#   spring: "New growth emerges as the forest awakens from winter."
+#   summer: "The canopy is thick and green, alive with birdsong."
+#   fall: "Leaves turn brilliant shades of red, orange, and gold."
+#   winter: "Bare branches reach toward gray skies, snow muffles all sound."
+# 
+# danger_modifier: 0
+# movement_modifier: 0.9
+# visibility_modifier: 0.8

@@ -1,0 +1,35 @@
+# Saguaro - Giant desert cactus
+id: flora_saguaro
+name: saguaro cactus
+description: A towering columnar cactus with upraised arms, an icon of the desert.
+flora_type: shrub
+
+biome_tags:
+  - desert
+  - arid
+
+temperature_range: [35, 120]
+light_requirement: full_sun
+moisture_requirement: arid
+
+harvestable: true
+harvest_items:
+  - item_id: item_saguaro_fruit
+    quantity: 2
+    chance: 0.4
+  - item_id: item_cactus_water
+    quantity: 1
+    chance: 0.3
+harvest_cooldown: 86400
+
+seasonal_variants:
+  spring: White flowers bloom atop the saguaro's arms.
+  summer: Red fruit develops from the spring flowers.
+  fall: The saguaro stands unchanged in the cooling desert.
+  winter: The giant cactus endures mild desert winters.
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: rare
+cluster_size: [1, 2]

@@ -1,0 +1,50 @@
+# Rat - Common rodent fauna
+# Phase 17.5: Fauna System
+
+id: npc_rat
+name: rat
+description: >
+  A large, mangy rodent with beady eyes and a naked tail.
+  It regards you with surprising intelligence.
+npc_type: neutral
+level: 1
+max_health: 8
+armor_class: 12
+strength: 4
+dexterity: 14
+intelligence: 4
+attack_damage_min: 1
+attack_damage_max: 3
+attack_speed: 1.5
+experience_reward: 3
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [cave, dungeon, urban, any]
+  temperature_tolerance: [30, 95]
+  activity_period: nocturnal
+  diet: omnivore
+  prey_tags: []
+  predator_tags: [owl, snake, fox, cat]
+  fauna_tags: [omnivore, rat, prey, rodent]
+  pack_size: [2, 10]
+  territorial: false
+  migratory: false
+  aggression: 0.2
+  flee_threshold: 0.6
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_frequently
+  - social
+loot_table: []
+idle_messages:
+  - "The rat's nose twitches."
+  - "The rat gnaws on something unidentifiable."
+  - "Rats scurry in the shadows."
+keywords:
+  - rat

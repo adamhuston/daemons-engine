@@ -1,0 +1,51 @@
+# Black Bear - Omnivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_blackbear
+name: black bear
+description: >
+  A stocky black bear with a shaggy coat and powerful limbs.
+  It regards you with small, intelligent eyes, more curious than aggressive.
+npc_type: neutral
+level: 5
+max_health: 100
+armor_class: 14
+strength: 18
+dexterity: 10
+intelligence: 4
+attack_damage_min: 8
+attack_damage_max: 18
+attack_speed: 3.0
+experience_reward: 35
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, mountain, temperate]
+  temperature_tolerance: [10, 85]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [fish, berry, prey]
+  predator_tags: []
+  fauna_tags: [omnivore, bear, predator]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 4
+  migratory: false
+  aggression: 0.3
+  flee_threshold: 0.2
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The bear sniffs the air curiously."
+  - "The bear scratches its back against a tree."
+  - "The bear yawns, revealing massive teeth."
+  - "The bear rummages through some undergrowth."
+keywords:
+  - bear
+  - black bear

@@ -1,0 +1,48 @@
+# Porcupine - Defensive herbivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_porcupine
+name: porcupine
+description: >
+  A rotund rodent covered in sharp, barbed quills.
+  It moves slowly but its defenses are formidable.
+npc_type: neutral
+level: 2
+max_health: 25
+armor_class: 15
+strength: 8
+dexterity: 6
+intelligence: 3
+attack_damage_min: 2
+attack_damage_max: 6
+attack_speed: 3.0
+experience_reward: 10
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, mountain, temperate]
+  temperature_tolerance: [10, 80]
+  activity_period: nocturnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: []
+  fauna_tags: [herbivore, porcupine, prey, defensive, quilled]
+  pack_size: [1, 1]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.3
+
+behavior:
+  - ambient
+  - grazes
+  - peaceful
+loot_table: []
+idle_messages:
+  - "The porcupine rattles its quills warningly."
+  - "The porcupine gnaws on tree bark."
+  - "The porcupine ambles along slowly."
+keywords:
+  - porcupine
+  - quills

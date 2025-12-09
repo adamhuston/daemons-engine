@@ -1,0 +1,49 @@
+# Squirrel - Small prey fauna
+# Phase 17.5: Fauna System
+
+id: npc_squirrel
+name: squirrel
+description: >
+  A bushy-tailed rodent with bright, alert eyes.
+  It chatters nervously and darts between tree branches.
+npc_type: neutral
+level: 1
+max_health: 8
+armor_class: 14
+strength: 4
+dexterity: 18
+intelligence: 4
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 1.0
+experience_reward: 3
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, temperate, urban]
+  temperature_tolerance: [20, 90]
+  activity_period: diurnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [fox, coyote, owl, hawk, snake]
+  fauna_tags: [herbivore, squirrel, prey, rodent, small]
+  pack_size: [1, 3]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.7
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - cowardly
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The squirrel chatters angrily at you."
+  - "The squirrel buries an acorn."
+  - "The squirrel flicks its bushy tail."
+keywords:
+  - squirrel

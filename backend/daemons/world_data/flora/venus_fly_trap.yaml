@@ -1,0 +1,37 @@
+# Venus Fly Trap - Carnivorous plant
+id: flora_venus_fly_trap
+name: venus fly trap
+description: A carnivorous plant with hinged leaves that snap shut on unsuspecting insects.
+flora_type: flower
+
+biome_tags:
+  - swamp
+  - wetland
+  - subtropical
+  - exotic
+
+temperature_range: [55, 95]
+light_requirement: full_sun
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_venus_trap_leaf
+    quantity: 2
+    chance: 0.5
+  - item_id: item_carnivore_essence
+    quantity: 1
+    chance: 0.2
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: New traps emerge from the carnivorous rosette.
+  summer: Active traps await unwary insects with deadly patience.
+  fall: The traps slow their deadly dance as temperatures cool.
+  winter: Venus fly traps lie dormant in the bog.
+
+dormant_seasons:
+  - winter
+
+rarity: rare
+cluster_size: [1, 4]

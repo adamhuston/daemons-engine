@@ -1,0 +1,54 @@
+# Wolf - Predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_wolf
+name: wolf
+description: >
+  A powerful gray wolf with thick fur and piercing amber eyes.
+  It moves with quiet confidence, muscles rippling beneath its coat.
+npc_type: hostile
+level: 4
+max_health: 65
+armor_class: 13
+strength: 14
+dexterity: 14
+intelligence: 4
+attack_damage_min: 6
+attack_damage_max: 12
+attack_speed: 2.5
+experience_reward: 25
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, tundra, mountain, taiga]
+  temperature_tolerance: [0, 80]
+  activity_period: nocturnal
+  diet: carnivore
+  prey_tags: [deer, rabbit, prey, herbivore]
+  predator_tags: []
+  fauna_tags: [carnivore, wolf, predator, canine]
+  pack_size: [3, 7]
+  pack_leader_template: npc_alpha_wolf
+  territorial: true
+  territory_radius: 5
+  migratory: false
+  migration_tendency: 0.05
+  aggression: 0.7
+  flee_threshold: 0.2
+
+behavior:
+  - ambient
+  - hunts
+  - aggressive
+  - social
+loot_table: []
+idle_messages:
+  - "The wolf's ears perk up at a distant sound."
+  - "The wolf licks its chops."
+  - "A low growl rumbles in the wolf's throat."
+  - "The wolf's amber eyes track your movements."
+keywords:
+  - wolf
+  - canine
+  - grey wolf

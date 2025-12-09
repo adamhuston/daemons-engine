@@ -1,0 +1,51 @@
+# Raccoon - Small omnivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_raccoon
+name: raccoon
+description: >
+  A plump, masked critter with dexterous paws and a ringed tail.
+  Its curious nature often leads it into trouble.
+npc_type: neutral
+level: 1
+max_health: 20
+armor_class: 12
+strength: 8
+dexterity: 16
+intelligence: 6
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 1.5
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, wetland, temperate]
+  temperature_tolerance: [10, 95]
+  activity_period: nocturnal
+  diet: omnivore
+  prey_tags: [fish, crab, frog]
+  predator_tags: [coyote, cougar, owl]
+  fauna_tags: [omnivore, raccoon, prey, rodent]
+  pack_size: [1, 3]
+  territorial: false
+  migratory: false
+  aggression: 0.1
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_frequently
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The raccoon washes something in its paws."
+  - "The raccoon chatters inquisitively."
+  - "The raccoon's masked face peers at you."
+keywords:
+  - raccoon
+  - coon

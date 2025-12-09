@@ -1,0 +1,40 @@
+# Swamp Reeds - Common aquatic flora
+id: flora_swamp_reeds
+name: swamp reeds
+description: Tall, fibrous reeds growing from the murky water.
+flora_type: aquatic
+
+biome_tags:
+  - swamp
+  - wetland
+  - river
+  - lake
+
+temperature_range: [45, 95]
+light_requirement: any
+moisture_requirement: aquatic
+
+harvestable: true
+harvest_items:
+  - item_id: item_reed_fiber
+    quantity: 4
+    chance: 0.9
+  - item_id: item_reed_root
+    quantity: 1
+    chance: 0.4
+harvest_cooldown: 3600  # 1 hour
+
+seasonal_variants:
+  spring: Young reeds emerge from the water, their green shoots reaching skyward.
+  summer: Tall reeds sway gently, their feathery tops catching the breeze.
+  fall: Browning reeds rustle in the wind, seeds dispersing across the water.
+  winter: Frozen reeds stand like sentinels in the icy water.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 4
+
+rarity: common
+cluster_size: [5, 12]

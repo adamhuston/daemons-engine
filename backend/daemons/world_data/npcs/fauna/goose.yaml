@@ -1,0 +1,54 @@
+# Canadian Goose - Waterfowl fauna
+# Phase 17.5: Fauna System
+
+id: npc_goose
+name: canadian goose
+description: >
+  A large gray-brown goose with a distinctive black head and white chin strap.
+  It honks loudly and hisses at anyone who approaches.
+npc_type: neutral
+level: 2
+max_health: 25
+armor_class: 11
+strength: 10
+dexterity: 10
+intelligence: 4
+attack_damage_min: 2
+attack_damage_max: 6
+attack_speed: 2.0
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [wetland, river, lake, grassland]
+  temperature_tolerance: [10, 80]
+  activity_period: diurnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [fox, coyote, eagle]
+  fauna_tags: [herbivore, goose, prey, bird, waterfowl]
+  pack_size: [5, 50]
+  territorial: true
+  territory_radius: 3
+  migratory: true
+  migration_seasons: [fall, spring]
+  aggression: 0.5
+  flee_threshold: 0.3
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - social
+  - brave
+loot_table: []
+idle_messages:
+  - "The goose honks aggressively."
+  - "The goose hisses and spreads its wings."
+  - "The goose preens its feathers."
+  - "A formation of geese flies overhead."
+keywords:
+  - goose
+  - geese
+  - canadian goose

@@ -1,0 +1,51 @@
+# Robin - Songbird fauna
+# Phase 17.5: Fauna System
+
+id: npc_robin
+name: robin
+description: >
+  A cheerful bird with a bright red-orange breast.
+  It hops across the lawn, head cocked for earthworms.
+npc_type: neutral
+level: 1
+max_health: 6
+armor_class: 13
+strength: 4
+dexterity: 14
+intelligence: 4
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 1.0
+experience_reward: 2
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [forest, meadow, temperate, urban]
+  temperature_tolerance: [30, 85]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [hawk, owl, cat, snake]
+  fauna_tags: [omnivore, robin, prey, bird, songbird]
+  pack_size: [1, 6]
+  territorial: true
+  territory_radius: 1
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.1
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The robin sings its cheerful song."
+  - "The robin tugs a worm from the ground."
+  - "The robin hops along, head tilted."
+keywords:
+  - robin

@@ -1,0 +1,49 @@
+# Skunk - Small omnivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_skunk
+name: skunk
+description: >
+  A black and white striped critter with a fluffy tail.
+  Its pungent defensive spray is infamous throughout the land.
+npc_type: neutral
+level: 1
+max_health: 15
+armor_class: 10
+strength: 6
+dexterity: 10
+intelligence: 3
+attack_damage_min: 1
+attack_damage_max: 4
+attack_speed: 2.0
+experience_reward: 5
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, grassland, temperate]
+  temperature_tolerance: [20, 90]
+  activity_period: nocturnal
+  diet: omnivore
+  prey_tags: [insect, mouse]
+  predator_tags: [owl]
+  fauna_tags: [omnivore, skunk, prey, defensive]
+  pack_size: [1, 2]
+  territorial: false
+  migratory: false
+  aggression: 0.1
+  flee_threshold: 0.3
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The skunk waddles along, tail raised warily."
+  - "The skunk roots around in the dirt."
+  - "A faint musk hangs in the air."
+keywords:
+  - skunk

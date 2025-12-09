@@ -1,0 +1,51 @@
+# Bobcat - Medium predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_bobcat
+name: bobcat
+description: >
+  A spotted wildcat with distinctive ear tufts and a stubby tail.
+  It stalks through the brush with patient, predatory focus.
+npc_type: neutral
+level: 3
+max_health: 45
+armor_class: 14
+strength: 12
+dexterity: 16
+intelligence: 4
+attack_damage_min: 5
+attack_damage_max: 10
+attack_speed: 2.0
+experience_reward: 20
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, scrubland, desert, grassland]
+  temperature_tolerance: [0, 100]
+  activity_period: nocturnal
+  diet: carnivore
+  prey_tags: [rabbit, mouse, bird, prey]
+  predator_tags: [cougar, wolf]
+  fauna_tags: [carnivore, bobcat, predator, feline]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 4
+  migratory: false
+  aggression: 0.3
+  flee_threshold: 0.35
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The bobcat's ears swivel independently."
+  - "The bobcat grooms its spotted fur."
+  - "The bobcat freezes, fixated on something."
+keywords:
+  - bobcat
+  - wildcat
+  - cat

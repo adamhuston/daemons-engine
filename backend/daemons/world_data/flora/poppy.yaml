@@ -1,0 +1,41 @@
+# Poppy - Delicate wildflower
+id: flora_poppy
+name: poppy
+description: A delicate flower with papery petals in vibrant orange, red, or yellow hues.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - grassland
+  - meadow
+  - plains
+
+temperature_range: [40, 90]
+light_requirement: full_sun
+moisture_requirement: dry
+
+harvestable: true
+harvest_items:
+  - item_id: item_poppy_petal
+    quantity: 4
+    chance: 0.7
+  - item_id: item_poppy_seed
+    quantity: 20
+    chance: 0.8
+  - item_id: item_poppy_pod
+    quantity: 1
+    chance: 0.4
+harvest_cooldown: 14400
+
+seasonal_variants:
+  spring: Feathery poppy foliage emerges from bare ground.
+  summer: Vibrant poppy blooms sway in the breeze.
+  fall: Dried seed pods stand on thin stalks.
+  winter: Nothing remains of the annual poppies.
+
+dormant_seasons:
+  - winter
+  - fall
+
+rarity: common
+cluster_size: [5, 20]

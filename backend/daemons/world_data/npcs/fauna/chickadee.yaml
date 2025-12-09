@@ -1,0 +1,50 @@
+# Chickadee - Songbird fauna
+# Phase 17.5: Fauna System
+
+id: npc_chickadee
+name: chickadee
+description: >
+  A tiny, round bird with a black cap and cheerful disposition.
+  Its namesake call echoes through the winter woods.
+npc_type: neutral
+level: 1
+max_health: 4
+armor_class: 15
+strength: 2
+dexterity: 18
+intelligence: 4
+attack_damage_min: 1
+attack_damage_max: 1
+attack_speed: 1.0
+experience_reward: 2
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [forest, temperate]
+  temperature_tolerance: [0, 80]
+  activity_period: diurnal
+  diet: omnivore
+  prey_tags: [insect]
+  predator_tags: [hawk, owl, snake]
+  fauna_tags: [omnivore, chickadee, prey, bird, songbird, small]
+  pack_size: [3, 12]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.7
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - social
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The chickadee calls 'chick-a-dee-dee-dee!'"
+  - "The chickadee hangs upside down on a branch."
+  - "The chickadee flits energetically through the trees."
+keywords:
+  - chickadee

@@ -1,0 +1,50 @@
+# Grouse - Ground bird fauna
+# Phase 17.5: Fauna System
+
+id: npc_grouse
+name: grouse
+description: >
+  A plump, camouflaged game bird with feathered legs.
+  It drums its wings in a distinctive mating display.
+npc_type: neutral
+level: 1
+max_health: 15
+armor_class: 11
+strength: 6
+dexterity: 12
+intelligence: 3
+attack_damage_min: 1
+attack_damage_max: 4
+attack_speed: 2.0
+experience_reward: 5
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [forest, mountain, temperate]
+  temperature_tolerance: [10, 75]
+  activity_period: diurnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [fox, coyote, hawk, owl]
+  fauna_tags: [herbivore, grouse, prey, bird, ground]
+  pack_size: [2, 8]
+  territorial: true
+  territory_radius: 2
+  migratory: false
+  aggression: 0.1
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The grouse drums its wings loudly."
+  - "The grouse scratches through the leaf litter."
+  - "The grouse freezes, relying on its camouflage."
+keywords:
+  - grouse
+  - ruffed grouse

@@ -1,0 +1,169 @@
+# Tropical Rainforest Biome
+# Hot, humid jungle with minimal seasonal variation
+
+biome_id: tropical
+name: Tropical Rainforest
+description: >
+  A dense jungle canopy blocks most sunlight, creating a shadowy world
+  of massive trees, hanging vines, and exotic creatures. Rain falls
+  almost daily, and the humidity is oppressive. Life here is more diverse
+  than anywhere else in the world.
+
+biome_type: TROPICAL
+
+# Temperature configuration
+temperature:
+  base_min: 70   # Warm year-round
+  base_max: 95   # Hot and humid
+  comfortable_min: 72
+  comfortable_max: 85
+
+# Seasonal modifiers (wet/dry seasons rather than traditional)
+seasonal_effects:
+  spring:
+    temperature_modifier: 0
+    precipitation_modifier: 1.0  # Transition
+    growth_rate: 1.2
+    spawn_rate: 1.1
+    light_hours: 12
+    description: "The transition to wet season. Rains begin to increase."
+    
+  summer:
+    temperature_modifier: 5
+    precipitation_modifier: 1.8  # Peak wet season
+    growth_rate: 1.5
+    spawn_rate: 1.4
+    light_hours: 13
+    description: "The wet season at its peak. Daily torrential rains feed explosive growth."
+    
+  autumn:
+    temperature_modifier: 0
+    precipitation_modifier: 1.0  # Transition
+    growth_rate: 1.0
+    spawn_rate: 1.0
+    light_hours: 12
+    description: "Rains begin to subside. The jungle adjusts to drier conditions."
+    
+  winter:
+    temperature_modifier: -3
+    precipitation_modifier: 0.5  # Dry season
+    growth_rate: 0.8
+    spawn_rate: 0.9
+    light_hours: 11
+    description: "The dry season. Brief respite from constant rain, though humidity remains."
+
+# Valid weather patterns
+valid_weather:
+  - CLOUDY
+  - OVERCAST
+  - LIGHT_RAIN
+  - RAIN
+  - HEAVY_RAIN
+  - THUNDERSTORM
+  - TROPICAL_STORM
+  - MIST
+  - HUMID
+
+# Weather weights
+weather_weights:
+  CLOUDY: 10
+  OVERCAST: 20
+  LIGHT_RAIN: 20
+  RAIN: 20
+  HEAVY_RAIN: 10
+  THUNDERSTORM: 8
+  TROPICAL_STORM: 3
+  MIST: 5
+  HUMID: 4
+
+# Valid seasons
+valid_seasons:
+  - SPRING
+  - SUMMER
+  - AUTUMN
+  - WINTER
+
+# Spawn modifiers
+spawn_modifiers:
+  herbivore: 1.3
+  predator: 1.3    # Apex predators thrive
+  omnivore: 1.4    # Great food diversity
+  bird: 2.0        # Incredible bird diversity
+  insect: 2.5      # Massive insect populations
+  reptile: 1.8     # Snakes, lizards everywhere
+  amphibian: 1.8   # Frogs, salamanders
+  plant: 2.0       # Explosive plant growth
+  fungus: 1.8      # Humid = fungi
+  undead: 0.5      # Life energy overwhelming
+  elemental: 0.6
+  beast: 1.3
+  fey: 1.3         # Nature spirits abound
+  primate: 2.0     # Monkeys, apes
+
+# Spawn types
+spawn_types:
+  common:
+    - monkey
+    - parrot
+    - snake
+    - jaguar
+    - frog
+    - insect_swarm
+    - lizard
+  uncommon:
+    - gorilla
+    - giant_snake
+    - panther
+    - crocodile
+  rare:
+    - yuan_ti
+    - couatl
+    - green_dragon
+    - dinosaur
+
+# Population limits
+population_limits:
+  herbivore_max: 6
+  predator_max: 3
+  bird_max: 10
+  insect_max: 15
+  plant_max: 20
+  total_creature_max: 12
+
+# Terrain features
+terrain_features:
+  - dense_canopy
+  - hanging_vines
+  - massive_trees
+  - jungle_floor
+  - rivers
+  - waterfalls
+  - ancient_ruins
+
+# Resources
+resources:
+  wood: abundant
+  herbs: abundant   # Medicinal plants
+  game: common
+  water: abundant
+  ore: rare         # Hidden by vegetation
+  exotic_materials: common
+
+# Hazards
+hazards:
+  - disease
+  - poison
+  - predators
+  - quicksand
+  - flash_floods
+  - carnivorous_plants
+  - insects
+
+# Tags
+tags:
+  - tropical
+  - jungle
+  - rainforest
+  - humid
+  - dense
+  - exotic

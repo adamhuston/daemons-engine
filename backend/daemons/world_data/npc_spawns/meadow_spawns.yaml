@@ -1,0 +1,6 @@
+# NPC spawn configuration for the Sunlit Meadow area
+# Dynamic fauna spawns based on conditions
+
+area_id: area_sunlit_meadow
+
+spawns:

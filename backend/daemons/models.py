@@ -204,6 +204,49 @@ class Area(Base):
         Integer, nullable=False, server_default="20"
     )
 
+    # Phase 17.2: Weather system
+    # Weather patterns - JSON dict with weather type probabilities
+    # Format: {"clear": 0.4, "rain": 0.3, "storm": 0.1, "cloudy": 0.2}
+    # If null, uses climate-based defaults
+    weather_patterns: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Weather immunity - if true, area has no weather (underground, indoor, etc.)
+    weather_immunity: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="0"
+    )
+
+    # Phase 17.3: Season and Biome Coherence
+    # Current season for this area
+    current_season: Mapped[str] = mapped_column(
+        String(50), nullable=False, server_default="summer"
+    )
+    # Day within current season (1 to days_per_season)
+    season_day: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="1"
+    )
+    # How many in-game days per season
+    days_per_season: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="30"
+    )
+    # If true, season never changes (frozen in eternal winter, etc.)
+    season_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="0"
+    )
+    # Biome coherence data - JSON dict with extended biome configuration
+    # Format: {"temperature_range": [40, 80], "seasonal_modifiers": {...}, ...}
+    biome_data: Mapped[dict] = mapped_column(
+        JSON, nullable=False, server_default="{}"
+    )
+    # Flora compatibility tags for Phase 17.4
+    # Format: ["deciduous", "conifer", "grass", "flowering"]
+    flora_tags: Mapped[list] = mapped_column(
+        JSON, nullable=False, server_default="[]"
+    )
+    # Fauna compatibility tags for Phase 17.5
+    # Format: ["woodland", "predator", "prey", "aquatic"]
+    fauna_tags: Mapped[list] = mapped_column(
+        JSON, nullable=False, server_default="[]"
+    )
+
     # Gameplay properties
     danger_level: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="1"
@@ -224,6 +267,39 @@ class Area(Base):
 
     # Entry points (stored as JSON array of room IDs)
     entry_points: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class WeatherState(Base):
+    """
+    Tracks the current weather state for each area.
+    
+    Weather changes over time based on area's weather_patterns
+    and climate. Each area has exactly one WeatherState record.
+    """
+
+    __tablename__ = "weather_states"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    area_id: Mapped[str] = mapped_column(
+        String, ForeignKey("areas.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    
+    # Current weather type: clear, cloudy, overcast, rain, storm, snow, fog, wind
+    weather_type: Mapped[str] = mapped_column(String, nullable=False)
+    
+    # Weather intensity: light, moderate, heavy
+    intensity: Mapped[str] = mapped_column(
+        String, nullable=False, server_default="moderate"
+    )
+    
+    # When this weather started (Unix timestamp)
+    started_at: Mapped[float] = mapped_column(Float, nullable=False)
+    
+    # How long this weather will last (seconds)
+    duration: Mapped[int] = mapped_column(Integer, nullable=False)
+    
+    # When weather will next change (Unix timestamp)
+    next_change_at: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class ItemTemplate(Base):
@@ -473,6 +549,14 @@ class NpcTemplate(Base):
     ability_loadout: Mapped[list] = mapped_column(
         JSON, default=list
     )  # Pre-equipped abilities in slot order
+
+    # Phase 17.5: Fauna properties
+    is_fauna: Mapped[bool] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )  # SQLite uses 0/1
+    fauna_data: Mapped[dict] = mapped_column(
+        JSON, default=dict
+    )  # Fauna-specific properties (biome_tags, diet, etc.)
 
 
 class NpcInstance(Base):
@@ -883,3 +967,46 @@ class FactionNPCMember(Base):
 
     # Relationships
     faction: Mapped["Faction"] = relationship("Faction", back_populates="npc_members")
+
+
+# === Phase 17.4: Flora System ===
+
+
+class FloraInstance(Base):
+    """
+    Dynamic flora instance - a specific plant or vegetation in the world.
+
+    Flora templates are loaded from YAML, but instances track runtime state
+    like harvest cooldowns, quantity, and depletion.
+    """
+
+    __tablename__ = "flora_instances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    template_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    room_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # State tracking
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    last_harvested_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_harvested_by: Mapped[str | None] = mapped_column(
+        String(255), ForeignKey("players.id", ondelete="SET NULL"), nullable=True
+    )
+    harvest_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+
+    # Respawn tracking
+    is_depleted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="0"
+    )
+    depleted_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Spawn tracking
+    spawned_at: Mapped[float] = mapped_column(Float, nullable=False)
+    is_permanent: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="0"
+    )
+

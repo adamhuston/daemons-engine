@@ -1,0 +1,49 @@
+# Egret - Wading bird fauna
+# Phase 17.5: Fauna System
+
+id: npc_egret
+name: egret
+description: >
+  A tall, elegant white bird with a long neck and slender yellow bill.
+  It stands motionless in the shallows, waiting to strike.
+npc_type: neutral
+level: 2
+max_health: 18
+armor_class: 12
+strength: 6
+dexterity: 14
+intelligence: 4
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 1.5
+experience_reward: 8
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [wetland, swamp, coast, river]
+  temperature_tolerance: [40, 100]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [fish, frog, crab]
+  predator_tags: [alligator, eagle]
+  fauna_tags: [carnivore, egret, prey, bird, wading]
+  pack_size: [1, 6]
+  territorial: false
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.0
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - peaceful
+loot_table: []
+idle_messages:
+  - "The egret stands perfectly still."
+  - "The egret's plumes ruffle in the breeze."
+  - "The egret strikes, catching a small fish."
+keywords:
+  - egret

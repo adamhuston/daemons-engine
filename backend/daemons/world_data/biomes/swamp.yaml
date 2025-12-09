@@ -1,0 +1,164 @@
+# Swamp/Wetland Biome
+# Murky marshes, bogs, and swamps with high humidity
+
+biome_id: swamp
+name: Swamp
+description: >
+  A murky expanse of stagnant water, tangled vegetation, and treacherous
+  footing. The air is thick with humidity and the buzz of insects. Ancient
+  trees draped in moss rise from the mire, while unseen things lurk beneath
+  the dark waters.
+
+biome_type: WETLAND
+
+# Temperature configuration
+temperature:
+  base_min: 50   # Mild winters
+  base_max: 95   # Hot, humid summers
+  comfortable_min: 60
+  comfortable_max: 80
+
+# Seasonal modifiers
+seasonal_effects:
+  spring:
+    temperature_modifier: 0
+    precipitation_modifier: 1.3
+    growth_rate: 1.3
+    spawn_rate: 1.4
+    light_hours: 12
+    description: "Spring rains swell the waters. Breeding season begins for many creatures."
+    
+  summer:
+    temperature_modifier: 10
+    precipitation_modifier: 1.5  # Frequent storms
+    growth_rate: 1.5
+    spawn_rate: 1.5
+    light_hours: 14
+    description: "Oppressive heat and humidity. The swamp teems with life... and death."
+    
+  autumn:
+    temperature_modifier: -5
+    precipitation_modifier: 1.0
+    growth_rate: 0.8
+    spawn_rate: 1.0
+    light_hours: 10
+    description: "Waters recede slightly. Rotting vegetation creates thick miasma."
+    
+  winter:
+    temperature_modifier: -15
+    precipitation_modifier: 0.8
+    growth_rate: 0.4
+    spawn_rate: 0.6
+    light_hours: 9
+    description: "A brief respite. The swamp grows quiet but never truly sleeps."
+
+# Valid weather patterns
+valid_weather:
+  - CLOUDY
+  - OVERCAST
+  - LIGHT_RAIN
+  - RAIN
+  - HEAVY_RAIN
+  - THUNDERSTORM
+  - FOG
+  - MIST
+  - MIASMA
+
+# Weather weights
+weather_weights:
+  CLOUDY: 15
+  OVERCAST: 20
+  LIGHT_RAIN: 15
+  RAIN: 15
+  HEAVY_RAIN: 10
+  THUNDERSTORM: 8
+  FOG: 8
+  MIST: 7
+  MIASMA: 2
+
+# Valid seasons
+valid_seasons:
+  - SPRING
+  - SUMMER
+  - AUTUMN
+  - WINTER
+
+# Spawn modifiers
+spawn_modifiers:
+  herbivore: 0.8
+  predator: 1.0
+  omnivore: 1.1
+  bird: 1.2       # Herons, egrets, waterfowl
+  insect: 2.0     # Mosquitoes, dragonflies
+  reptile: 1.8    # Ideal for crocodilians, snakes
+  amphibian: 2.0  # Perfect for frogs, salamanders
+  plant: 1.5      # Lush growth
+  fungus: 1.8     # Decay fuels fungi
+  undead: 1.5     # Death and decay attract undead
+  elemental: 0.8
+  beast: 0.9
+  aquatic: 1.5
+
+# Spawn types
+spawn_types:
+  common:
+    - frog
+    - snake
+    - mosquito_swarm
+    - heron
+    - turtle
+    - catfish
+  uncommon:
+    - alligator
+    - giant_spider
+    - will_o_wisp
+    - bog_lurker
+  rare:
+    - hydra
+    - swamp_hag
+    - black_dragon
+
+# Population limits
+population_limits:
+  herbivore_max: 4
+  predator_max: 3
+  amphibian_max: 8
+  insect_max: 10
+  plant_max: 12
+  total_creature_max: 10
+
+# Terrain features
+terrain_features:
+  - stagnant_pools
+  - moss_draped_trees
+  - quicksand
+  - fallen_logs
+  - lily_pads
+  - mangrove_roots
+
+# Resources
+resources:
+  wood: common      # Cypress, willow
+  herbs: abundant   # Medicinal plants
+  game: common
+  water: abundant   # But not potable
+  ore: rare
+  reagents: common  # Alchemical ingredients
+
+# Hazards
+hazards:
+  - quicksand
+  - disease
+  - poison_gas
+  - hidden_depths
+  - carnivorous_plants
+  - leeches
+
+# Tags
+tags:
+  - swamp
+  - wetland
+  - marsh
+  - bog
+  - humid
+  - murky

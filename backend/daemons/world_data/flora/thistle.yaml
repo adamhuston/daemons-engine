@@ -1,0 +1,40 @@
+# Thistle - Prickly wildflower
+id: flora_thistle
+name: thistle
+description: A hardy plant with spiny leaves and purple flower heads beloved by butterflies.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - grassland
+  - meadow
+  - plains
+  - highland
+
+temperature_range: [30, 85]
+light_requirement: full_sun
+moisture_requirement: dry
+
+harvestable: true
+harvest_items:
+  - item_id: item_thistle_seed
+    quantity: 8
+    chance: 0.8
+  - item_id: item_thistle_down
+    quantity: 4
+    chance: 0.6
+  - item_id: item_thistle_flower
+    quantity: 2
+    chance: 0.5
+harvest_cooldown: 14400
+
+seasonal_variants:
+  spring: Spiny thistle rosettes spread across the ground.
+  summer: Purple thistle heads attract bees and butterflies.
+  fall: Fluffy thistle down drifts on the wind.
+  winter: Dried thistle stalks stand through the snow.
+
+dormant_seasons: []
+
+rarity: common
+cluster_size: [2, 8]

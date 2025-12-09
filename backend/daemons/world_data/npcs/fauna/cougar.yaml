@@ -1,0 +1,52 @@
+# Cougar / Mountain Lion - Apex predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_cougar
+name: cougar
+description: >
+  A powerful tawny cat with rippling muscles and cold, calculating eyes.
+  It moves with silent, deadly grace through the shadows.
+npc_type: hostile
+level: 6
+max_health: 85
+armor_class: 15
+strength: 16
+dexterity: 18
+intelligence: 4
+attack_damage_min: 10
+attack_damage_max: 18
+attack_speed: 2.0
+experience_reward: 50
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, mountain, desert, scrubland]
+  temperature_tolerance: [10, 100]
+  activity_period: crepuscular
+  diet: carnivore
+  prey_tags: [deer, rabbit, prey, herbivore]
+  predator_tags: []
+  fauna_tags: [carnivore, cougar, predator, feline, apex]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 8
+  migratory: false
+  aggression: 0.5
+  flee_threshold: 0.25
+
+behavior:
+  - ambient
+  - hunts
+  - aggressive
+loot_table: []
+idle_messages:
+  - "The cougar's tail twitches as it watches you."
+  - "The cougar yawns, displaying impressive fangs."
+  - "The cougar's eyes gleam in the shadows."
+  - "The cougar crouches low, muscles tensed."
+keywords:
+  - cougar
+  - mountain lion
+  - puma
+  - cat

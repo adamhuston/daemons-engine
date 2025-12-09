@@ -1,0 +1,52 @@
+# Cottontail Rabbit - Small prey fauna
+# Phase 17.5: Fauna System
+
+id: npc_cottontail
+name: cottontail rabbit
+description: >
+  A small brown rabbit with a distinctive white cotton-ball tail.
+  Its nose twitches constantly as it nibbles on grass.
+npc_type: neutral
+level: 1
+max_health: 10
+armor_class: 14
+strength: 4
+dexterity: 18
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 1.0
+experience_reward: 5
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, grassland, meadow, temperate]
+  temperature_tolerance: [15, 95]
+  activity_period: crepuscular
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [fox, wolf, hawk, owl, snake, carnivore]
+  fauna_tags: [herbivore, rabbit, prey, rodent]
+  pack_size: [1, 3]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.8
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - peaceful
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The rabbit's nose twitches rapidly."
+  - "The rabbit nibbles on a clover."
+  - "The rabbit's long ears swivel at every sound."
+  - "The rabbit thumps its hind foot nervously."
+keywords:
+  - rabbit
+  - cottontail
+  - bunny

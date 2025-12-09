@@ -1,0 +1,39 @@
+# Dogwood - Flowering shrub/small tree
+id: flora_dogwood
+name: dogwood
+description: A graceful shrub with showy white or pink bracts surrounding tiny flowers.
+flora_type: shrub
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+
+temperature_range: [15, 90]
+light_requirement: partial_shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_dogwood_berry
+    quantity: 4
+    chance: 0.6
+  - item_id: item_dogwood_bark
+    quantity: 2
+    chance: 0.4
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: Large white bracts make the dogwood look snow-covered.
+  summer: Dark green leaves fill the dogwood's graceful branches.
+  fall: Red berries and purple-red leaves adorn the dogwood.
+  winter: Red twigs brighten the winter landscape.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: common
+cluster_size: [1, 3]

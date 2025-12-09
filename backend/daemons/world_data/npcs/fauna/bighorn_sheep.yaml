@@ -1,0 +1,52 @@
+# Bighorn Sheep - Mountain herbivore fauna
+# Phase 17.5: Fauna System
+
+id: npc_bighorn_sheep
+name: bighorn sheep
+description: >
+  A sturdy mountain sheep with magnificent curved horns.
+  It navigates rocky terrain with surprising agility.
+npc_type: neutral
+level: 3
+max_health: 50
+armor_class: 14
+strength: 14
+dexterity: 14
+intelligence: 3
+attack_damage_min: 5
+attack_damage_max: 12
+attack_speed: 2.5
+experience_reward: 18
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [mountain, alpine, rocky]
+  temperature_tolerance: [0, 85]
+  activity_period: diurnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [cougar, wolf]
+  fauna_tags: [herbivore, sheep, prey, ungulate]
+  pack_size: [3, 10]
+  territorial: false
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.1
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - flees_predators
+  - wanders_sometimes
+  - social
+  - grazes
+loot_table: []
+idle_messages:
+  - "The bighorn sheep surveys the rocky slopes."
+  - "Two rams butt heads with a resounding crack."
+  - "The sheep bleats to its companions."
+keywords:
+  - sheep
+  - bighorn
+  - ram

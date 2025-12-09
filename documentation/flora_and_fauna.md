@@ -138,7 +138,7 @@ King Snake
 Lizard
 Newt
 Rattle Snake
-Salomander
+Salamander
 Skunk
 Snapping Turtle
 Tree Frog

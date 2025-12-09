@@ -1,0 +1,51 @@
+# Alligator - Large reptile predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_alligator
+name: alligator
+description: >
+  A massive, armored reptile with powerful jaws and cold, patient eyes.
+  It lurks just beneath the murky surface, waiting for prey.
+npc_type: hostile
+level: 7
+max_health: 120
+armor_class: 17
+strength: 22
+dexterity: 8
+intelligence: 3
+attack_damage_min: 12
+attack_damage_max: 25
+attack_speed: 3.0
+experience_reward: 60
+
+is_fauna: true
+fauna_data:
+  fauna_type: reptile
+  biome_tags: [swamp, wetland, river]
+  temperature_tolerance: [50, 100]
+  activity_period: crepuscular
+  diet: carnivore
+  prey_tags: [fish, bird, deer, prey]
+  predator_tags: []
+  fauna_tags: [carnivore, alligator, predator, apex, reptile, aquatic]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 5
+  migratory: false
+  aggression: 0.6
+  flee_threshold: 0.15
+
+behavior:
+  - ambient
+  - hunts
+  - lurks
+  - aggressive
+loot_table: []
+idle_messages:
+  - "The alligator's eyes break the surface."
+  - "The alligator's tail swishes ominously."
+  - "The alligator basks on the muddy bank."
+  - "The alligator's jaws snap shut with a thunderous crack."
+keywords:
+  - alligator
+  - gator

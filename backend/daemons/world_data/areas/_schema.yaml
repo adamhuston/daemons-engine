@@ -72,6 +72,32 @@ temperature_variation: int (default: 20)
   # Range: 0-50 (0 = constant temperature)
   # Example: 20 (typical day/night swing)
 
+# Weather Properties (Optional) - Phase 17.2
+# ==========================================
+weather_profile_data: dictionary (optional, default: {})
+  # Custom weather configuration for this area
+  # Overrides default biome weather profile
+  # Keys:
+  #   default_weather: string - Starting weather type
+  #   transition_chances: dict - Probabilities of weather changes
+  #   valid_weather: array - Weather types possible in this area
+  # Weather types: clear, cloudy, rain, heavy_rain, thunderstorm,
+  #                snow, blizzard, fog, sandstorm
+  # Intensity levels: none, light, moderate, heavy, severe
+  # Example:
+  #   default_weather: "cloudy"
+  #   transition_chances:
+  #     clear: 0.2
+  #     rain: 0.4
+  #     thunderstorm: 0.2
+  #   valid_weather: ["clear", "cloudy", "rain", "thunderstorm"]
+
+weather_immunity: bool (default: false)
+  # If true, this area is sheltered from weather effects
+  # Weather may still be displayed but effects don't apply
+  # Use for: indoor areas, caves, magical protection zones
+  # Example: true (for a tavern or underground dungeon)
+
 # Gameplay Properties (Required)
 # ==============================
 danger_level: int (default: 1)

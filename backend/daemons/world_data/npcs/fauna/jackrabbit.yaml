@@ -1,0 +1,51 @@
+# Jackrabbit - Desert prey fauna
+# Phase 17.5: Fauna System
+
+id: npc_jackrabbit
+name: jackrabbit
+description: >
+  A lanky hare with enormous ears and powerful hind legs.
+  It can sprint across the desert floor at incredible speeds.
+npc_type: neutral
+level: 1
+max_health: 15
+armor_class: 16
+strength: 6
+dexterity: 20
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 3
+attack_speed: 1.0
+experience_reward: 6
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [desert, grassland, scrubland]
+  temperature_tolerance: [30, 115]
+  activity_period: crepuscular
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [coyote, hawk, snake, carnivore]
+  fauna_tags: [herbivore, rabbit, prey, hare]
+  pack_size: [1, 2]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.9
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - peaceful
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The jackrabbit's enormous ears twitch."
+  - "The jackrabbit bounds a short distance and stops."
+  - "The jackrabbit stands on its hind legs, scanning for danger."
+keywords:
+  - jackrabbit
+  - hare
+  - rabbit

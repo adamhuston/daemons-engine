@@ -1,0 +1,51 @@
+# Hawk - Avian predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_hawk
+name: hawk
+description: >
+  A swift raptor with rust-colored feathers and a hooked beak.
+  It dives with deadly precision on unsuspecting prey.
+npc_type: neutral
+level: 3
+max_health: 25
+armor_class: 15
+strength: 10
+dexterity: 18
+intelligence: 4
+attack_damage_min: 4
+attack_damage_max: 9
+attack_speed: 1.5
+experience_reward: 15
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [grassland, forest, desert, scrubland]
+  temperature_tolerance: [10, 100]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [mouse, rabbit, snake, bird, prey]
+  predator_tags: [eagle]
+  fauna_tags: [carnivore, hawk, predator, raptor, bird, flying]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 6
+  migratory: true
+  migration_seasons: [winter]
+  aggression: 0.2
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The hawk cries out sharply."
+  - "The hawk circles lazily in a thermal."
+  - "The hawk preens its feathers."
+keywords:
+  - hawk
+  - raptor

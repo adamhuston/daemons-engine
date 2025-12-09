@@ -1,0 +1,49 @@
+# Chipmunk - Small rodent fauna
+# Phase 17.5: Fauna System
+
+id: npc_chipmunk
+name: chipmunk
+description: >
+  A tiny striped rodent with bulging cheeks and a twitching tail.
+  It chatters nervously and scurries between hiding spots.
+npc_type: neutral
+level: 1
+max_health: 5
+armor_class: 14
+strength: 3
+dexterity: 18
+intelligence: 4
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 1.0
+experience_reward: 2
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, temperate]
+  temperature_tolerance: [30, 85]
+  activity_period: diurnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [fox, hawk, owl, snake, coyote]
+  fauna_tags: [herbivore, chipmunk, prey, rodent, small]
+  pack_size: [1, 3]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.8
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - cowardly
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The chipmunk stuffs acorns into its cheeks."
+  - "The chipmunk chirps a warning call."
+  - "The chipmunk darts into a burrow."
+keywords:
+  - chipmunk

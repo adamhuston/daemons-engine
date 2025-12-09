@@ -1,0 +1,54 @@
+# Fox - Small predator fauna
+# Phase 17.5: Fauna System
+
+id: npc_fox
+name: fox
+description: >
+  A sleek red fox with a bushy tail and keen, calculating eyes.
+  It moves with fluid grace, always alert to opportunity or danger.
+npc_type: neutral
+level: 2
+max_health: 25
+armor_class: 14
+strength: 8
+dexterity: 18
+intelligence: 6
+attack_damage_min: 2
+attack_damage_max: 5
+attack_speed: 1.5
+experience_reward: 12
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, grassland, meadow, temperate]
+  temperature_tolerance: [0, 90]
+  activity_period: crepuscular
+  diet: omnivore
+  prey_tags: [rabbit, mouse, bird, prey]
+  predator_tags: [wolf, cougar, bear]
+  fauna_tags: [omnivore, fox, predator, canine]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 3
+  migratory: false
+  aggression: 0.1
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_frequently
+  - cowardly
+loot_table: []
+idle_messages:
+  - "The fox's ears rotate, catching distant sounds."
+  - "The fox grooms its luxurious tail."
+  - "The fox's nose twitches as it catches a scent."
+  - "The fox yips softly."
+keywords:
+  - fox
+  - red fox
+  - vixen

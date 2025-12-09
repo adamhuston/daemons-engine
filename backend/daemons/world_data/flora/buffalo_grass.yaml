@@ -1,0 +1,33 @@
+# Buffalo Grass - Native prairie grass
+id: flora_buffalo_grass
+name: buffalo grass
+description: A low-growing prairie grass with grayish-green blades.
+flora_type: grass
+
+biome_tags:
+  - grassland
+  - plains
+  - prairie
+
+temperature_range: [0, 110]
+light_requirement: full_sun
+moisture_requirement: dry
+
+harvestable: true
+harvest_items:
+  - item_id: item_grass_bundle
+    quantity: 3
+    chance: 0.8
+harvest_cooldown: 7200
+
+seasonal_variants:
+  spring: Fresh green blades emerge from the buffalo grass.
+  summer: The grass forms a dense, curly turf.
+  fall: The buffalo grass turns tan and goes dormant.
+  winter: Dried grass provides winter forage.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [10, 30]

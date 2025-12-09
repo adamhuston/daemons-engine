@@ -1722,118 +1722,132 @@ Stub client tweaks
 - [ ] **Testing**:
     - [ ] Unit tests for TemperatureSystem calculations
     - [ ] Integration tests for temperature triggers
-    - [ ] Test biome modifiers and time-of-day variations
+    - [x] Test biome modifiers and time-of-day variations
 
 ---
 
-#### Phase 17.2 - Weather System ⬜
+#### Phase 17.2 - Weather System ✅
 
 **Purpose**: Dynamic weather that changes over time and affects gameplay
 
-- [ ] **Database Schema**:
-    - [ ] Create `weather_states` table (id, area_id, weather_type, intensity, started_at, duration)
-    - [ ] Expand areas `weather_profile` into `weather_patterns` JSON field
-    - [ ] Add `weather_immunity` boolean to areas (for underground, indoor, etc.)
-    - [ ] Create Alembic migration `phase17_2_weather.py`
+- [x] **Database Schema**:
+    - [x] Create `weather_states` table (id, area_id, weather_type, intensity, started_at, duration)
+    - [x] Expand areas `weather_profile` into `weather_profile_data` JSON field
+    - [x] Add `weather_immunity` boolean to areas (for underground, indoor, etc.)
+    - [x] Create Alembic migration `q9r0s1t2u3v4_phase17_2_weather.py`
 
-- [ ] **Weather Types** (enum):
-    - [ ] CLEAR, CLOUDY, OVERCAST
-    - [ ] RAIN (light, moderate, heavy), STORM (thunderstorm)
-    - [ ] SNOW (flurries, moderate, blizzard)
-    - [ ] FOG (light, dense)
-    - [ ] WIND (breezy, windy, gale)
+- [x] **Weather Types** (enum):
+    - [x] CLEAR, CLOUDY, OVERCAST
+    - [x] RAIN, STORM (thunderstorm)
+    - [x] SNOW
+    - [x] FOG
+    - [x] WIND
 
-- [ ] **WeatherSystem Class** (`backend/daemons/engine/systems/weather.py`):
-    - [ ] `get_current_weather(area_id)` → WeatherState
-    - [ ] `advance_weather(area_id)` → WeatherState (transition logic)
-    - [ ] `schedule_weather_tick()` - periodic weather updates (every 5-15 min game time)
-    - [ ] Weather transitions based on climate + season + randomness
-    - [ ] Markov chain or weighted probability for realistic progression
+- [x] **WeatherSystem Class** (`backend/daemons/engine/systems/weather.py`):
+    - [x] `get_current_weather(area_id)` → WeatherState
+    - [x] `advance_weather(area_id)` → WeatherState (transition logic)
+    - [x] Weather transitions based on climate + randomness
+    - [x] Markov chain for realistic progression (WEATHER_TRANSITIONS)
+    - [x] `get_forecast(area_id)` → WeatherForecast
+    - [x] `check_weather_condition()` for trigger integration
 
-- [ ] **Weather Effects**:
-    - [ ] Visibility modifiers (fog/rain reduce light_level)
-    - [ ] Temperature modifiers (rain cools, clear sun heats)
-    - [ ] Movement modifiers (blizzard/storm = slower travel)
-    - [ ] Combat modifiers (rain = ranged penalty, wind = casting penalty)
+- [x] **Weather Effects**:
+    - [x] Visibility modifiers (fog/rain reduce visibility)
+    - [x] Temperature modifiers (rain cools, clear sun heats) - integrated with TemperatureSystem
+    - [x] Movement modifiers (storm/snow = slower travel)
+    - [x] Combat modifiers (ranged_penalty, casting_penalty)
 
-- [ ] **Weather Patterns by Climate**:
-    - [ ] `arid`: CLEAR (70%), WIND (25%), STORM (5%)
-    - [ ] `temperate`: CLEAR (40%), CLOUDY (30%), RAIN (20%), STORM (10%)
-    - [ ] `arctic`: SNOW (50%), CLOUDY (30%), BLIZZARD (15%), CLEAR (5%)
-    - [ ] `tropical`: RAIN (40%), STORM (25%), CLEAR (25%), CLOUDY (10%)
+- [x] **Weather Patterns by Climate**:
+    - [x] Weather-immune biomes: underground, cave, ethereal, void, planar
+    - [x] Markov transitions ensure realistic weather progression
 
-- [ ] **Integration**:
-    - [ ] Weather shown in `look` output
-    - [ ] `weather` command for detailed forecast
-    - [ ] Weather events broadcast to area on change
-    - [ ] Trigger conditions: `weather_is`, `weather_intensity`
+- [x] **Integration**:
+    - [x] Weather shown in `look` output (when notable)
+    - [x] `weather` / `w` command for detailed forecast
+    - [x] Trigger conditions: `weather_is`, `weather_intensity`, `weather_not`
+    - [x] Temperature system reads weather temperature_modifier
 
-- [ ] **Area YAML Schema Update**:
-    ```yaml
-    weather_patterns:
-      clear: 0.4
-      rain: 0.3
-      storm: 0.1
-      cloudy: 0.2
-    weather_immunity: false
-    ```
+- [x] **Area YAML Schema Update**:
+    - [x] Added `weather_profile_data` and `weather_immunity` fields to `_schema.yaml`
 
 ---
 
-#### Phase 17.3 - Biome Coherence System ⬜
+#### Phase 17.3 - Biome Coherence System ✅
 
 **Purpose**: Define biomes as coherent combinations of temperature + weather + climate + flora + fauna
 
-- [ ] **Biome Definition Schema** (`world_data/biomes/_schema.yaml`):
-    ```yaml
-    id: string
-    name: string
-    description: string
-    
-    # Environmental ranges
-    temperature_range: [min, max]  # Comfortable range for this biome
-    climate_types: [list]          # Compatible climates
-    weather_patterns: dict         # Default weather probabilities
-    ambient_lighting: string       # Default lighting
-    
-    # Flora/Fauna compatibility
-    flora_tags: [list]             # e.g., ["deciduous", "conifer", "grass"]
-    fauna_tags: [list]             # e.g., ["woodland", "predator", "prey"]
-    
-    # Gameplay modifiers
-    danger_modifier: int           # Added to area danger_level
-    magic_affinity: string         # Affects magic_intensity
-    ```
+- [x] **Database Schema**:
+    - [x] Add `current_season` to areas table (string, default "spring")
+    - [x] Add `days_per_season` to areas table (int, default 7)
+    - [x] Add `season_day`, `season_locked`, `seasonal_modifiers` to areas
+    - [x] Create Alembic migration `r0s1t2u3v4w5_phase17_3_biomes.py`
 
-- [ ] **Predefined Biomes** (`world_data/biomes/`):
-    - [ ] `temperate_forest.yaml`: 40-75°F, deciduous trees, deer/wolves/bears
-    - [ ] `boreal_forest.yaml`: 20-55°F, conifers, moose/wolves/bears
-    - [ ] `grassland.yaml`: 50-90°F, grasses/flowers, bison/rabbits/hawks
-    - [ ] `desert.yaml`: 60-120°F, cacti/shrubs, snakes/lizards/vultures
-    - [ ] `arctic_tundra.yaml`: -20-40°F, mosses/lichens, bears/wolves/seals
-    - [ ] `swamp.yaml`: 60-85°F, reeds/cypress, gators/herons/snakes
-    - [ ] `mountain.yaml`: 30-60°F, alpine flowers/conifers, goats/eagles
-    - [ ] `underground.yaml`: 50-60°F constant, mushrooms/moss, bats/spiders
-    - [ ] `ethereal.yaml`: N/A temperature, magical flora, wisps/spirits
+- [x] **Biome Definition Schema** (`world_data/biomes/_schema.yaml`):
+    - [x] id, name, description
+    - [x] temperature_range: [min, max]
+    - [x] climate_types: [list]
+    - [x] weather_patterns: dict
+    - [x] seasonal_temperature_modifiers, seasonal_weather_modifiers
+    - [x] flora_tags, fauna_tags for compatibility
+    - [x] spawn_modifiers for creature spawning
+    - [x] danger_modifier, magic_affinity, movement_modifier, visibility_modifier
 
-- [ ] **BiomeSystem Class** (`backend/daemons/engine/systems/biome.py`):
-    - [ ] Load biome definitions from YAML
-    - [ ] `validate_area_biome(area)` → warnings for incompatible settings
-    - [ ] `get_compatible_flora(biome_id)` → list of flora template IDs
-    - [ ] `get_compatible_fauna(biome_id)` → list of NPC template IDs
+- [x] **Predefined Biomes** (`world_data/biomes/`):
+    - [x] `temperate_forest.yaml`: 40-85°F, deciduous, deer/wolves/bears
+    - [x] `desert.yaml`: 35-120°F, arid, snakes/lizards/vultures
+    - [x] `arctic.yaml`: -50-45°F, frozen, polar bears/seals/arctic foxes
+    - [x] `swamp.yaml`: 50-95°F, wetland, gators/herons/snakes
+    - [x] `mountain.yaml`: 10-70°F, alpine, goats/eagles/bears
+    - [x] `tropical.yaml`: 70-95°F, rainforest, monkeys/jaguars/parrots
+    - [x] `underground.yaml`: 50-65°F constant, cave, bats/spiders/oozes
 
-- [ ] **Area Validation**:
-    - [ ] Warn if area.temperature outside biome.temperature_range
-    - [ ] Warn if area.climate not in biome.climate_types
-    - [ ] Warn if spawned NPCs don't match fauna_tags
+- [x] **BiomeSystem Class** (`backend/daemons/engine/systems/biome.py`):
+    - [x] Load biome definitions from YAML files
+    - [x] `get_biome(biome_id)` → BiomeDefinition
+    - [x] `get_biome_for_area(area)` → BiomeDefinition
+    - [x] `validate_area(area)` → warnings for incompatible settings
+    - [x] `get_compatible_flora_tags(area)` → set of flora tags
+    - [x] `get_compatible_fauna_tags(area)` → set of fauna tags
+    - [x] `get_spawn_modifier(area, modifier_key, season)` → float
+    - [x] `get_movement_modifier(area)`, `get_visibility_modifier(area)`, `get_danger_modifier(area)`
+
+- [x] **SeasonSystem Class** (`backend/daemons/engine/systems/biome.py`):
+    - [x] `get_season(area)` → Season enum
+    - [x] `get_season_state(area)` → SeasonState
+    - [x] `advance_day(area)` → bool (True if season changed)
+    - [x] `get_next_season(current)` → Season
+    - [x] `get_temperature_modifier(area)` → int
+    - [x] `get_weather_modifiers(area)` → dict
+    - [x] Season-immune biomes: underground, cave, ethereal, void, planar
+
+- [x] **Integration with Temperature/Weather**:
+    - [x] TemperatureSystem accepts BiomeSystem and applies seasonal_modifier
+    - [x] TemperatureState includes seasonal_modifier field
+    - [x] Temperature command displays seasonal modifier breakdown
+    - [x] Season modifiers affect weather probabilities
+
+- [x] **Player Commands**:
+    - [x] `season` / `seasons` command to check current season
+    - [x] Displays current season, biome, seasonal effects
+
+- [x] **Trigger Conditions**:
+    - [x] `season_is`: Fire when season matches (spring, summer, fall, winter)
+    - [x] `season_not`: Fire when season does NOT match
+    - [x] `biome_is`: Fire when area biome matches
+    - [x] `biome_has_tag`: Fire when biome has specific tag
+
+- [x] **Testing**:
+    - [x] Unit tests for BiomeSystem (43 tests)
+    - [x] Tests for SeasonSystem including seasonal cycle
+    - [x] Tests for temperature/weather integration
 
 ---
 
-#### Phase 17.4 - Flora System ⬜
+#### Phase 17.4 - Flora System ✅
 
 **Purpose**: Define plants, trees, and vegetation as interactive world objects
 
-- [ ] **Flora Template Schema** (`world_data/flora/_schema.yaml`):
+- [x] **Flora Template Schema** (`world_data/flora/_schema.yaml`):
     ```yaml
     id: string                      # e.g., "flora_oak_tree"
     name: string                    # "Oak Tree"
@@ -1856,104 +1870,200 @@ Stub client tweaks
     blocks_movement: bool           # Large trees might block some directions
     ```
 
-- [ ] **Flora Templates from flora_and_fauna.md**:
-    - [ ] Trees (20): oak, maple, pine, fir, etc. with biome assignments
-    - [ ] Shrubs (19): berry bushes, sagebrush, etc.
-    - [ ] Grasses/Flowers (24): wildflowers, cattails, ferns, etc.
+- [x] **Flora Templates** (7 initial templates):
+    - [x] oak_tree.yaml - Large deciduous tree
+    - [x] wild_berries.yaml - Harvestable shrub
+    - [x] healing_herbs.yaml - Medicinal flowers
+    - [x] glowing_mushrooms.yaml - Cave fungi
+    - [x] desert_cactus.yaml - Arid biome plant
+    - [x] swamp_reeds.yaml - Wetland grass
+    - [x] frost_flower.yaml - Tundra flower
 
-- [ ] **Room Flora System**:
-    - [ ] Add `flora` field to rooms (list of flora instance refs)
-    - [ ] Flora instances track: template_id, room_id, last_harvested, quantity
-    - [ ] Flora shown in `look` output under "Vegetation:" section
+- [x] **FloraSystem Class** (`backend/daemons/engine/systems/flora.py`):
+    - [x] FloraType, LightRequirement, Rarity enums
+    - [x] FloraTemplate, FloraInstance dataclasses
+    - [x] Template loading from YAML files
+    - [x] `get_templates_for_biome(biome)` - filter by biome tags
+    - [x] `spawn_flora(room_id, template_id)` - create instance
+    - [x] `can_exist_in_room(template, room)` - check conditions
+    - [x] Seasonal variant descriptions
 
-- [ ] **Harvest Command**:
-    - [ ] `harvest <plant>` - gather resources from harvestable flora
-    - [ ] Skill check for rare items (herbalism skill future?)
-    - [ ] Cooldown per-player-per-plant
+- [x] **Room Flora System**:
+    - [x] Flora instances stored in database (FloraInstance model)
+    - [x] Flora instances track: template_id, room_id, last_harvested, quantity
+    - [x] Flora shown in room descriptions via `format_room_flora()`
 
-- [ ] **Flora Spawn System**:
-    - [ ] Flora spawns defined per-area or per-room
-    - [ ] Density settings (sparse, moderate, dense, lush)
-    - [ ] Regeneration over time after harvest
+- [x] **Harvest Command**:
+    - [x] `harvest <plant>` (aliases: gather, pick) - gather resources
+    - [x] Cooldown per-player-per-flora instance
+    - [x] Quantity tracking (depletes, respawns)
+    - [x] HarvestResult dataclass with items and messages
+
+- [x] **Flora Respawn System**:
+    - [x] Hybrid passive + event-triggered respawns (Design Decision #1)
+    - [x] FloraRespawnConfig with customizable rates
+    - [x] `process_respawns(session, area_id)` for tick-based respawns
+    - [x] Integration with ecosystem tick
+
+- [x] **Unit Tests** (`test_flora.py`):
+    - [x] Flora enum tests
+    - [x] Template loading tests
+    - [x] Instance management tests
+    - [x] Harvest mechanics tests
+    - [x] Respawn logic tests
+    - [x] Seasonal variant tests
+    - [x] Room formatting tests
 
 ---
 
-#### Phase 17.5 - Fauna System ⬜
+#### Phase 17.5 - Fauna System ✅
 
 **Purpose**: Extend NPC templates with fauna-specific properties for wildlife behavior
 
-- [ ] **Fauna Template Extensions** (NPC schema additions):
+- [x] **FaunaProperties Dataclass** (NPC extension):
     ```yaml
-    # Add to npcs/_schema.yaml
-    is_fauna: bool                  # Distinguishes wildlife from humanoids
-    fauna_type: enum                # mammal, bird, reptile, fish, insect
-    
-    # Environmental requirements
+    template_id: string
+    fauna_type: enum                # mammal, bird, reptile, amphibian, fish, insect
     biome_tags: [list]              # Where this creature naturally spawns
     temperature_tolerance: [min, max]  # Survival range
     activity_period: enum           # diurnal, nocturnal, crepuscular, always
-    
-    # Ecological role
-    diet: enum                      # herbivore, carnivore, omnivore
+    diet: enum                      # herbivore, carnivore, omnivore, scavenger
     prey_tags: [list]               # What it hunts (other fauna_tags)
     predator_tags: [list]           # What hunts it
-    
-    # Behavior modifiers
+    fauna_tags: [list]              # Tags for matching
     pack_size: [min, max]           # Spawns in groups
+    pack_leader_template: string    # Alpha template for packs
     territorial: bool               # Attacks intruders
+    territory_radius: int           # Rooms from spawn point
     migratory: bool                 # Moves between areas seasonally
+    migration_seasons: [list]       # Seasons when migrated away
+    migration_tendency: float       # Chance to explore per tick
+    aggression: float               # 0.0-1.0 attack likelihood
+    flee_threshold: float           # Health % to flee
     ```
 
-- [ ] **Fauna Templates from flora_and_fauna.md**:
-    - [ ] Mammals (27): deer, wolf, bear, fox, etc.
-    - [ ] Birds (23): eagle, hawk, owl, songbirds, etc.
-    - [ ] Reptiles (14): snakes, turtles, lizards, etc.
+- [x] **FaunaSystem Class** (`backend/daemons/engine/systems/fauna.py`):
+    - [x] ActivityPeriod, Diet, FaunaType, TimeOfDay enums
+    - [x] FaunaProperties.from_npc_template() extraction
+    - [x] `get_fauna_properties(template_id)` with caching
+    - [x] `is_fauna(npc)` check
+    - [x] `is_active_now(fauna, area_id)` activity period check
+    - [x] `is_migrated(fauna, area_id)` seasonal migration
+    - [x] `can_survive_temperature(fauna, room_id, area_id)`
+    - [x] `calculate_pack_size(fauna)` for pack spawning
+    - [x] `spawn_pack(template_id, room_id, session)` async
+    - [x] `find_prey_in_room(predator_id, room_id)` predator-prey
+    - [x] `find_predators_in_room(prey_id, room_id)`
+    - [x] `handle_fauna_death(npc, cause, session)` - abstract death (Design Decision #2)
+    - [x] `consider_migration(npc, room_id, session)` - biome-aware (Design Decision #4)
+    - [x] `get_fauna_in_area(area_id)` utility
+    - [x] `get_population_snapshot(area_id)` statistics
 
-- [ ] **FaunaSystem Class** (`backend/daemons/engine/systems/fauna.py`):
-    - [ ] Extends NPC spawning with fauna-specific logic
-    - [ ] Activity period checks (nocturnal = spawn at night)
-    - [ ] Pack spawning (wolves spawn in groups of 3-5)
-    - [ ] Predator-prey interactions (wolves chase deer)
+- [x] **Fauna AI Behaviors** (`backend/daemons/engine/systems/fauna_behaviors.py`):
+    - [x] BehaviorResult, BehaviorContext dataclasses
+    - [x] BaseBehavior with on_tick, on_player_enter, on_damage_taken hooks
+    - [x] GrazingBehavior: Herbivores wander and "eat" flora
+    - [x] HuntingBehavior: Carnivores seek prey NPCs
+    - [x] FleeingBehavior: Prey flees from predator NPCs
+    - [x] TerritorialBehavior: Attacks NPCs entering territory
+    - [x] BiomeAwareMigration: Cross-area movement with biome checks
 
-- [ ] **Fauna AI Behaviors** (new behavior scripts):
-    - [ ] `grazing`: Herbivores wander and "eat" flora
-    - [ ] `hunting`: Carnivores seek prey NPCs
-    - [ ] `fleeing_predator`: Prey flees from predator NPCs
-    - [ ] `nesting`: Returns to spawn room at night
-    - [ ] `territorial`: Attacks NPCs entering territory
+- [x] **Unit Tests** (`test_fauna.py`):
+    - [x] Fauna enum tests
+    - [x] FaunaProperties dataclass tests
+    - [x] FaunaSystem basic tests
+    - [x] Activity period tests
+    - [x] Migration tests
+    - [x] Temperature tolerance tests
+    - [x] Pack spawning tests
+    - [x] Predator-prey dynamics tests
+    - [x] Death handling tests
+    - [x] Population snapshot tests
 
 ---
 
-#### Phase 17.6 - Condition-Dependent Spawn Cycles ⬜
+#### Phase 17.6 - Condition-Dependent Spawn Cycles ✅
 
 **Purpose**: Flora and fauna spawn based on environmental conditions
 
-- [ ] **Spawn Condition System**:
-    - [ ] Extend `npc_spawns/_schema.yaml` with spawn conditions:
-    ```yaml
-    spawns:
-      - template_id: npc_wolf
-        room_id: forest_clearing
-        quantity: 3
-        spawn_conditions:
-          time_of_day: [dusk, night, dawn]  # Nocturnal
-          temperature_range: [20, 70]        # Not too hot
-          weather_not: [storm, blizzard]     # Seek shelter in storms
-          biome_match: true                  # Only if room biome matches
-    ```
+- [x] **SpawnConditions Dataclass** (`backend/daemons/engine/systems/spawn_conditions.py`):
+    - [x] time_of_day: [dawn, day, dusk, night]
+    - [x] temperature_range: [min, max]
+    - [x] weather_is: [list] / weather_not: [list]
+    - [x] weather_intensity_min/max
+    - [x] season_is: [list] / season_not: [list]
+    - [x] biome_is: [list] / biome_match: bool
+    - [x] light_level_min/max (0-100)
+    - [x] max_in_room / max_in_area population limits
+    - [x] requires_flora: [list] - flora dependencies
+    - [x] requires_fauna: [list] - prey must be present
+    - [x] excludes_fauna: [list] - predators prevent spawn
+    - [x] `from_dict(data)` parser from YAML
+    - [x] `has_conditions()` check
 
-- [ ] **SpawnConditionEvaluator**:
-    - [ ] Check all conditions before spawning
-    - [ ] Re-evaluate periodically for despawn conditions
-    - [ ] Integrate with NPC housekeeping tick
+- [x] **SpawnConditionEvaluator Class**:
+    - [x] Integrates with all environmental systems
+    - [x] `evaluate(conditions, room_id, area_id, template_id, session)` async
+    - [x] EvaluationResult with can_spawn, failed_conditions, warnings
+    - [x] Time condition checks via TimeManager
+    - [x] Temperature checks via TemperatureSystem
+    - [x] Weather checks via WeatherSystem
+    - [x] Season checks via BiomeSystem
+    - [x] Biome compatibility checks
+    - [x] Light level calculation (time + weather + room type)
+    - [x] Population limit checks (room and area)
+    - [x] Flora/fauna dependency checks
+    - [x] `evaluate_all_spawns(spawn_defs, area_id, session)` batch
 
-- [ ] **Population Management**:
-    - [ ] Area-wide population caps per fauna type
-    - [ ] Competition: predators reduce prey population
-    - [ ] Recovery: fauna respawns faster when population low
-    - [ ] Balance: herbivores need flora, carnivores need herbivores
+- [x] **PopulationManager Class** (`backend/daemons/engine/systems/population.py`):
+    - [x] PopulationConfig per-area settings
+    - [x] PopulationSnapshot current state tracking
+    - [x] PredationResult, SpawnResult dataclasses
+    - [x] `get_population_snapshot(area_id)` with caching
+    - [x] `calculate_spawn_rate(template_id, area_id)` ecological dynamics
+    - [x] Herbivore spawn rate depends on flora
+    - [x] Carnivore spawn rate depends on prey
+    - [x] Critical recovery rate when population < 25%
+    - [x] Recent death tracking boosts respawn rate
+    - [x] `apply_predation(area_id, session)` - abstract kills (Design Decision #2)
+    - [x] `apply_population_control(area_id, session)` - excess culling
+    - [x] `record_death(template_id, room_id)` for tracking
+    - [x] `get_area_health(area_id)` ecological metrics
 
-- [ ] **Seasonal Spawning** (future enhancement):
+- [x] **Engine Integration** (`backend/daemons/engine/engine.py`):
+    - [x] Initialize FaunaSystem with all dependencies
+    - [x] Initialize SpawnConditionEvaluator
+    - [x] Initialize PopulationManager
+    - [x] Connect FaunaSystem to PopulationManager
+    - [x] `_ecosystem_tick_interval` config (Design Decision #5)
+    - [x] `_schedule_ecosystem_tick()` recurring event
+    - [x] `_process_flora_respawns(area_id, session)` every tick
+    - [x] `_process_fauna_spawns(area_id, session)` every 3rd tick
+    - [x] `_process_population_dynamics(area_id, session)` every 5th tick
+    - [x] `_process_fauna_migration(area_id, session)` every 10th tick
+    - [x] Player presence optimization (skip empty areas)
+
+- [x] **Unit Tests** (`test_spawn_population.py`):
+    - [x] SpawnConditions parsing tests
+    - [x] SpawnConditionEvaluator condition tests
+    - [x] PopulationConfig tests
+    - [x] PopulationSnapshot tests
+    - [x] PopulationManager spawn rate tests
+    - [x] Death recording and recovery tests
+    - [x] Light level calculation tests
+
+**Design Decisions Implemented**:
+1. ✅ Flora respawn: Hybrid passive + event-triggered
+2. ✅ Fauna death: Abstract model, no loot/corpses
+3. ✅ Player impact: No default, extensible system
+4. ✅ Cross-area migration: Biome-aware
+5. ✅ Performance: Single adjustable tick interval
+
+---
+
+#### Phase 17.7 - Seasonal Spawning ⬜
+
+**Purpose**: Future enhancement for seasonal spawn variations
     - [ ] Some fauna only in certain seasons
     - [ ] Migration patterns between areas
     - [ ] Breeding seasons = more spawns

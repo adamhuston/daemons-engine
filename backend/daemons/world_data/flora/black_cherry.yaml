@@ -1,0 +1,39 @@
+# Black Cherry - Fruit-bearing deciduous tree
+id: flora_black_cherry
+name: black cherry tree
+description: A cherry tree with dark bark and clusters of small dark fruits.
+flora_type: tree
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+
+temperature_range: [15, 90]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_black_cherry
+    quantity: 5
+    chance: 0.7
+  - item_id: item_cherry_bark
+    quantity: 2
+    chance: 0.5
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: White blossoms cover the cherry tree in fragrant clusters.
+  summer: Dark cherries hang heavy on the branches.
+  fall: The cherry's leaves turn brilliant shades of orange and red.
+  winter: Dark bark contrasts with snow on the bare cherry tree.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: common
+cluster_size: [1, 2]

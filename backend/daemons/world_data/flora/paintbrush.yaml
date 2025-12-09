@@ -1,0 +1,38 @@
+# Paintbrush - Vibrant alpine wildflower
+id: flora_paintbrush
+name: paintbrush
+description: A striking wildflower with bright red-orange bracts that look dipped in paint.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - alpine
+  - mountain
+  - meadow
+  - grassland
+
+temperature_range: [25, 70]
+light_requirement: full_sun
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_paintbrush_flower
+    quantity: 3
+    chance: 0.7
+  - item_id: item_red_dye
+    quantity: 1
+    chance: 0.3
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: Young paintbrush plants emerge in rocky soils.
+  summer: Brilliant red-orange flowers dot the alpine meadows.
+  fall: The colorful bracts fade to brown.
+  winter: Only dried stalks remain above the snow.
+
+dormant_seasons:
+  - winter
+
+rarity: uncommon
+cluster_size: [3, 10]

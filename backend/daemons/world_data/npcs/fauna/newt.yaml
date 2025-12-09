@@ -1,0 +1,48 @@
+# Newt - Small amphibian fauna
+# Phase 17.5: Fauna System
+
+id: npc_newt
+name: newt
+description: >
+  A small, slick-skinned amphibian with a bright orange belly.
+  It moves slowly through damp areas, glistening with moisture.
+npc_type: neutral
+level: 1
+max_health: 4
+armor_class: 11
+strength: 2
+dexterity: 10
+intelligence: 2
+attack_damage_min: 1
+attack_damage_max: 1
+attack_speed: 2.0
+experience_reward: 2
+
+is_fauna: true
+fauna_data:
+  fauna_type: amphibian
+  biome_tags: [wetland, forest, swamp]
+  temperature_tolerance: [40, 75]
+  activity_period: nocturnal
+  diet: carnivore
+  prey_tags: [insect]
+  predator_tags: [snake, bird, fish]
+  fauna_tags: [carnivore, newt, prey, amphibian, aquatic]
+  pack_size: [1, 4]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.7
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - peaceful
+loot_table: []
+idle_messages:
+  - "The newt's skin glistens with moisture."
+  - "The newt crawls slowly through the leaves."
+  - "The newt slips into the water."
+keywords:
+  - newt

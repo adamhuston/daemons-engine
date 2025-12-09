@@ -1,0 +1,164 @@
+# Temperate Forest Biome
+# Standard deciduous and mixed forests with four distinct seasons
+
+biome_id: temperate_forest
+name: Temperate Forest
+description: >
+  A lush forest of oak, maple, and birch trees with a rich understory.
+  The canopy filters sunlight creating dappled patterns on the forest floor.
+  Wildlife is abundant, from deer and foxes to songbirds and squirrels.
+
+biome_type: TEMPERATE
+
+# Temperature configuration
+temperature:
+  base_min: 40  # Winter lows
+  base_max: 85  # Summer highs
+  comfortable_min: 55
+  comfortable_max: 75
+
+# Seasonal modifiers - how each season affects the base values
+seasonal_effects:
+  spring:
+    temperature_modifier: -5
+    precipitation_modifier: 1.2
+    growth_rate: 1.5
+    spawn_rate: 1.3
+    light_hours: 12
+    description: "New growth emerges as the forest awakens from winter dormancy."
+    
+  summer:
+    temperature_modifier: 10
+    precipitation_modifier: 0.8
+    growth_rate: 1.0
+    spawn_rate: 1.0
+    light_hours: 14
+    description: "The forest is thick with foliage, buzzing with insects and alive with activity."
+    
+  autumn:
+    temperature_modifier: -5
+    precipitation_modifier: 0.9
+    growth_rate: 0.5
+    spawn_rate: 0.8
+    light_hours: 10
+    description: "Leaves turn brilliant reds and golds as wildlife prepares for winter."
+    
+  winter:
+    temperature_modifier: -20
+    precipitation_modifier: 1.0
+    growth_rate: 0.0
+    spawn_rate: 0.4
+    light_hours: 8
+    description: "Bare branches and snow-covered ground mark the forest's dormant period."
+
+# Valid weather patterns for this biome
+valid_weather:
+  - CLEAR
+  - CLOUDY
+  - OVERCAST
+  - LIGHT_RAIN
+  - RAIN
+  - HEAVY_RAIN
+  - THUNDERSTORM
+  - LIGHT_SNOW
+  - SNOW
+  - FOG
+  - MIST
+
+# Weather weights - likelihood of each pattern
+weather_weights:
+  CLEAR: 30
+  CLOUDY: 25
+  OVERCAST: 15
+  LIGHT_RAIN: 10
+  RAIN: 8
+  HEAVY_RAIN: 3
+  THUNDERSTORM: 2
+  LIGHT_SNOW: 3  # Winter only
+  SNOW: 2        # Winter only
+  FOG: 1
+  MIST: 1
+
+# Valid seasons (some biomes might not have all 4)
+valid_seasons:
+  - SPRING
+  - SUMMER
+  - AUTUMN
+  - WINTER
+
+# Spawn modifiers for different creature categories
+# These are multipliers (1.0 = normal, 0.5 = half, 2.0 = double)
+# Extensible for future flora/fauna phases
+spawn_modifiers:
+  herbivore: 1.2    # Plentiful vegetation supports grazers
+  predator: 1.0     # Standard predator population
+  omnivore: 1.1     # Good variety of food sources
+  bird: 1.3         # Forest canopy attracts birds
+  insect: 1.2       # Rich insect life
+  plant: 1.0        # Standard plant growth
+  fungus: 1.3       # Ideal conditions for mushrooms
+  undead: 0.5       # Life energy discourages undead
+  elemental: 0.7    # Few elemental creatures
+  fey: 1.5          # Strong fey presence
+  beast: 1.2        # Many forest beasts
+
+# Spawn types - what kind of creatures can appear
+# Extensible for future phases
+spawn_types:
+  common:
+    - deer
+    - rabbit
+    - squirrel
+    - fox
+    - wolf
+    - owl
+    - songbird
+    - boar
+  uncommon:
+    - bear
+    - lynx
+    - badger
+    - eagle
+  rare:
+    - unicorn
+    - treant
+    - dryad
+
+# Population limits per room (density control)
+# Extensible for future phases
+population_limits:
+  herbivore_max: 6
+  predator_max: 2
+  plant_max: 10
+  total_creature_max: 8
+
+# Terrain features common to this biome
+terrain_features:
+  - dense_undergrowth
+  - fallen_logs
+  - clearings
+  - streams
+  - rocky_outcrops
+
+# Resource availability
+resources:
+  wood: abundant
+  herbs: common
+  game: common
+  water: common
+  ore: rare
+
+# Hazards specific to this biome
+hazards:
+  - falling_branches
+  - poison_ivy
+  - predator_dens
+  - hidden_ravines
+
+# Tags for matching and filtering
+tags:
+  - forest
+  - deciduous
+  - temperate
+  - four_seasons
+  - woodland

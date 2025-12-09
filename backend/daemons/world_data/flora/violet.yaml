@@ -1,0 +1,37 @@
+# Violet - Shade-loving wildflower
+id: flora_violet
+name: violet
+description: A small, delicate flower with heart-shaped leaves and purple, blue, or white blooms.
+flora_type: flower
+
+biome_tags:
+  - temperate
+  - forest
+  - woodland
+  - meadow
+
+temperature_range: [35, 75]
+light_requirement: shade
+moisture_requirement: moderate
+
+harvestable: true
+harvest_items:
+  - item_id: item_violet_flower
+    quantity: 4
+    chance: 0.7
+  - item_id: item_violet_leaf
+    quantity: 6
+    chance: 0.8
+harvest_cooldown: 14400
+
+seasonal_variants:
+  spring: Violets bloom in shaded woodland clearings.
+  summer: Heart-shaped leaves carpet the forest floor.
+  fall: The violet leaves persist but flowers are gone.
+  winter: Violets survive under leaf litter and snow.
+
+dormant_seasons:
+  - winter
+
+rarity: common
+cluster_size: [4, 15]

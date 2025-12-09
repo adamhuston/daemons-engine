@@ -1,0 +1,40 @@
+# Alder - Common riparian tree
+id: flora_alder
+name: alder tree
+description: A slender alder tree with dark bark and oval leaves, often found near water.
+flora_type: tree
+
+biome_tags:
+  - temperate
+  - forest
+  - wetland
+  - riparian
+
+temperature_range: [25, 85]
+light_requirement: partial_shade
+moisture_requirement: wet
+
+harvestable: true
+harvest_items:
+  - item_id: item_alder_bark
+    quantity: 2
+    chance: 0.7
+  - item_id: item_alder_wood
+    quantity: 1
+    chance: 0.5
+harvest_cooldown: 43200
+
+seasonal_variants:
+  spring: An alder tree with catkins dangling from its branches.
+  summer: A leafy alder provides shade near the water's edge.
+  fall: The alder's leaves turn yellow before dropping.
+  winter: A bare alder stands sentinel by the water.
+
+dormant_seasons:
+  - winter
+
+provides_cover: true
+cover_bonus: 2
+
+rarity: common
+cluster_size: [2, 4]

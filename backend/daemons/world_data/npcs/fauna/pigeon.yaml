@@ -1,0 +1,50 @@
+# Pigeon - Common bird fauna
+# Phase 17.5: Fauna System
+
+id: npc_pigeon
+name: pigeon
+description: >
+  A plump gray bird with iridescent neck feathers.
+  It coos softly and bobs its head as it walks.
+npc_type: neutral
+level: 1
+max_health: 8
+armor_class: 11
+strength: 4
+dexterity: 14
+intelligence: 3
+attack_damage_min: 1
+attack_damage_max: 2
+attack_speed: 1.5
+experience_reward: 3
+
+is_fauna: true
+fauna_data:
+  fauna_type: bird
+  biome_tags: [urban, any]
+  temperature_tolerance: [20, 95]
+  activity_period: diurnal
+  diet: herbivore
+  prey_tags: []
+  predator_tags: [hawk, falcon, cat]
+  fauna_tags: [herbivore, pigeon, prey, bird]
+  pack_size: [5, 30]
+  territorial: false
+  migratory: false
+  aggression: 0.0
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - social
+  - wanders_frequently
+loot_table: []
+idle_messages:
+  - "The pigeon coos softly."
+  - "The pigeon bobs its head while walking."
+  - "The pigeon pecks at the ground."
+keywords:
+  - pigeon
+  - dove

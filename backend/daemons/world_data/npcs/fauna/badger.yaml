@@ -1,0 +1,51 @@
+# Badger - Aggressive small mammal fauna
+# Phase 17.5: Fauna System
+
+id: npc_badger
+name: badger
+description: >
+  A stocky, striped-faced creature with powerful claws.
+  Despite its size, it's famously fierce when cornered.
+npc_type: neutral
+level: 2
+max_health: 30
+armor_class: 13
+strength: 12
+dexterity: 12
+intelligence: 4
+attack_damage_min: 4
+attack_damage_max: 9
+attack_speed: 2.0
+experience_reward: 12
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, grassland, temperate]
+  temperature_tolerance: [10, 85]
+  activity_period: nocturnal
+  diet: omnivore
+  prey_tags: [mouse, rabbit, insect, frog]
+  predator_tags: [wolf, cougar]
+  fauna_tags: [omnivore, badger, predator, aggressive, fierce]
+  pack_size: [1, 2]
+  territorial: true
+  territory_radius: 2
+  migratory: false
+  aggression: 0.5
+  flee_threshold: 0.15
+
+behavior:
+  - ambient
+  - grazes
+  - flees_predators
+  - brave
+  - hunts
+loot_table: []
+idle_messages:
+  - "The badger growls warningly."
+  - "The badger digs furiously at the ground."
+  - "The badger's claws click on the stones."
+keywords:
+  - badger
+  - honey badger

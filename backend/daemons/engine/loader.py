@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import (
     Area,
+    FloraInstance,
     ItemInstance,
     ItemTemplate,
     NpcInstance,
@@ -211,6 +212,17 @@ async def load_world(session: AsyncSession) -> World:
             # Phase 17.1: Temperature system
             base_temperature=getattr(a, "base_temperature", 70),
             temperature_variation=getattr(a, "temperature_variation", 20),
+            # Phase 17.2: Weather system
+            weather_patterns=getattr(a, "weather_patterns", None),
+            weather_immunity=bool(getattr(a, "weather_immunity", False)),
+            # Phase 17.3: Biome coherence and seasons
+            current_season=getattr(a, "current_season", "summer"),
+            season_day=getattr(a, "season_day", 1),
+            days_per_season=getattr(a, "days_per_season", 30),
+            season_locked=bool(getattr(a, "season_locked", False)),
+            biome_data=getattr(a, "biome_data", {}) or {},
+            flora_tags=getattr(a, "flora_tags", []) or [],
+            fauna_tags=getattr(a, "fauna_tags", []) or [],
         )
 
     # ----- Link rooms to areas -----
@@ -320,6 +332,21 @@ async def load_world(session: AsyncSession) -> World:
         if player.id in player_inventories:
             player.inventory_meta = player_inventories[player.id]
 
+    # ----- Load flora instances (Phase 17.4) -----
+    flora_result = await session.execute(
+        select(FloraInstance).where(FloraInstance.is_depleted == False)  # noqa: E712
+    )
+    flora_models = flora_result.scalars().all()
+
+    # Build flora cache and link to rooms
+    flora_cache: dict[int, tuple[str, int]] = {}
+    for flora in flora_models:
+        # Cache for synchronous lookup: id -> (template_id, quantity)
+        flora_cache[flora.id] = (flora.template_id, flora.quantity)
+        # Link to room
+        if flora.room_id and flora.room_id in rooms:
+            rooms[flora.room_id].flora.add(flora.id)
+
     # ----- Load NPC templates (Phase 4) -----
     npc_template_result = await session.execute(select(NpcTemplate))
     npc_template_models = npc_template_result.scalars().all()
@@ -364,6 +391,9 @@ async def load_world(session: AsyncSession) -> World:
             class_id=t.class_id,
             default_abilities=set(t.default_abilities or []),
             ability_loadout=list(t.ability_loadout or []),
+            # Phase 17.5: Fauna properties
+            is_fauna=getattr(t, "is_fauna", False) or False,
+            fauna_data=getattr(t, "fauna_data", {}) or {},
         )
 
     # ----- Load NPC instances (Phase 4) -----
@@ -424,6 +454,7 @@ async def load_world(session: AsyncSession) -> World:
         npc_templates=npc_templates,
         npcs=npcs,
         container_contents=container_contents,
+        flora_instances=flora_cache,
     )
 
 
@@ -616,6 +647,41 @@ def load_triggers_from_yaml(world: World, world_data_dir: str | None = None) -> 
         print(
             f"Loaded triggers: {rooms_loaded} room triggers, {areas_loaded} area triggers"
         )
+
+    # ----- Load NPC spawn definitions for dynamic fauna spawning -----
+    spawns_loaded = 0
+    npc_spawns_dir = world_data_dir / "npc_spawns"
+    if npc_spawns_dir.exists():
+        yaml_files = list(npc_spawns_dir.glob("**/*.yaml"))
+        for yaml_file in yaml_files:
+            # Skip schema/documentation files
+            if yaml_file.name.startswith("_"):
+                continue
+            with open(yaml_file, encoding="utf-8") as f:
+                spawn_data = yaml.safe_load(f)
+
+            if not spawn_data:
+                continue
+
+            area_id = spawn_data.get("area_id")
+            spawns = spawn_data.get("spawns", [])
+
+            if not area_id or not spawns:
+                continue
+
+            area = world.areas.get(area_id)
+            if not area:
+                print(f"Warning: NPC spawns for unknown area '{area_id}'")
+                continue
+
+            # Add spawn definitions that have spawn_conditions (dynamic spawns)
+            for spawn_def in spawns:
+                if spawn_def.get("spawn_conditions"):
+                    area.npc_spawns.append(spawn_def)
+                    spawns_loaded += 1
+
+    if spawns_loaded > 0:
+        print(f"Loaded {spawns_loaded} dynamic NPC spawn definitions")
 
 
 def _parse_trigger(trigger_dict: dict):

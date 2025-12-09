@@ -1,0 +1,37 @@
+# Prickly Pear - Desert cactus
+id: flora_prickly_pear
+name: prickly pear cactus
+description: A paddle-shaped cactus with sharp spines and colorful edible fruit.
+flora_type: shrub
+
+biome_tags:
+  - desert
+  - arid
+  - grassland
+
+temperature_range: [20, 115]
+light_requirement: full_sun
+moisture_requirement: arid
+
+harvestable: true
+harvest_items:
+  - item_id: item_prickly_pear_fruit
+    quantity: 3
+    chance: 0.7
+  - item_id: item_cactus_pad
+    quantity: 2
+    chance: 0.5
+harvest_cooldown: 43200
+harvest_tool: gloves
+
+seasonal_variants:
+  spring: Bright flowers bloom along the edges of the prickly pear pads.
+  summer: Colorful fruit develops from the spent flowers.
+  fall: Ripe fruit attracts desert wildlife.
+  winter: The cactus endures the cool desert nights unchanged.
+
+provides_cover: false
+cover_bonus: 0
+
+rarity: common
+cluster_size: [1, 4]

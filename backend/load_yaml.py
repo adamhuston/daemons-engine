@@ -1,6 +1,8 @@
 """Load all world data from YAML into database."""
 
 import asyncio
+import random
+import time
 import uuid
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from sqlalchemy import select
 from daemons.db import AsyncSessionLocal
 from daemons.models import (
     Area,
+    FloraInstance,
     ItemInstance,
     ItemTemplate,
     NpcInstance,
@@ -19,7 +22,7 @@ from daemons.models import (
 
 
 async def load_data():
-    world_data_dir = Path(__file__).parent / "world_data"
+    world_data_dir = Path(__file__).parent / "daemons" / "world_data"
 
     async with AsyncSessionLocal() as session:
         # ===== Load Areas =====
@@ -233,6 +236,9 @@ async def load_data():
                     existing.idle_messages = npc_data.get("idle_messages", [])
                     existing.keywords = npc_data.get("keywords", [])
                     existing.loot_table = npc_data.get("loot_table", [])
+                    # Phase 17.5: Fauna properties
+                    existing.is_fauna = npc_data.get("is_fauna", False)
+                    existing.fauna_data = npc_data.get("fauna_data", {})
                     print(f"Updating NPC template: {npc_data['name']}")
                 else:
                     print(f"Loading NPC template: {npc_data['name']}")
@@ -255,6 +261,9 @@ async def load_data():
                         idle_messages=npc_data.get("idle_messages", []),
                         keywords=npc_data.get("keywords", []),
                         loot_table=npc_data.get("loot_table", []),
+                        # Phase 17.5: Fauna properties
+                        is_fauna=npc_data.get("is_fauna", False),
+                        fauna_data=npc_data.get("fauna_data", {}),
                     )
                     session.add(template)
                 loaded += 1
@@ -273,7 +282,10 @@ async def load_data():
                 with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
 
-                spawns = data.get("spawns", [])
+                if not data:
+                    continue
+
+                spawns = data.get("spawns", []) or []
                 for spawn in spawns:
                     instance_id = str(uuid.uuid4())
                     room_id = spawn["room_id"]
@@ -306,6 +318,169 @@ async def load_data():
                     loaded += 1
             await session.commit()
             print(f"Loaded {loaded} NPC spawns")
+
+        # ===== Load Biome Definitions =====
+        biomes_dir = world_data_dir / "biomes"
+        biome_defs = {}
+        if biomes_dir.exists():
+            yaml_files = list(biomes_dir.glob("**/*.yaml"))
+            for yaml_file in yaml_files:
+                if yaml_file.name.startswith("_"):
+                    continue
+                with open(yaml_file, encoding="utf-8") as f:
+                    biome_data = yaml.safe_load(f)
+                if biome_data and "biome_id" in biome_data:
+                    biome_defs[biome_data["biome_id"]] = biome_data
+
+        # ===== Load Flora Templates =====
+        flora_dir = world_data_dir / "flora"
+        flora_templates = {}
+        if flora_dir.exists():
+            yaml_files = list(flora_dir.glob("**/*.yaml"))
+            for yaml_file in yaml_files:
+                if yaml_file.name.startswith("_"):
+                    continue
+                with open(yaml_file, encoding="utf-8") as f:
+                    flora_data = yaml.safe_load(f)
+                if flora_data and "id" in flora_data:
+                    flora_templates[flora_data["id"]] = flora_data
+
+        # ===== Load Fauna (NPC) Templates =====
+        npcs_dir = world_data_dir / "npcs"
+        fauna_templates = {}
+        if npcs_dir.exists():
+            yaml_files = list(npcs_dir.glob("**/*.yaml"))
+            for yaml_file in yaml_files:
+                if yaml_file.name.startswith("_"):
+                    continue
+                with open(yaml_file, encoding="utf-8") as f:
+                    npc_data = yaml.safe_load(f)
+                # Only include fauna NPCs
+                if npc_data and npc_data.get("is_fauna"):
+                    fauna_templates[npc_data["id"]] = npc_data
+
+        # ===== Seed Initial Flora and Fauna by Biome =====
+        # Get all rooms and areas
+        rooms_result = await session.execute(select(Room))
+        rooms = rooms_result.scalars().all()
+        
+        areas_result = await session.execute(select(Area))
+        areas_by_id = {a.id: a for a in areas_result.scalars().all()}
+        
+        flora_loaded = 0
+        fauna_loaded = 0
+        
+        for room in rooms:
+            area = areas_by_id.get(room.area_id)
+            if not area:
+                continue
+                
+            # Get biome definition
+            biome = biome_defs.get(area.biome, {})
+            
+            # Build compatibility tags from biome
+            biome_flora_tags = set(biome.get("flora_tags", []))
+            biome_fauna_tags = set(biome.get("fauna_tags", []))
+            biome_tags = set(biome.get("tags", []))
+            
+            # Fallback: use biome name as tag if no specific tags
+            if not biome_flora_tags:
+                biome_flora_tags = biome_tags | {area.biome} if area.biome else set()
+            if not biome_fauna_tags:
+                biome_fauna_tags = biome_tags | {area.biome} if area.biome else set()
+            
+            # ----- Seed Flora -----
+            if flora_templates and biome_flora_tags:
+                # Check if room already has flora
+                existing_flora = await session.execute(
+                    select(FloraInstance).where(FloraInstance.room_id == room.id)
+                )
+                if not existing_flora.scalars().first():
+                    # Find compatible flora templates
+                    compatible = []
+                    for template_id, template in flora_templates.items():
+                        template_tags = set(template.get("biome_tags", []))
+                        if not template_tags or template_tags & biome_flora_tags:
+                            rarity = template.get("rarity", "common")
+                            weight = {"common": 1.0, "uncommon": 0.5, "rare": 0.2, "very_rare": 0.05}.get(rarity, 1.0)
+                            compatible.append((template_id, template, weight))
+                    
+                    if compatible:
+                        # Spawn 1-3 flora types per room
+                        num_to_spawn = random.randint(1, min(3, len(compatible)))
+                        templates_to_spawn = random.choices(
+                            compatible,
+                            weights=[c[2] for c in compatible],
+                            k=num_to_spawn
+                        )
+                        
+                        for template_id, template, _ in templates_to_spawn:
+                            cluster_size = template.get("cluster_size", [1, 3])
+                            quantity = random.randint(cluster_size[0], cluster_size[1])
+                            
+                            flora_instance = FloraInstance(
+                                template_id=template_id,
+                                room_id=room.id,
+                                quantity=quantity,
+                                spawned_at=time.time(),
+                                is_permanent=True,
+                                is_depleted=False,
+                            )
+                            session.add(flora_instance)
+                            flora_loaded += 1
+            
+            # ----- Seed Fauna -----
+            if fauna_templates and biome_fauna_tags:
+                # Check if room already has fauna
+                existing_fauna = await session.execute(
+                    select(NpcInstance).where(NpcInstance.room_id == room.id)
+                )
+                if not existing_fauna.scalars().first():
+                    # Find compatible fauna templates
+                    compatible = []
+                    for template_id, template in fauna_templates.items():
+                        fauna_data = template.get("fauna_data", {})
+                        template_tags = set(fauna_data.get("biome_tags", []))
+                        if not template_tags or template_tags & biome_fauna_tags:
+                            # Weight by level (lower level = more common)
+                            level = template.get("level", 1)
+                            weight = 1.0 / (level * 0.5 + 0.5)
+                            compatible.append((template_id, template, weight))
+                    
+                    if compatible:
+                        # 50% chance to spawn fauna in room (not every room needs fauna)
+                        if random.random() < 0.5:
+                            # Spawn 1-2 fauna types per room
+                            num_to_spawn = random.randint(1, min(2, len(compatible)))
+                            templates_to_spawn = random.choices(
+                                compatible,
+                                weights=[c[2] for c in compatible],
+                                k=num_to_spawn
+                            )
+                            
+                            for template_id, template, _ in templates_to_spawn:
+                                # Get max health from template
+                                max_health = template.get("max_health", 50)
+                                
+                                instance_id = str(uuid.uuid4())
+                                npc_instance = NpcInstance(
+                                    id=instance_id,
+                                    template_id=template_id,
+                                    room_id=room.id,
+                                    spawn_room_id=room.id,
+                                    current_health=max_health,
+                                    is_alive=True,
+                                    respawn_time=300,  # 5 minute respawn
+                                    instance_data={},
+                                )
+                                session.add(npc_instance)
+                                fauna_loaded += 1
+        
+        await session.commit()
+        if flora_loaded > 0:
+            print(f"Seeded {flora_loaded} flora instances based on biomes")
+        if fauna_loaded > 0:
+            print(f"Seeded {fauna_loaded} fauna instances based on biomes")
 
         print("\n✅ All world data loaded!")
 

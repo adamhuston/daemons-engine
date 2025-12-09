@@ -1,0 +1,50 @@
+# Opossum - Nocturnal marsupial fauna
+# Phase 17.5: Fauna System
+
+id: npc_opossum
+name: opossum
+description: >
+  A gray, rat-faced marsupial with a naked prehensile tail.
+  It hisses and bares its many teeth when threatened.
+npc_type: neutral
+level: 1
+max_health: 15
+armor_class: 11
+strength: 6
+dexterity: 12
+intelligence: 4
+attack_damage_min: 2
+attack_damage_max: 4
+attack_speed: 2.0
+experience_reward: 5
+
+is_fauna: true
+fauna_data:
+  fauna_type: mammal
+  biome_tags: [forest, temperate, wetland]
+  temperature_tolerance: [30, 90]
+  activity_period: nocturnal
+  diet: omnivore
+  prey_tags: [insect, frog, mouse]
+  predator_tags: [coyote, owl, fox]
+  fauna_tags: [omnivore, opossum, prey, marsupial]
+  pack_size: [1, 1]
+  territorial: false
+  migratory: false
+  aggression: 0.1
+  flee_threshold: 0.5
+
+behavior:
+  - ambient
+  - grazes
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The opossum hisses, showing its teeth."
+  - "The opossum plays dead convincingly."
+  - "The opossum hangs from a branch by its tail."
+keywords:
+  - opossum
+  - possum

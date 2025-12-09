@@ -633,7 +633,7 @@ class TriggerSystem:
                 self._schedule_delayed_action(handler, ctx, action.params, action.delay)
             else:
                 # Execute immediately
-                action_events = handler(self, ctx, action.params)
+                action_events = handler(ctx, action.params)
                 events.extend(action_events)
 
         return events
@@ -648,7 +648,7 @@ class TriggerSystem:
         """Schedule an action to execute after a delay."""
 
         async def delayed_callback():
-            events = handler(self, ctx, params)
+            events = handler(ctx, params)
             if events:
                 await self.ctx.dispatch_events(events)
 
@@ -713,6 +713,15 @@ class TriggerSystem:
         self.condition_handlers["temperature_below"] = self._condition_temperature_below
         self.condition_handlers["temperature_range"] = self._condition_temperature_range
         self.condition_handlers["temperature_level"] = self._condition_temperature_level
+        # Phase 17.2 conditions - Weather
+        self.condition_handlers["weather_is"] = self._condition_weather_is
+        self.condition_handlers["weather_intensity"] = self._condition_weather_intensity
+        self.condition_handlers["weather_not"] = self._condition_weather_not
+        # Phase 17.3 conditions - Biome and Season
+        self.condition_handlers["season_is"] = self._condition_season_is
+        self.condition_handlers["season_not"] = self._condition_season_not
+        self.condition_handlers["biome_is"] = self._condition_biome_is
+        self.condition_handlers["biome_has_tag"] = self._condition_biome_has_tag
 
     def _condition_flag_set(self, ctx: TriggerContext, params: dict[str, Any]) -> bool:
         """
@@ -1048,6 +1057,197 @@ class TriggerSystem:
         state = temperature_system.calculate_room_temperature(room, 0)
         return state.level.value == expected_level
 
+    # ---------- Phase 17.2 Condition Handlers - Weather ----------
+
+    def _condition_weather_is(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the area's current weather matches a type.
+
+        Params:
+            weather_type: Weather type to check for ("clear", "rain", "storm", etc.)
+        """
+        room = ctx.get_room()
+        if not room or not room.area_id:
+            return False
+
+        # Get weather system from context
+        weather_system = getattr(self.ctx, "weather_system", None)
+        if not weather_system:
+            return False
+
+        expected_type = params.get("weather_type", "clear").lower()
+        return weather_system.check_weather_condition(
+            room.area_id, "weather_is", weather_type=expected_type
+        )
+
+    def _condition_weather_intensity(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the area's current weather intensity matches.
+
+        Params:
+            intensity: Intensity level ("light", "moderate", "heavy")
+        """
+        room = ctx.get_room()
+        if not room or not room.area_id:
+            return False
+
+        # Get weather system from context
+        weather_system = getattr(self.ctx, "weather_system", None)
+        if not weather_system:
+            return False
+
+        expected_intensity = params.get("intensity", "moderate").lower()
+        return weather_system.check_weather_condition(
+            room.area_id, "weather_intensity", intensity=expected_intensity
+        )
+
+    def _condition_weather_not(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the area's current weather is NOT a specific type.
+
+        Params:
+            weather_type: Weather type to check against ("storm", "blizzard", etc.)
+        """
+        room = ctx.get_room()
+        if not room or not room.area_id:
+            return False
+
+        # Get weather system from context
+        weather_system = getattr(self.ctx, "weather_system", None)
+        if not weather_system:
+            return False
+
+        excluded_type = params.get("weather_type", "").lower()
+        return weather_system.check_weather_condition(
+            room.area_id, "weather_not", weather_type=excluded_type
+        )
+
+    # ---------- Phase 17.3 Condition Handlers - Biome and Season ----------
+
+    def _condition_season_is(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the area's current season matches.
+
+        Params:
+            season: Season to check for ("spring", "summer", "autumn", "winter")
+        """
+        room = ctx.get_room()
+        if not room or not room.area_id:
+            return False
+
+        # Get the area
+        area = ctx.world.areas.get(room.area_id)
+        if not area:
+            return False
+
+        expected_season = params.get("season", "").lower()
+        current_season = getattr(area, "current_season", "spring").lower()
+        return current_season == expected_season
+
+    def _condition_season_not(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the area's current season is NOT a specific season.
+
+        Params:
+            season: Season to check against ("spring", "summer", "autumn", "winter")
+        """
+        room = ctx.get_room()
+        if not room or not room.area_id:
+            return False
+
+        # Get the area
+        area = ctx.world.areas.get(room.area_id)
+        if not area:
+            return False
+
+        excluded_season = params.get("season", "").lower()
+        current_season = getattr(area, "current_season", "spring").lower()
+        return current_season != excluded_season
+
+    def _condition_biome_is(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the area's biome type matches.
+
+        Params:
+            biome: Biome type to check for ("temperate", "desert", "arctic", etc.)
+        """
+        room = ctx.get_room()
+        if not room or not room.area_id:
+            return False
+
+        # Get the area
+        area = ctx.world.areas.get(room.area_id)
+        if not area:
+            return False
+
+        expected_biome = params.get("biome", "").lower()
+        current_biome = getattr(area, "biome", "temperate").lower()
+        return current_biome == expected_biome
+
+    def _condition_biome_has_tag(
+        self, ctx: TriggerContext, params: dict[str, Any]
+    ) -> bool:
+        """
+        Check if the area's biome has a specific tag.
+
+        Params:
+            tag: Tag to check for ("forest", "humid", "cold", etc.)
+
+        Note: This checks biome profile tags via the BiomeSystem.
+        """
+        room = ctx.get_room()
+        if not room or not room.area_id:
+            return False
+
+        # Get the area
+        area = ctx.world.areas.get(room.area_id)
+        if not area:
+            return False
+
+        # Get biome system from context
+        biome_system = getattr(self.ctx, "biome_system", None)
+        if not biome_system:
+            # Fall back to checking area tags directly
+            area_tags = getattr(area, "tags", []) or []
+            tag = params.get("tag", "").lower()
+            return tag in [t.lower() for t in area_tags]
+
+        # Use biome system to check tags
+        tag = params.get("tag", "").lower()
+        biome_type_str = getattr(area, "biome", "temperate").upper()
+
+        try:
+            from .biome import BiomeType
+            biome_type = BiomeType[biome_type_str]
+        except (KeyError, ImportError):
+            return False
+
+        profile = biome_system.get_biome_profile(biome_type)
+        if not profile:
+            return False
+
+        # Check spawn_types keys as implicit tags
+        spawn_types = profile.spawn_types or {}
+        all_tags = list(spawn_types.keys())
+
+        # Also check spawn_modifiers keys as tags
+        spawn_modifiers = profile.spawn_modifiers or {}
+        all_tags.extend(spawn_modifiers.keys())
+
+        return tag in [t.lower() for t in all_tags]
+
     def _compare(self, actual: float, operator: str, expected: float) -> bool:
         """Helper to perform numeric comparison."""
         if operator == ">=":
@@ -1113,8 +1313,11 @@ class TriggerSystem:
 
         Params:
             text: The message text (supports {variable} substitution)
+            message: Alias for text (for backward compatibility)
         """
-        text = params.get("text", "")
+        text = params.get("text") or params.get("message", "")
+        if not text:
+            return []  # Don't send empty messages
         text = self.substitute_variables(text, ctx)
 
         return [self.ctx.msg_to_player(ctx.player_id, text)]
@@ -1129,9 +1332,12 @@ class TriggerSystem:
 
         Params:
             text: The message text (supports {variable} substitution)
+            message: Alias for text (for backward compatibility)
             exclude_player: If True, exclude the triggering player
         """
-        text = params.get("text", "")
+        text = params.get("text") or params.get("message", "")
+        if not text:
+            return []  # Don't send empty messages
         text = self.substitute_variables(text, ctx)
 
         exclude: set | None = None

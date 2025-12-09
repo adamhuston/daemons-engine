@@ -1,0 +1,51 @@
+# King Snake - Non-venomous snake fauna
+# Phase 17.5: Fauna System
+
+id: npc_king_snake
+name: king snake
+description: >
+  A boldly banded snake with glossy scales in red, black, and white.
+  It's immune to venom and preys upon other snakes.
+npc_type: neutral
+level: 2
+max_health: 18
+armor_class: 13
+strength: 10
+dexterity: 16
+intelligence: 2
+attack_damage_min: 3
+attack_damage_max: 7
+attack_speed: 1.5
+experience_reward: 10
+
+is_fauna: true
+fauna_data:
+  fauna_type: reptile
+  biome_tags: [forest, grassland, desert]
+  temperature_tolerance: [50, 100]
+  activity_period: diurnal
+  diet: carnivore
+  prey_tags: [snake, mouse, lizard, bird]
+  predator_tags: [hawk, eagle]
+  fauna_tags: [carnivore, snake, predator, reptile]
+  pack_size: [1, 1]
+  territorial: true
+  territory_radius: 2
+  migratory: false
+  aggression: 0.2
+  flee_threshold: 0.4
+
+behavior:
+  - ambient
+  - hunts
+  - flees_predators
+  - wanders_sometimes
+loot_table: []
+idle_messages:
+  - "The king snake coils calmly."
+  - "The king snake's bright bands gleam."
+  - "The king snake flicks its tongue rapidly."
+keywords:
+  - snake
+  - king snake
+  - kingsnake

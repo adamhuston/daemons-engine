@@ -1,0 +1,40 @@
+# Cinquefoil - Small flowering shrub
+id: flora_cinquefoil
+name: cinquefoil
+description: A low shrub with five-petaled yellow flowers and silvery-green leaves.
+flora_type: shrub
+
+biome_tags:
+  - mountain
+  - grassland
+  - temperate
+  - alpine
+
+temperature_range: [-10, 80]
+light_requirement: full_sun
+moisture_requirement: dry
+
+harvestable: true
+harvest_items:
+  - item_id: item_cinquefoil_flower
+    quantity: 3
+    chance: 0.7
+  - item_id: item_cinquefoil_root
+    quantity: 1
+    chance: 0.4
+harvest_cooldown: 21600
+
+seasonal_variants:
+  spring: Fresh silvery leaves emerge on the cinquefoil.
+  summer: Bright yellow flowers cover the cinquefoil in cheerful blooms.
+  fall: The cinquefoil's flowers fade to seed heads.
+  winter: The woody stems persist beneath the snow.
+
+dormant_seasons:
+  - winter
+
+provides_cover: false
+cover_bonus: 0
+
+rarity: common
+cluster_size: [2, 6]
