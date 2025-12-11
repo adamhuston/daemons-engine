@@ -79,6 +79,19 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
   // Layout management
   const { layouts, updateRoomPosition: updateLayoutPosition, loadLayout, saveLayout } = useLayout(worldDataPath);
 
+  // Helper to find existing room folder for an area_id by checking loaded rooms
+  const findExistingAreaFolderForRoom = useCallback((areaId: string, currentRooms: RoomNode[]): string | null => {
+    // Look for any room with the same area_id that has a file path
+    const existingRoom = currentRooms.find((r) => r.area_id === areaId && r.filePath);
+    if (existingRoom?.filePath) {
+      const lastSlash = existingRoom.filePath.lastIndexOf('/');
+      if (lastSlash > 0) {
+        return existingRoom.filePath.substring(0, lastSlash);
+      }
+    }
+    return null;
+  }, []);
+
   // Helper to get the area folder path from a room's file path
   const getAreaPathFromRoom = useCallback((room: RoomNode): string | null => {
     // If we have a stored file path, derive area path from it
@@ -90,13 +103,20 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
         return room.filePath.substring(0, lastSlash);
       }
     }
-    // Fall back to deriving from area_id (for newly created rooms)
+    // Try to find existing folder for this area_id from other rooms
+    if (room.area_id) {
+      const existingFolder = findExistingAreaFolderForRoom(room.area_id, rooms);
+      if (existingFolder) {
+        return existingFolder;
+      }
+    }
+    // Fall back to deriving from area_id (for truly new areas with no existing rooms)
     if (worldDataPath && room.area_id) {
       const areaName = room.area_id.replace('area_', '');
       return `${worldDataPath}/rooms/${areaName}`;
     }
     return null;
-  }, [worldDataPath]);
+  }, [worldDataPath, rooms, findExistingAreaFolderForRoom]);
 
   // Load all room files from the workspace
   const loadRooms = useCallback(async () => {
@@ -341,6 +361,19 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
     let areaPath: string;
     let filePath: string;
     
+    // Helper to find existing room folder for an area_id
+    const findExistingAreaFolder = (areaId: string): string | null => {
+      // Look for any room with the same area_id that has a file path
+      const existingRoom = rooms.find((r) => r.area_id === areaId && r.filePath);
+      if (existingRoom?.filePath) {
+        const lastSlash = existingRoom.filePath.lastIndexOf('/');
+        if (lastSlash > 0) {
+          return existingRoom.filePath.substring(0, lastSlash);
+        }
+      }
+      return null;
+    };
+    
     // If we have a source room, use its folder
     if (sourceRoomId) {
       const sourceRoom = rooms.find((r) => r.id === sourceRoomId);
@@ -350,15 +383,27 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
         areaPath = sourceRoom.filePath.substring(0, lastSlash);
         filePath = `${areaPath}/${roomData.id}.yaml`;
       } else {
-        // Fall back to deriving from area_id
-        const areaName = (roomData.area_id || 'unknown').replace('area_', '');
-        areaPath = `${worldDataPath}/rooms/${areaName}`;
+        // Try to find existing folder for this area_id
+        const existingFolder = roomData.area_id ? findExistingAreaFolder(roomData.area_id) : null;
+        if (existingFolder) {
+          areaPath = existingFolder;
+        } else {
+          // Fall back to deriving from area_id (for truly new areas)
+          const areaName = (roomData.area_id || 'unknown').replace('area_', '');
+          areaPath = `${worldDataPath}/rooms/${areaName}`;
+        }
         filePath = `${areaPath}/${roomData.id}.yaml`;
       }
     } else {
-      // No source room - derive from area_id
-      const areaName = (roomData.area_id || 'unknown').replace('area_', '');
-      areaPath = `${worldDataPath}/rooms/${areaName}`;
+      // No source room - try to find existing folder for this area_id first
+      const existingFolder = roomData.area_id ? findExistingAreaFolder(roomData.area_id) : null;
+      if (existingFolder) {
+        areaPath = existingFolder;
+      } else {
+        // Fall back to deriving from area_id (for truly new areas)
+        const areaName = (roomData.area_id || 'unknown').replace('area_', '');
+        areaPath = `${worldDataPath}/rooms/${areaName}`;
+      }
       filePath = `${areaPath}/${roomData.id}.yaml`;
     }
     

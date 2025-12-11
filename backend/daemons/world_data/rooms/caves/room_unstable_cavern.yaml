@@ -1,0 +1,36 @@
+id: room_unstable_cavern
+area_id: area_dark_caves
+name: Unstable Cavern
+description: >-
+  This section of the cave looks dangerously unstable. Cracks spider across the ceiling and loose stones litter
+  the floor. The walls groan ominously with each step you take.
+room_type: cave
+lighting_override: '15'
+exits:
+  east: room_cave_tunnel_1
+on_enter_effect: Pebbles rain down from above as you enter.
+on_exit_effect: You carefully back away from the unstable area.
+triggers:
+  - id: falling_rocks_trap
+    event: on_enter
+    cooldown: 30.0
+    conditions: []
+    actions:
+      - type: message_player
+        message: ⚠️ **CRACK!** The ceiling above you gives way!
+      - type: message_room
+        message: Rocks crash down from the ceiling with a thunderous roar!
+      - type: message_player
+        message: 🪨💥 Heavy stones slam into you as you scramble for cover!
+      - type: damage
+        amount: 8
+        damage_type: bludgeoning
+      - type: message_player
+        message: "(-8 HP from falling rocks)"
+  - id: dust_settles
+    event: on_enter
+    cooldown: 30.0
+    conditions: []
+    actions:
+      - type: message_player
+        message: 💨 Dust and debris fill the air, making it hard to breathe.

@@ -28,7 +28,7 @@ cd backend
 alembic upgrade head
 
 # Start the server
-uvicorn app.main:app --reload --log-level info
+daemons run
 ```
 
 Notes:

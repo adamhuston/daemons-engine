@@ -5,7 +5,7 @@ from .base import BehaviorContext, BehaviorResult, BehaviorScript, behavior
 
 @behavior(
     name="aggressive",
-    description="NPC attacks players on sight",
+    description="NPC attacks players on sight after they enter the room",
     priority=80,
     defaults={
         "aggro_on_sight": True,
@@ -13,6 +13,45 @@ from .base import BehaviorContext, BehaviorResult, BehaviorScript, behavior
     },
 )
 class Aggressive(BehaviorScript):
+    """
+    Standard aggressive behavior - NPC attacks players who enter its room.
+    
+    The attack message is handled by the combat system, so we don't include
+    a separate message here. This allows the attack announcement to appear
+    with combat initiation rather than as a separate early warning.
+    """
+    async def on_player_enter(
+        self, ctx: BehaviorContext, player_id: str
+    ) -> BehaviorResult:
+        if not ctx.config.get("aggro_on_sight", True):
+            return BehaviorResult.nothing()
+
+        # Return attack target without a message - combat system handles messaging
+        # This prevents the "screams and attacks!" appearing before combat actually starts
+        return BehaviorResult(
+            handled=True,
+            attack_target=player_id,
+        )
+
+
+@behavior(
+    name="attacks_on_sight",
+    description="NPC attacks players immediately on sight, before they can react",
+    priority=75,  # Higher priority than aggressive (lower number = runs first)
+    defaults={
+        "aggro_on_sight": True,
+        "attacks_first": True,
+        "instant_aggro": True,  # Flag for engine to process synchronously
+    },
+)
+class AttacksOnSight(BehaviorScript):
+    """
+    Extremely aggressive behavior - NPC attacks immediately when players enter.
+    
+    Unlike regular 'aggressive', this triggers synchronously before the player
+    gets their room prompt, so they cannot move before being attacked.
+    Use for ambush predators, enraged creatures, or trap-like encounters.
+    """
     async def on_player_enter(
         self, ctx: BehaviorContext, player_id: str
     ) -> BehaviorResult:
@@ -22,10 +61,12 @@ class Aggressive(BehaviorScript):
         player = ctx.world.players.get(player_id)
         player_name = player.name if player else "someone"
 
+        # Include a threatening message for instant attacks
         return BehaviorResult(
             handled=True,
             attack_target=player_id,
-            message=f"{ctx.npc.name} snarls and attacks {player_name}!",
+            message=f"{ctx.npc.name} lunges at {player_name} without warning!",
+            custom_data={"instant_aggro": True},
         )
 
 

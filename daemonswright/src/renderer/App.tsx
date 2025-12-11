@@ -26,6 +26,9 @@ const QuestDesigner = React.lazy(() =>
 const DialogueEditor = React.lazy(() =>
   import('./components/DialogueEditor').then((mod) => ({ default: mod.DialogueEditor }))
 );
+const WorldSummary = React.lazy(() =>
+  import('./components/WorldSummary').then((mod) => ({ default: mod.WorldSummary }))
+);
 import { StatusBar } from './components/StatusBar';
 import { MenuBar, EditorView } from './components/MenuBar';
 import { useWorkspace } from './hooks/useWorkspace';
@@ -394,10 +397,9 @@ function App() {
               />
             </Suspense>
           ) : (
-            <div className="empty-state">
-              <h2>Daemonswright Content Studio</h2>
-              <p>Open a world_data folder to begin editing content</p>
-            </div>
+            <Suspense fallback={<EditorFallback />}>
+              <WorldSummary worldDataPath={worldDataPath} />
+            </Suspense>
           )}
         </Content>
       </Layout>

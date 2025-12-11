@@ -2425,7 +2425,7 @@ class WorldEngine:
 
         return events
 
-    def _reload_handler(
+    async def _reload_handler(
         self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
     ) -> list[Event]:
         """[Admin] Reload game content from YAML files."""
@@ -2439,7 +2439,7 @@ class WorldEngine:
         content_type = args.strip().lower() if args and args.strip() else "all"
 
         # Valid content types
-        valid_types = ["all", "abilities", "items", "npcs", "rooms", "areas", "classes"]
+        valid_types = ["all", "items", "npcs", "rooms", "areas", "spawns", "instances"]
 
         if content_type not in valid_types:
             return [
@@ -2448,23 +2448,70 @@ class WorldEngine:
                 )
             ]
 
-        # Attempt to reload content
-        try:
-            if hasattr(self, "content_reloader"):
-                result = self.content_reloader.reload(content_type)
-                events = [
-                    self._msg_to_player(player_id, f"Reloaded {content_type}: {result}")
-                ]
-            else:
-                events = [
-                    self._msg_to_player(
-                        player_id, "Content reload system not available."
-                    )
-                ]
-        except Exception as e:
-            events = [self._msg_to_player(player_id, f"Reload failed: {str(e)}")]
+        # Check if database session factory is available
+        if not self._db_session_factory:
+            return [
+                self._msg_to_player(
+                    player_id, "Content reload not available (no database connection)."
+                )
+            ]
 
-        return events
+        # Attempt to reload content using ContentReloader
+        try:
+            from daemons.routes.admin import ContentReloader, ReloadContentType
+
+            async with self._db_session_factory() as session:
+                reloader = ContentReloader(self, session)
+
+                if content_type == "all":
+                    results = await reloader.reload_all()
+                    total_loaded = sum(
+                        r["items_loaded"] for r in results["results"].values()
+                    )
+                    total_updated = sum(
+                        r["items_updated"] for r in results["results"].values()
+                    )
+                    return [
+                        self._msg_to_player(
+                            player_id,
+                            f"Reloaded all content: {total_loaded} loaded, {total_updated} updated.",
+                        )
+                    ]
+                elif content_type == "items":
+                    result = await reloader.reload_item_templates()
+                elif content_type == "npcs":
+                    result = await reloader.reload_npc_templates()
+                elif content_type == "rooms":
+                    result = await reloader.reload_rooms()
+                elif content_type == "areas":
+                    result = await reloader.reload_areas()
+                elif content_type == "instances":
+                    result = await reloader.reload_item_instances()
+                elif content_type == "spawns":
+                    result = await reloader.reload_npc_spawns()
+                else:
+                    return [
+                        self._msg_to_player(player_id, f"Unknown content type: {content_type}")
+                    ]
+
+                if result.success:
+                    return [
+                        self._msg_to_player(
+                            player_id,
+                            f"Reloaded {content_type}: {result.items_loaded} loaded, {result.items_updated} updated.",
+                        )
+                    ]
+                else:
+                    error_msg = "; ".join(result.errors[:3])  # Show first 3 errors
+                    return [
+                        self._msg_to_player(
+                            player_id,
+                            f"Reload {content_type} had errors: {error_msg}",
+                        )
+                    ]
+
+        except Exception as e:
+            return [self._msg_to_player(player_id, f"Reload failed: {str(e)}")]
 
     def _ban_command_handler(
         self, engine: Any, player_id: PlayerId, args: str, cmd_name: str = ""
@@ -5040,42 +5087,14 @@ class WorldEngine:
         if player.on_move_effect:
             description_lines.append(player.on_move_effect)
 
-        # Show new room (use effective description for trigger overrides)
-        room_emoji = get_room_emoji(new_room.room_type, new_room.room_type_emoji)
-        description_lines.extend(
-            [
-                "",
-                f"**{room_emoji} {new_room.name}**",
-                new_room.get_effective_description(),
-            ]
+        # Add blank line before room description
+        description_lines.append("")
+
+        # Use shared room description formatter (DRY - also used by _look)
+        room_lines = self._format_room_description(
+            new_room, player_id, include_enter_effect=True
         )
-
-        # Trigger enter effect for new room
-        if new_room.on_enter_effect:
-            description_lines.append("")
-            description_lines.append(new_room.on_enter_effect)
-
-        # List other players in the new room
-        description_lines.extend(self._format_room_occupants(new_room, player_id))
-
-        # Show items in new room (Phase 3)
-        if new_room.items:
-            items_here = []
-            for item_id in new_room.items:
-                item = self.world.items[item_id]
-                template = self.world.item_templates[item.template_id]
-                quantity_str = f" x{item.quantity}" if item.quantity > 1 else ""
-                items_here.append(f"  {template.name}{quantity_str}")
-
-            description_lines.append("")
-            description_lines.append("Items here:")
-            description_lines.extend(items_here)
-
-        # Add exits to the room description (show visible exits with door states)
-        exits_str = format_exits_with_doors(new_room)
-        if exits_str:
-            description_lines.append("")
-            description_lines.append(f"Exits: {exits_str}")
+        description_lines.extend(room_lines)
 
         events.append(
             self._msg_to_player(
@@ -5122,8 +5141,20 @@ class WorldEngine:
                 )
             )
 
+        # Check for instant-aggro NPCs (attacks_on_sight behavior)
+        # These attacks happen synchronously BEFORE the player gets their room prompt
+        instant_aggro_events, handled_npcs = self._check_instant_aggro_npcs(
+            new_room_id, player_id
+        )
+        if instant_aggro_events:
+            # Prepend instant attack events so player sees them before room description
+            events = instant_aggro_events + events
+
         # Trigger on_player_enter for NPCs in the new room (aggressive NPCs attack)
-        asyncio.create_task(self._trigger_npc_player_enter(new_room_id, player_id))
+        # Skip NPCs already handled by instant aggro
+        asyncio.create_task(
+            self._trigger_npc_player_enter(new_room_id, player_id, handled_npcs)
+        )
 
         # Fire on_enter triggers for the new room (after arrival)
         enter_trigger_ctx = TriggerContext(
@@ -5161,57 +5192,51 @@ class WorldEngine:
             # Look at room
             return self._look(player_id)
 
-    def _look(self, player_id: PlayerId) -> list[Event]:
+    def _format_room_description(
+        self, room: "WorldRoom", player_id: PlayerId, include_enter_effect: bool = True
+    ) -> list[str]:
+        """
+        Generate room description lines with proper lighting visibility.
+
+        This is the single source of truth for room descriptions, used by both
+        _look() and _move_player() to ensure consistent lighting behavior.
+
+        Args:
+            room: The room to describe
+            player_id: The player viewing the room
+            include_enter_effect: Whether to include on_enter_effect text
+
+        Returns:
+            List of description lines (may be darkness message if pitch black)
+        """
         import time
 
         world = self.world
-
-        if player_id not in world.players:
-            return [
-                self._msg_to_player(
-                    player_id,
-                    "You have no form here. (Player not found)",
-                )
-            ]
-
-        player = world.players[player_id]
-
-        # Check if sleeping
-        sleeping_check = self._check_sleeping(player_id)
-        if sleeping_check:
-            return sleeping_check
-        room = world.rooms.get(player.room_id)
-
-        if room is None:
-            return [
-                self._msg_to_player(
-                    player_id,
-                    "There is only darkness. (Room not found)",
-                )
-            ]
+        lines: list[str] = []
 
         # Phase 11: Check light level for visibility
         current_time = time.time()
         light_level = self.lighting_system.calculate_room_light(room, current_time)
         visibility = self.lighting_system.get_visibility_level(light_level)
 
-        # If pitch black, show darkness message
         from daemons.engine.systems.lighting import VisibilityLevel
-
-        if visibility == VisibilityLevel.NONE:
-            return [
-                self._msg_to_player(
-                    player_id,
-                    "It is pitch black. You can't see anything.\n"
-                    "You might need a light source to see your surroundings.",
-                )
-            ]
 
         room_emoji = get_room_emoji(room.room_type, room.room_type_emoji)
 
+        # If pitch black, show darkness message
+        if visibility == VisibilityLevel.NONE:
+            lines.extend(
+                [
+                    f"**{room_emoji} {room.name}**",
+                    "It is pitch black. You can't see anything.",
+                    "You might need a light source to see your surroundings.",
+                ]
+            )
+            return lines
+
         # Get description based on light level
         description = self.lighting_system.get_visible_description(room, light_level)
-        lines: list[str] = [f"**{room_emoji} {room.name}**", description]
+        lines.extend([f"**{room_emoji} {room.name}**", description])
 
         # Phase 17.1: Show temperature for extreme conditions
         if hasattr(self, "temperature_system") and self.temperature_system:
@@ -5239,15 +5264,22 @@ class WorldEngine:
                 lines.append("")
                 lines.append(flora_desc)
 
+        # Trigger enter effect for room (optional, used during movement)
+        if include_enter_effect and room.on_enter_effect:
+            lines.append("")
+            lines.append(room.on_enter_effect)
+
         # List all entities (players and NPCs) in the same room
         # Filter by visibility
         if visibility != VisibilityLevel.MINIMAL:  # Can see entities in dim+ light
             lines.extend(self._format_room_entities(room, player_id))
         elif visibility == VisibilityLevel.MINIMAL:
-            # In minimal light, show only that entities are present
-            entity_count = len([e for e in room.entities if e != player_id])
-            if entity_count > 0:
-                lines.append(f"\nYou sense {entity_count} other presence(s) nearby.")
+            # In minimal light, show entities as "Someone" (can't identify them)
+            other_entities = [e for e in room.entities if e != player_id]
+            if other_entities:
+                lines.append("")
+                for _ in other_entities:
+                    lines.append("Someone is here.")
 
         # Show items in room (Phase 3) - only if light is sufficient
         if room.items and self.lighting_system.can_see_item_details(light_level):
@@ -5265,12 +5297,43 @@ class WorldEngine:
             lines.append("\nYou can barely make out some objects on the ground.")
 
         # List visible exits with door states
-        # Always show exits unless pitch black (already handled above)
         exits_str = format_exits_with_doors(room)
         if exits_str:
             lines.append("")
             lines.append(f"Exits: {exits_str}")
 
+        return lines
+
+    def _look(self, player_id: PlayerId) -> list[Event]:
+        world = self.world
+
+        if player_id not in world.players:
+            return [
+                self._msg_to_player(
+                    player_id,
+                    "You have no form here. (Player not found)",
+                )
+            ]
+
+        player = world.players[player_id]
+
+        # Check if sleeping
+        sleeping_check = self._check_sleeping(player_id)
+        if sleeping_check:
+            return sleeping_check
+
+        room = world.rooms.get(player.room_id)
+
+        if room is None:
+            return [
+                self._msg_to_player(
+                    player_id,
+                    "There is only darkness. (Room not found)",
+                )
+            ]
+
+        # Use shared room description formatter (DRY - also used by _move_player)
+        lines = self._format_room_description(room, player_id, include_enter_effect=False)
         return [self._msg_to_player(player_id, "\n".join(lines))]
 
     def _look_at_item(self, player_id: PlayerId, item_name: str) -> list[Event]:
@@ -6281,8 +6344,16 @@ class WorldEngine:
         """Show current combat status. Delegates to CombatSystem."""
         return self.combat_system.show_combat_status(player_id)
 
-    async def _trigger_npc_player_enter(self, room_id: str, player_id: str) -> None:
-        """Trigger on_player_enter for all NPCs in a room when a player enters."""
+    async def _trigger_npc_player_enter(
+        self, room_id: str, player_id: str, skip_npcs: set[str] | None = None
+    ) -> None:
+        """Trigger on_player_enter for all NPCs in a room when a player enters.
+        
+        Args:
+            room_id: The room the player entered
+            player_id: The player who entered
+            skip_npcs: Set of NPC IDs to skip (already processed by instant aggro)
+        """
         room = self.world.rooms.get(room_id)
         if not room:
             return
@@ -6291,8 +6362,14 @@ class WorldEngine:
         if not player:
             return
 
+        skip_npcs = skip_npcs or set()
+
         for entity_id in list(room.entities):
             if entity_id not in self.world.npcs:
+                continue
+
+            # Skip NPCs already handled by instant aggro
+            if entity_id in skip_npcs:
                 continue
 
             npc = self.world.npcs[entity_id]
@@ -6315,6 +6392,72 @@ class WorldEngine:
                 # Dispatch events
                 if events:
                     await self._dispatch_events(events)
+
+    def _check_instant_aggro_npcs(
+        self, room_id: str, player_id: str
+    ) -> tuple[list[Event], set[str]]:
+        """
+        Check for NPCs with instant_aggro behavior in a room and process their attacks.
+        
+        This is called synchronously during movement to handle attacks_on_sight
+        behavior, where the player should be attacked before they can react.
+        
+        Args:
+            room_id: The room to check
+            player_id: The player entering the room
+            
+        Returns:
+            Tuple of (attack events to add to movement events, set of NPC IDs handled)
+        """
+        from .behaviors import get_behavior_instances, resolve_behaviors
+        
+        events: list[Event] = []
+        handled_npcs: set[str] = set()
+        
+        room = self.world.rooms.get(room_id)
+        if not room:
+            return events, handled_npcs
+            
+        player = self.world.players.get(player_id)
+        if not player:
+            return events, handled_npcs
+        
+        for entity_id in list(room.entities):
+            if entity_id not in self.world.npcs:
+                continue
+                
+            npc = self.world.npcs[entity_id]
+            if not npc.is_alive():
+                continue
+                
+            template = self.world.npc_templates.get(npc.template_id)
+            if not template:
+                continue
+            
+            # Check if this NPC has instant_aggro behavior
+            behavior_config = resolve_behaviors(template.behaviors)
+            if not behavior_config.get("instant_aggro", False):
+                continue
+            
+            if not behavior_config.get("aggro_on_sight", True):
+                continue
+            
+            # This NPC attacks on sight instantly!
+            handled_npcs.add(entity_id)
+            
+            # Generate attack events
+            attack_events = self.combat_system.start_attack_entity(entity_id, player_id)
+            
+            # Add a threatening message for the instant attack
+            events.append(
+                self._msg_to_room(
+                    room_id,
+                    f"{npc.name} lunges at {player.name} without warning!",
+                )
+            )
+            events.extend(attack_events)
+        
+        return events, handled_npcs
 
     async def _trigger_npc_combat_start(self, npc_id: str, attacker_id: str) -> None:
         """Trigger on_combat_start behavior hooks for an NPC."""

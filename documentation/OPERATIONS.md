@@ -4,6 +4,25 @@ This document covers server management, troubleshooting, and engine development.
 
 ---
 
+## Default Admin Account
+
+On first run, the server seeds a default admin account:
+
+| Field    | Value   |
+|----------|---------|
+| Username | `admin` |
+| Password | `admin` |
+
+**⚠️ SECURITY WARNING**: Change the default password immediately in production!
+
+Characters created under this account automatically have full admin permissions, including:
+- All game master abilities (teleport, spawn, modify stats)
+- User management (ban, unban, role assignment)
+- Server commands (reload, maintenance mode)
+- Full API access
+
+---
+
 ## Server Options
 
 ```bash
@@ -100,13 +119,52 @@ daemons run --port 8080
 
 ## Content Hot Reload
 
-When running with `--reload`, content changes are picked up automatically. Or reload manually in-game:
+**Note:** The `--reload` flag on uvicorn only hot-reloads Python code changes. YAML content changes require the `reload` command.
+
+The reload system:
+- **Updates** existing entities with changes from YAML files
+- **Creates** new entities from YAML files that don't exist yet (adds to database + memory)
+- Preserves player positions and entity states during reload
+
+### In-Game Admin Commands
 
 ```bash
-# In-game (as admin)
-reload items
-reload npcs
-reload rooms
+# Reload templates (definitions)
+reload items       # Item templates
+reload npcs        # NPC templates
+reload rooms       # Room definitions
+reload areas       # Area definitions
+
+# Reload instances (placed in world)
+reload instances   # Item instances (pre-placed items, flora)
+reload spawns      # NPC spawns (fauna, placed NPCs)
+
+# Reload everything
+reload all         # All templates + all instances
+```
+
+### API Endpoints
+
+```bash
+# Reload all content
+curl -X POST http://localhost:8000/api/admin/content/reload \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"content_type": "all"}'
+
+# Reload specific content type
+curl -X POST http://localhost:8000/api/admin/content/reload \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"content_type": "rooms"}'
+
+# Reload schemas
+curl -X POST http://localhost:8000/api/admin/schemas/reload \
+  -H "Authorization: Bearer <admin_token>"
+
+# Reload classes/abilities/behaviors
+curl -X POST http://localhost:8000/api/admin/classes/reload \
+  -H "Authorization: Bearer <admin_token>"
 ```
 
 ---
@@ -153,6 +211,13 @@ pip install pre-commit ruff black isort mypy safety
 
 ### Run the Backend
 
+```bash
+cd backend
+alembic upgrade head
+daemons run
+```
+
+Alternative (without CLI):
 ```bash
 cd backend
 alembic upgrade head

@@ -1,8 +1,0 @@
-version: 1
-grid_size: 150
-rooms:
-  room_meadow_north:
-    x: 10
-    'y': -1
-    z: 0
-layer_names: {}

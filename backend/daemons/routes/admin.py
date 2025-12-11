@@ -4064,6 +4064,10 @@ class ContentReloader:
             yaml_files = list(items_dir.glob("**/*.yaml")) if items_dir.exists() else []
 
         for yaml_file in yaml_files:
+            # Skip schema files
+            if yaml_file.name.startswith("_"):
+                continue
+
             try:
                 with open(yaml_file, encoding="utf-8") as f:
                     item_data = yaml.safe_load(f)
@@ -4141,6 +4145,10 @@ class ContentReloader:
             yaml_files = list(npcs_dir.glob("**/*.yaml")) if npcs_dir.exists() else []
 
         for yaml_file in yaml_files:
+            # Skip schema files
+            if yaml_file.name.startswith("_"):
+                continue
+
             try:
                 with open(yaml_file, encoding="utf-8") as f:
                     npc_data = yaml.safe_load(f)
@@ -4200,9 +4208,14 @@ class ContentReloader:
         """
         Reload room data from YAML files.
 
-        Rooms with yaml_managed=False (API-modified) are skipped unless force=True.
+        - Updates existing rooms in memory
+        - Creates NEW rooms in both database and memory
+        - Rooms with yaml_managed=False (API-modified) are skipped unless force=True.
         """
         import yaml
+
+        from daemons.models import Room as RoomModel
+        from daemons.engine.world import WorldRoom
 
         rooms_dir = self.world_data_dir / "rooms"
         result = ReloadResult(
@@ -4221,6 +4234,10 @@ class ContentReloader:
         skipped_rooms = []
 
         for yaml_file in yaml_files:
+            # Skip schema and layout files
+            if yaml_file.name.startswith("_"):
+                continue
+
             try:
                 with open(yaml_file, encoding="utf-8") as f:
                     room_data = yaml.safe_load(f)
@@ -4243,8 +4260,11 @@ class ContentReloader:
                     existing_room.name = room_data["name"]
                     existing_room.description = room_data["description"]
                     existing_room.room_type = room_data.get("room_type", "ethereal")
+                    existing_room.area_id = room_data.get("area_id")
                     existing_room.on_enter_effect = room_data.get("on_enter_effect")
                     existing_room.on_exit_effect = room_data.get("on_exit_effect")
+                    existing_room.lighting_override = room_data.get("lighting_override")
+                    existing_room.temperature_override = room_data.get("temperature_override")
 
                     # Update exits
                     exits = room_data.get("exits", {})
@@ -4256,14 +4276,55 @@ class ContentReloader:
 
                     result.items_updated += 1
                 else:
-                    result.warnings.append(
-                        f"Room {room_id} not found in world (add via database)"
+                    # NEW: Create room in database and add to world
+                    exits = room_data.get("exits", {})
+
+                    # Create database model
+                    db_room = RoomModel(
+                        id=room_id,
+                        name=room_data["name"],
+                        description=room_data["description"],
+                        room_type=room_data.get("room_type", "ethereal"),
+                        area_id=room_data.get("area_id"),
+                        north_id=exits.get("north"),
+                        south_id=exits.get("south"),
+                        east_id=exits.get("east"),
+                        west_id=exits.get("west"),
+                        up_id=exits.get("up"),
+                        down_id=exits.get("down"),
+                        on_enter_effect=room_data.get("on_enter_effect"),
+                        on_exit_effect=room_data.get("on_exit_effect"),
+                        lighting_override=room_data.get("lighting_override"),
+                        temperature_override=room_data.get("temperature_override"),
+                        yaml_managed=True,
                     )
-                    result.items_failed += 1
+                    self.session.add(db_room)
+
+                    # Create in-memory WorldRoom
+                    world_room = WorldRoom(
+                        id=room_id,
+                        name=room_data["name"],
+                        description=room_data["description"],
+                        room_type=room_data.get("room_type", "ethereal"),
+                        area_id=room_data.get("area_id"),
+                        exits=exits,
+                        on_enter_effect=room_data.get("on_enter_effect"),
+                        on_exit_effect=room_data.get("on_exit_effect"),
+                        lighting_override=room_data.get("lighting_override"),
+                        temperature_override=room_data.get("temperature_override"),
+                        yaml_managed=True,
+                    )
+                    self.world.rooms[room_id] = world_room
+
+                    result.items_loaded += 1
 
             except Exception as e:
                 result.errors.append(f"{yaml_file}: {e}")
                 result.items_failed += 1
+
+        # Commit new rooms to database
+        if result.items_loaded > 0:
+            await self.session.commit()
 
         # Report skipped API-managed rooms
         if skipped_rooms:
@@ -4282,8 +4343,16 @@ class ContentReloader:
         return result
 
     async def reload_areas(self, file_path: Path | None = None) -> ReloadResult:
-        """Reload area data from YAML files."""
+        """
+        Reload area data from YAML files.
+
+        - Updates existing areas in memory
+        - Creates NEW areas in both database and memory
+        """
         import yaml
+
+        from daemons.models import Area as AreaModel
+        from daemons.engine.world import WorldArea, WorldTime
 
         areas_dir = self.world_data_dir / "areas"
         result = ReloadResult(
@@ -4300,6 +4369,10 @@ class ContentReloader:
             yaml_files = list(areas_dir.glob("**/*.yaml")) if areas_dir.exists() else []
 
         for yaml_file in yaml_files:
+            # Skip schema files
+            if yaml_file.name.startswith("_"):
+                continue
+
             try:
                 with open(yaml_file, encoding="utf-8") as f:
                     area_data = yaml.safe_load(f)
@@ -4329,17 +4402,313 @@ class ContentReloader:
                     existing_area.default_respawn_time = area_data.get(
                         "default_respawn_time", 300
                     )
+                    existing_area.base_temperature = area_data.get("base_temperature", 70)
+                    existing_area.temperature_variation = area_data.get("temperature_variation", 20)
 
                     result.items_updated += 1
                 else:
-                    result.warnings.append(
-                        f"Area {area_id} not found in world (add via database)"
+                    # NEW: Create area in database and add to world
+                    db_area = AreaModel(
+                        id=area_id,
+                        name=area_data["name"],
+                        description=area_data.get("description", ""),
+                        time_scale=area_data.get("time_scale", 1.0),
+                        biome=area_data.get("biome", "ethereal"),
+                        climate=area_data.get("climate", "temperate"),
+                        ambient_lighting=area_data.get("ambient_lighting", "normal"),
+                        weather_profile=area_data.get("weather_profile", "clear"),
+                        danger_level=area_data.get("danger_level", 1),
+                        base_temperature=area_data.get("base_temperature", 70),
+                        temperature_variation=area_data.get("temperature_variation", 20),
+                        starting_day=area_data.get("starting_day", 1),
+                        starting_hour=area_data.get("starting_hour", 6),
+                        starting_minute=area_data.get("starting_minute", 0),
                     )
-                    result.items_failed += 1
+                    self.session.add(db_area)
+
+                    # Create in-memory WorldArea
+                    world_area = WorldArea(
+                        id=area_id,
+                        name=area_data["name"],
+                        description=area_data.get("description", ""),
+                        time_scale=area_data.get("time_scale", 1.0),
+                        biome=area_data.get("biome", "ethereal"),
+                        climate=area_data.get("climate", "temperate"),
+                        ambient_lighting=area_data.get("ambient_lighting", "normal"),
+                        weather_profile=area_data.get("weather_profile", "clear"),
+                        danger_level=area_data.get("danger_level", 1),
+                        magic_intensity=area_data.get("magic_intensity", "normal"),
+                        default_respawn_time=area_data.get("default_respawn_time", 300),
+                        base_temperature=area_data.get("base_temperature", 70),
+                        temperature_variation=area_data.get("temperature_variation", 20),
+                        area_time=WorldTime(
+                            day=area_data.get("starting_day", 1),
+                            hour=area_data.get("starting_hour", 6),
+                            minute=area_data.get("starting_minute", 0),
+                        ),
+                    )
+                    self.world.areas[area_id] = world_area
+
+                    result.items_loaded += 1
 
             except Exception as e:
                 result.errors.append(f"{yaml_file}: {e}")
                 result.items_failed += 1
+
+        # Commit new areas to database
+        if result.items_loaded > 0:
+            await self.session.commit()
+
+        if result.items_failed > 0:
+            result.success = False
+
+        return result
+
+    async def reload_item_instances(self) -> ReloadResult:
+        """
+        Reload item instances (pre-placed items, flora) from YAML files.
+
+        - Creates NEW item instances in both database and memory
+        - Skips instances that already exist (by checking template_id + room_id combo)
+        """
+        import uuid
+        import yaml
+
+        from daemons.models import ItemInstance as ItemInstanceModel
+        from daemons.engine.world import WorldItem
+
+        instances_dir = self.world_data_dir / "item_instances"
+        result = ReloadResult(
+            success=True,
+            content_type="item_instances",
+            items_loaded=0,
+            items_updated=0,
+            items_failed=0,
+        )
+
+        if not instances_dir.exists():
+            return result
+
+        yaml_files = list(instances_dir.glob("**/*.yaml"))
+
+        for yaml_file in yaml_files:
+            # Skip schema files
+            if yaml_file.name.startswith("_"):
+                continue
+
+            try:
+                with open(yaml_file, encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+
+                if not data:
+                    continue
+
+                items = data.get("items", [])
+                for item_data in items:
+                    template_id = item_data.get("template_id")
+                    room_id = item_data.get("room_id")
+
+                    if not template_id or not room_id:
+                        result.errors.append(f"{yaml_file}: Item missing template_id or room_id")
+                        result.items_failed += 1
+                        continue
+
+                    # Check if room exists
+                    if room_id not in self.world.rooms:
+                        result.warnings.append(f"Room {room_id} not found, skipping item")
+                        continue
+
+                    # Check if template exists
+                    template = self.world.item_templates.get(template_id)
+                    if not template:
+                        result.warnings.append(f"Template {template_id} not found, skipping item")
+                        continue
+
+                    # Check if this item already exists in the room (by template)
+                    room = self.world.rooms[room_id]
+                    already_exists = False
+                    for item_id in room.items:
+                        existing_item = self.world.items.get(item_id)
+                        if existing_item and existing_item.template_id == template_id:
+                            already_exists = True
+                            result.items_updated += 1
+                            break
+
+                    if already_exists:
+                        continue
+
+                    # Create new item instance
+                    instance_id = str(uuid.uuid4())
+
+                    # Create database model
+                    db_item = ItemInstanceModel(
+                        id=instance_id,
+                        template_id=template_id,
+                        room_id=room_id,
+                        player_id=None,
+                        container_id=None,
+                        quantity=item_data.get("quantity", 1),
+                        current_durability=item_data.get("current_durability"),
+                        equipped_slot=None,
+                        instance_data=item_data.get("instance_data", {}),
+                    )
+                    self.session.add(db_item)
+
+                    # Create in-memory WorldItem
+                    world_item = WorldItem(
+                        id=instance_id,
+                        template_id=template_id,
+                        name=template.name,
+                        keywords=list(template.keywords),
+                        room_id=room_id,
+                        player_id=None,
+                        container_id=None,
+                        quantity=item_data.get("quantity", 1),
+                        current_durability=item_data.get("current_durability"),
+                        equipped_slot=None,
+                        instance_data=item_data.get("instance_data", {}),
+                        _description=template.description,
+                    )
+                    self.world.items[instance_id] = world_item
+                    room.items.add(instance_id)
+
+                    result.items_loaded += 1
+
+            except Exception as e:
+                result.errors.append(f"{yaml_file}: {e}")
+                result.items_failed += 1
+
+        # Commit new instances to database
+        if result.items_loaded > 0:
+            await self.session.commit()
+
+        if result.items_failed > 0:
+            result.success = False
+
+        return result
+
+    async def reload_npc_spawns(self) -> ReloadResult:
+        """
+        Reload NPC spawns (fauna, placed NPCs) from YAML files.
+
+        - Creates NEW NPC instances in both database and memory
+        - Skips instances that already exist (by checking template_id + room_id combo)
+        """
+        import uuid
+        import yaml
+
+        from daemons.models import NpcInstance as NpcInstanceModel
+        from daemons.engine.world import WorldNpc, EntityType
+
+        spawns_dir = self.world_data_dir / "npc_spawns"
+        result = ReloadResult(
+            success=True,
+            content_type="npc_spawns",
+            items_loaded=0,
+            items_updated=0,
+            items_failed=0,
+        )
+
+        if not spawns_dir.exists():
+            return result
+
+        yaml_files = list(spawns_dir.glob("**/*.yaml"))
+
+        for yaml_file in yaml_files:
+            # Skip schema files
+            if yaml_file.name.startswith("_"):
+                continue
+
+            try:
+                with open(yaml_file, encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+
+                if not data:
+                    continue
+
+                spawns = data.get("spawns", []) or []
+                for spawn in spawns:
+                    template_id = spawn.get("template_id")
+                    room_id = spawn.get("room_id")
+
+                    if not template_id or not room_id:
+                        result.errors.append(f"{yaml_file}: Spawn missing template_id or room_id")
+                        result.items_failed += 1
+                        continue
+
+                    # Check if room exists
+                    if room_id not in self.world.rooms:
+                        result.warnings.append(f"Room {room_id} not found, skipping NPC spawn")
+                        continue
+
+                    # Check if template exists
+                    template = self.world.npc_templates.get(template_id)
+                    if not template:
+                        result.warnings.append(f"NPC template {template_id} not found, skipping")
+                        continue
+
+                    # Check if this NPC already exists in the room (by template)
+                    room = self.world.rooms[room_id]
+                    already_exists = False
+                    for entity_id in room.entities:
+                        existing_npc = self.world.npcs.get(entity_id)
+                        if existing_npc and existing_npc.template_id == template_id:
+                            already_exists = True
+                            result.items_updated += 1
+                            break
+
+                    if already_exists:
+                        continue
+
+                    # Create new NPC instance
+                    instance_id = str(uuid.uuid4())
+                    current_health = spawn.get("current_health") or template.max_health
+
+                    # Create database model
+                    db_npc = NpcInstanceModel(
+                        id=instance_id,
+                        template_id=template_id,
+                        room_id=room_id,
+                        spawn_room_id=room_id,
+                        current_health=current_health,
+                        is_alive=True,
+                        respawn_time=spawn.get("respawn_time"),
+                        instance_data=spawn.get("instance_data", {}),
+                    )
+                    self.session.add(db_npc)
+
+                    # Create in-memory WorldNpc
+                    world_npc = WorldNpc(
+                        id=instance_id,
+                        entity_type=EntityType.NPC,
+                        template_id=template_id,
+                        name=template.name,
+                        room_id=room_id,
+                        spawn_room_id=room_id,
+                        current_health=current_health,
+                        max_health=template.max_health,
+                        is_alive=True,
+                        respawn_time=spawn.get("respawn_time"),
+                        instance_data=spawn.get("instance_data", {}),
+                        # Copy stats from template
+                        level=template.level,
+                        armor_class=template.armor_class,
+                        strength=template.strength,
+                        dexterity=template.dexterity,
+                        intelligence=template.intelligence,
+                    )
+                    self.world.npcs[instance_id] = world_npc
+                    room.entities.add(instance_id)
+
+                    result.items_loaded += 1
+
+            except Exception as e:
+                result.errors.append(f"{yaml_file}: {e}")
+                result.items_failed += 1
+
+        # Commit new instances to database
+        if result.items_loaded > 0:
+            await self.session.commit()
 
         if result.items_failed > 0:
             result.success = False
@@ -4347,12 +4716,14 @@ class ContentReloader:
         return result
 
     async def reload_all(self, force: bool = False) -> dict:
-        """Reload all content types."""
+        """Reload all content types including instances."""
         results = {
             "areas": await self.reload_areas(),
             "rooms": await self.reload_rooms(force=force),
             "item_templates": await self.reload_item_templates(),
             "npc_templates": await self.reload_npc_templates(),
+            "item_instances": await self.reload_item_instances(),
+            "npc_spawns": await self.reload_npc_spawns(),
         }
 
         overall_success = all(r.success for r in results.values())
