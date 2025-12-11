@@ -1,0 +1,37 @@
+# Wooden Torch - Basic light source
+# Provides illumination when equipped or dropped on the ground
+
+id: item_wooden_torch
+name: Wooden Torch
+description: A sturdy wooden stick wrapped with oil-soaked rags at one end. It crackles with warm, flickering flame.
+item_type: light_source
+item_subtype: torch
+equipment_slot: offhand
+
+stat_modifiers: {}
+
+weight: 1.0
+max_stack_size: 5
+
+has_durability: false
+max_durability: null
+
+is_container: false
+is_consumable: false
+
+# Phase 11: Light source properties
+provides_light: true
+light_intensity: 35
+light_duration: null  # Permanent (magic torch that never burns out for testing)
+
+flavor_text: The flames dance hypnotically, casting long shadows on the walls.
+rarity: common
+value: 5
+
+flags: {}
+
+keywords:
+  - torch
+  - light
+  - flame
+  - fire

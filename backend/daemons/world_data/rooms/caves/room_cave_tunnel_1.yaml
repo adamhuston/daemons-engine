@@ -7,6 +7,7 @@ lighting_override: '5'
 exits:
   south: room_cave_entrance
   north: room_cave_chamber
+  west: room_unstable_cavern
 on_enter_effect: The darkness presses in around you.
 on_exit_effect: null
 triggers:

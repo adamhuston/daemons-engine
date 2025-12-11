@@ -1,0 +1,84 @@
+/**
+ * WorldSummary Component Styles
+ */
+
+.world-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 48px;
+  overflow: auto;
+}
+
+.world-summary.loading {
+  gap: 16px;
+}
+
+.world-summary-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.world-summary-header h2 {
+  margin-bottom: 8px;
+  color: var(--color-text-primary);
+}
+
+.world-summary-grid {
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 32px;
+}
+
+.world-summary-card {
+  text-align: center;
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+  transition: all 0.2s ease;
+}
+
+.world-summary-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.world-summary-card .ant-statistic-title {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.world-summary-card .ant-statistic-content {
+  color: var(--color-text-primary);
+}
+
+.world-summary-card .ant-statistic-content-prefix {
+  margin-right: 8px;
+  font-size: 18px;
+}
+
+.world-summary-empty {
+  text-align: center;
+  padding: 32px;
+  max-width: 400px;
+}
+
+.world-summary-hint {
+  margin-top: 24px;
+  padding: 24px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  max-width: 500px;
+}
+
+.world-summary-hint .hint-list {
+  margin: 8px 0 0 20px;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.world-summary-hint .hint-list li {
+  margin-bottom: 4px;
+  color: var(--color-text-secondary);
+}

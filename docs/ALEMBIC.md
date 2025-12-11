@@ -134,7 +134,7 @@ alembic upgrade head
 5. **Test your changes**
 
 ```bash
-uvicorn app.main:app --reload
+daemons run
 ```
 
 The app now uses the new schema without losing data!
@@ -155,7 +155,7 @@ cd backend
 alembic upgrade head
 
 # 4. Restart the application
-uvicorn app.main:app --reload --log-level info
+daemons run
 ```
 
 ### Zero-Downtime Deployment (Advanced)

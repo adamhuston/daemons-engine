@@ -229,7 +229,27 @@ Random movement to adjacent rooms. Good for giving fauna realistic movement.
 Follows a set path between rooms. Useful for creatures with regular routes.
 
 ### `aggressive`
-Attacks players on sight. Use for hostile creatures like bears.
+Attacks players on sight. The attack begins after the player enters the room and sees
+the room description. This gives players a moment to react before combat starts.
+Use for hostile creatures like bears or goblins.
+
+### `attacks_on_sight`
+**Extremely aggressive** - attacks players immediately when they enter, before they
+can react or move away. The attack happens synchronously with room entry, so the
+player sees the attack message before (or with) the room description. Use for:
+- Ambush predators
+- Enraged creatures
+- Trap-like encounters
+- Boss rooms where escape should be difficult
+
+**Configuration:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `instant_aggro` | true | Triggers immediate attack on room entry |
+| `aggro_on_sight` | true | Whether to attack (can be disabled) |
+
+**Example:** A cornered, starving wolf in a cave would use `attacks_on_sight` while a
+territorial wolf guarding its den would use `aggressive`.
 
 ### `cowardly`
 Flees when health drops below threshold. Already built into flee_threshold.

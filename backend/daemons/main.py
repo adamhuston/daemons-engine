@@ -32,13 +32,13 @@ from .engine.loader import (
     load_world,
     restore_player_quest_progress,
 )
-from .engine.systems.auth import AuthSystem, verify_access_token
+from .engine.systems.auth import AuthSystem, hash_password, verify_access_token
 from .input_sanitization import sanitize_player_name
 from .legacy_deprecation import (
     legacy_deprecation_manager,
 )
 from .metrics import init_metrics
-from .models import Base, Player, PlayerInventory
+from .models import Base, Player, PlayerInventory, UserAccount
 from .rate_limit import (
     RATE_LIMITS,
     is_chat_command,
@@ -240,8 +240,41 @@ app.include_router(admin_router)
 
 async def seed_world(session: AsyncSession) -> None:
     """
-    Seed test players only. Rooms and areas are loaded from YAML via migrations.
+    Seed test players and default admin account.
+    Rooms and areas are loaded from YAML via migrations.
     """
+    import time
+
+    # ========================================================================
+    # Seed default admin account
+    # ========================================================================
+    # Check if admin account already exists
+    result = await session.execute(
+        select(UserAccount).where(UserAccount.username == "admin")
+    )
+    if result.scalar_one_or_none() is None:
+        admin_account = UserAccount(
+            id=str(uuid.uuid4()),
+            username="admin",
+            email="admin@localhost",
+            password_hash=hash_password("admin"),  # Default password: admin
+            role="admin",  # Full admin access
+            is_active=True,
+            created_at=time.time(),
+            last_login=None,
+            active_character_id=None,
+        )
+        session.add(admin_account)
+        logger.info(
+            "Seeded default admin account (username: admin, password: admin)"
+        )
+        logger.warning(
+            "⚠️  SECURITY: Change the default admin password immediately!"
+        )
+
+    # ========================================================================
+    # Seed test players
+    # ========================================================================
     # Start players in the center of the grid (1, 1, 1)
     start_room_id = "room_1_1_1"
 

@@ -54,6 +54,7 @@ class CombatSystem:
     - Loot dropping with configurable drop tables
     - Flee mechanic with dex-based difficulty scaling
     - Level-up integration
+    - Darkness anonymization for combat messages
 
     Usage:
         combat = CombatSystem(ctx, config=CombatConfig())
@@ -64,6 +65,71 @@ class CombatSystem:
     def __init__(self, ctx: GameContext, config: CombatConfig | None = None) -> None:
         self.ctx = ctx
         self.config = config or CombatConfig()
+
+    # ---------- Visibility Helpers ----------
+
+    def _get_room_visibility(self, room_id: "RoomId") -> str:
+        """
+        Get the visibility level for a room.
+        
+        Returns:
+            Visibility level string: "none", "minimal", "partial", "normal", "enhanced"
+        """
+        if not hasattr(self.ctx, "lighting_system") or not self.ctx.lighting_system:
+            return "normal"
+        
+        room = self.ctx.world.rooms.get(room_id)
+        if not room:
+            return "normal"
+        
+        light_level = self.ctx.lighting_system.calculate_room_light(room, time.time())
+        visibility = self.ctx.lighting_system.get_visibility_level(light_level)
+        return visibility.value
+
+    def _get_display_name_for_observer(
+        self, 
+        entity_id: "EntityId", 
+        observer_id: "EntityId",
+        room_id: "RoomId"
+    ) -> str:
+        """
+        Get the display name of an entity as seen by an observer.
+        
+        In low visibility (NONE or MINIMAL), entities appear as "Someone".
+        The observer can always see themselves clearly.
+        
+        Args:
+            entity_id: The entity whose name to get
+            observer_id: The entity observing (can see themselves)
+            room_id: The room where this is happening
+            
+        Returns:
+            The entity's name or "Someone" if visibility is too low
+        """
+        # You can always see yourself
+        if entity_id == observer_id:
+            entity = self.ctx.world.players.get(entity_id) or self.ctx.world.npcs.get(entity_id)
+            return entity.name if entity else "Someone"
+        
+        visibility = self._get_room_visibility(room_id)
+        
+        # In minimal or no visibility, can't identify others
+        if visibility in ("none", "minimal"):
+            return "Someone"
+        
+        # Normal visibility - show actual name
+        entity = self.ctx.world.players.get(entity_id) or self.ctx.world.npcs.get(entity_id)
+        return entity.name if entity else "Someone"
+
+    def _should_anonymize_room_broadcast(self, room_id: "RoomId") -> bool:
+        """
+        Check if room broadcasts should use anonymous names.
+        
+        Returns:
+            True if visibility is too low to identify combatants
+        """
+        visibility = self._get_room_visibility(room_id)
+        return visibility in ("none", "minimal")
 
     # ---------- Combat Initiation ----------
 
@@ -142,20 +208,32 @@ class CombatSystem:
             )
         )
 
-        # Notify target
+        # Notify target (anonymize attacker name if dark)
         if target.id in world.players:
+            attacker_name_for_target = self._get_display_name_for_observer(
+                player_id, target.id, room.id
+            )
             events.append(
-                self.ctx.msg_to_player(target.id, f"{player.name} attacks you!")
+                self.ctx.msg_to_player(target.id, f"{attacker_name_for_target} attacks you!")
             )
 
-        # Broadcast to room
-        events.append(
-            self.ctx.msg_to_room(
-                room.id,
-                f"{player.name} attacks {target.name}!",
-                exclude={player_id, target.id},
+        # Broadcast to room (anonymize both names if dark)
+        if self._should_anonymize_room_broadcast(room.id):
+            events.append(
+                self.ctx.msg_to_room(
+                    room.id,
+                    "Someone attacks someone!",
+                    exclude={player_id, target.id},
+                )
             )
-        )
+        else:
+            events.append(
+                self.ctx.msg_to_room(
+                    room.id,
+                    f"{player.name} attacks {target.name}!",
+                    exclude={player_id, target.id},
+                )
+            )
 
         # Add threat for NPCs and trigger combat start behavior
         if target.id in world.npcs:
@@ -280,20 +358,32 @@ class CombatSystem:
                 )
             )
 
-        # Notify target if player
+        # Notify target if player (anonymize attacker name if dark)
         if target.id in world.players:
+            attacker_name_for_target = self._get_display_name_for_observer(
+                attacker_id, target.id, room.id
+            )
             events.append(
-                self.ctx.msg_to_player(target.id, f"{attacker.name} attacks you!")
+                self.ctx.msg_to_player(target.id, f"{attacker_name_for_target} attacks you!")
             )
 
-        # Room broadcast
-        events.append(
-            self.ctx.msg_to_room(
-                room.id,
-                f"{attacker.name} attacks {target.name}!",
-                exclude={attacker_id, target_id},
+        # Room broadcast (anonymize if dark)
+        if self._should_anonymize_room_broadcast(room.id):
+            events.append(
+                self.ctx.msg_to_room(
+                    room.id,
+                    "Someone attacks someone!",
+                    exclude={attacker_id, target_id},
+                )
             )
-        )
+        else:
+            events.append(
+                self.ctx.msg_to_room(
+                    room.id,
+                    f"{attacker.name} attacks {target.name}!",
+                    exclude={attacker_id, target_id},
+                )
+            )
 
         # Add threat for NPC targets
         if target.id in world.npcs:
@@ -573,24 +663,36 @@ class CombatSystem:
                         )
                     )
 
-                # Target message
+                # Target message (anonymize attacker if dark)
                 if target_id in world.players:
+                    attacker_name_for_target = self._get_display_name_for_observer(
+                        attacker_id, target_id, attacker.room_id
+                    )
                     events.append(
                         self.ctx.msg_to_player(
-                            target_id, f"{attacker.name} swings at you but misses!"
+                            target_id, f"{attacker_name_for_target} swings at you but misses!"
                         )
                     )
 
-                # Room broadcast
+                # Room broadcast (anonymize if dark)
                 room = world.rooms.get(attacker.room_id)
                 if room:
-                    events.append(
-                        self.ctx.msg_to_room(
-                            room.id,
-                            f"{attacker.name} swings at {target.name} but misses!",
-                            exclude={attacker_id, target_id},
+                    if self._should_anonymize_room_broadcast(room.id):
+                        events.append(
+                            self.ctx.msg_to_room(
+                                room.id,
+                                "Someone swings at someone but misses!",
+                                exclude={attacker_id, target_id},
+                            )
                         )
-                    )
+                    else:
+                        events.append(
+                            self.ctx.msg_to_room(
+                                room.id,
+                                f"{attacker.name} swings at {target.name} but misses!",
+                                exclude={attacker_id, target_id},
+                            )
+                        )
 
                 # Continue auto-attack if enabled
                 if attacker.combat.auto_attack and attacker.is_alive():
@@ -651,26 +753,38 @@ class CombatSystem:
                     )
                 )
 
-            # Target message and health update
+            # Target message and health update (anonymize attacker if dark)
             if target_id in world.players:
+                attacker_name_for_target = self._get_display_name_for_observer(
+                    attacker_id, target_id, attacker.room_id
+                )
                 events.append(
                     self.ctx.msg_to_player(
                         target_id,
-                        f"{attacker.name} hits you for {damage} damage!{crit_text}",
+                        f"{attacker_name_for_target} hits you for {damage} damage!{crit_text}",
                     )
                 )
                 events.extend(self.ctx.event_dispatcher.emit_stat_update(target_id))
 
-            # Room broadcast
+            # Room broadcast (anonymize if dark)
             room = world.rooms.get(attacker.room_id)
             if room:
-                events.append(
-                    self.ctx.msg_to_room(
-                        room.id,
-                        f"{attacker.name} hits {target.name}!{crit_text}",
-                        exclude={attacker_id, target_id},
+                if self._should_anonymize_room_broadcast(room.id):
+                    events.append(
+                        self.ctx.msg_to_room(
+                            room.id,
+                            f"Someone hits someone!{crit_text}",
+                            exclude={attacker_id, target_id},
+                        )
                     )
-                )
+                else:
+                    events.append(
+                        self.ctx.msg_to_room(
+                            room.id,
+                            f"{attacker.name} hits {target.name}!{crit_text}",
+                            exclude={attacker_id, target_id},
+                        )
+                    )
 
             # Check for death
             if not target.is_alive():
@@ -840,13 +954,20 @@ class CombatSystem:
             world.items[item_id] = item
             room.items.add(item_id)
 
-            # Broadcast drop message
+            # Broadcast drop message (anonymize NPC name if dark)
             quantity_str = f" x{quantity}" if quantity > 1 else ""
-            events.append(
-                self.ctx.msg_to_room(
-                    room_id, f"💎 {npc_name} drops {template.name}{quantity_str}."
+            if self._should_anonymize_room_broadcast(room_id):
+                events.append(
+                    self.ctx.msg_to_room(
+                        room_id, f"💎 Something drops {template.name}{quantity_str}."
+                    )
                 )
-            )
+            else:
+                events.append(
+                    self.ctx.msg_to_room(
+                        room_id, f"💎 {npc_name} drops {template.name}{quantity_str}."
+                    )
+                )
 
         return events
 
@@ -876,14 +997,21 @@ class CombatSystem:
         victim_name = victim.name
         killer_name = killer.name if killer else "unknown forces"
 
-        # Death message to room
+        # Death message to room (anonymize if dark)
         room = world.rooms.get(victim.room_id)
         if room:
-            events.append(
-                self.ctx.msg_to_room(
-                    room.id, f"💀 {victim_name} has been slain by {killer_name}!"
+            if self._should_anonymize_room_broadcast(room.id):
+                events.append(
+                    self.ctx.msg_to_room(
+                        room.id, "💀 Someone has been slain!"
+                    )
                 )
-            )
+            else:
+                events.append(
+                    self.ctx.msg_to_room(
+                        room.id, f"💀 {victim_name} has been slain by {killer_name}!"
+                    )
+                )
 
         # If victim was an NPC, trigger respawn and loot
         if victim_id in world.npcs:

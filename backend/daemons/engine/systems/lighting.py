@@ -144,8 +144,9 @@ class LightingSystem:
         - Area ambient_lighting (base): 0-90
         - Time-of-day modifier: -20 to +0
         - Player light spells: +0 to +50
+        - Ground item light sources: +10 to +35
+        - Equipped item light sources: +10 to +35 (player-carried torches, etc.)
         - Darkness effects: -50 to -100
-        - Item light sources: +10 to +35
 
         Args:
             room: The WorldRoom to calculate light for
@@ -200,7 +201,13 @@ class LightingSystem:
         for source in light_state.active_light_sources.values():
             light_level += source.intensity
 
-        # 4. Check for darkness effects from players in room
+        # 4. Check for items on the ground that provide light (torches, lanterns, etc.)
+        light_level += self._calculate_ground_item_light(room)
+
+        # 5. Check for equipped items that provide light (player-carried torches, etc.)
+        light_level += self._calculate_equipped_item_light(room)
+
+        # 6. Check for darkness effects from players in room
         darkness_penalty = self._calculate_darkness_penalty(room)
         light_level += darkness_penalty  # Note: penalty is negative
 
@@ -247,6 +254,78 @@ class LightingSystem:
                     penalty -= 60
 
         return penalty
+
+    def _calculate_ground_item_light(self, room: "WorldRoom") -> int:
+        """
+        Calculate light contribution from items on the ground in a room.
+
+        Items with provides_light=True contribute their light_intensity
+        to the room's overall light level.
+
+        Returns:
+            Total light contribution from ground items (positive integer)
+        """
+        total_light = 0
+
+        if not hasattr(room, "items") or not room.items:
+            return 0
+
+        for item_id in room.items:
+            item = self.world.items.get(item_id)
+            if not item:
+                continue
+
+            template = self.world.item_templates.get(item.template_id)
+            if not template:
+                continue
+
+            if getattr(template, "provides_light", False):
+                intensity = getattr(template, "light_intensity", 0)
+                total_light += intensity
+                logger.debug(
+                    f"Ground item '{template.name}' in room {room.id} "
+                    f"contributes +{intensity} light"
+                )
+
+        return total_light
+
+    def _calculate_equipped_item_light(self, room: "WorldRoom") -> int:
+        """
+        Calculate light contribution from items equipped by players in a room.
+
+        Players carrying/wielding light sources (torches, lanterns, etc.)
+        contribute their light_intensity to the room's overall light level.
+
+        Returns:
+            Total light contribution from equipped items (positive integer)
+        """
+        total_light = 0
+
+        # Check all players in the room
+        for player_id in room.entities:
+            player = self.world.players.get(player_id)
+            if not player:
+                continue
+
+            # Check all equipped items
+            for slot, item_id in player.equipped_items.items():
+                item = self.world.items.get(item_id)
+                if not item:
+                    continue
+
+                template = self.world.item_templates.get(item.template_id)
+                if not template:
+                    continue
+
+                if getattr(template, "provides_light", False):
+                    intensity = getattr(template, "light_intensity", 0)
+                    total_light += intensity
+                    logger.debug(
+                        f"Equipped item '{template.name}' on player {player_id} "
+                        f"in room {room.id} contributes +{intensity} light"
+                    )
+
+        return total_light
 
     def update_light_source(
         self,

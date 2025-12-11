@@ -18,6 +18,7 @@ import {
   FormOutlined,
   CodeOutlined,
   TeamOutlined,
+  BugOutlined,
 } from '@ant-design/icons';
 import yaml from 'js-yaml';
 import { FormEditor } from '../FormEditor';
@@ -45,6 +46,8 @@ const ENTITY_CATEGORIES: EntityCategory[] = [
   { key: 'abilities', label: 'Abilities', icon: <ThunderboltOutlined />, folder: 'abilities', schemaId: 'abilities' },
   { key: 'classes', label: 'Classes', icon: <TeamOutlined />, folder: 'classes', schemaId: 'classes' },
   { key: 'triggers', label: 'Triggers', icon: <ThunderboltOutlined />, folder: 'triggers', schemaId: 'triggers', useCustomEditor: true },
+  { key: 'flora', label: 'Flora', icon: <span role="img" aria-label="flora">🌿</span>, folder: 'flora', schemaId: 'flora' },
+  { key: 'fauna', label: 'Fauna', icon: <BugOutlined />, folder: 'npcs/fauna', schemaId: 'npcs' },
 ];
 
 interface EntityFile {

@@ -1,0 +1,11 @@
+# Meadow Center Items
+# Pre-placed items in the sunlit meadow clearing
+
+items:
+  - id: meadow_torch_1
+    template_id: item_wooden_torch
+    room_id: room_meadow_center
+    quantity: 1
+    instance_data:
+      placed_by: "world_builder"
+      purpose: "Testing ground item light emission"

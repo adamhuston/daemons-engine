@@ -21,7 +21,7 @@ class TestSchemaAPIEndpoints:
     """Test the schema API endpoints.
 
     Note: These tests are skipped by default. To run them:
-    1. Start the server: uvicorn app.main:app --reload
+    1. Start the server: daemons run
     2. Run with: pytest -m api --runxfail
     """
 
@@ -113,7 +113,7 @@ def test_schema_api_documentation():
     Manual API Testing Instructions:
 
     1. Start the server:
-       uvicorn app.main:app --reload
+       daemons run
 
     2. Get an access token:
        POST http://localhost:8000/auth/login

@@ -150,7 +150,8 @@ keywords: array of strings (default: [])
 # ======================
 # wanders_sometimes   -> wander_chance: 0.1 (10%)
 # wanders_often       -> wander_chance: 0.3 (30%)
-# aggressive          -> aggro_on_sight: true
+# aggressive          -> aggro_on_sight: true (attacks after player enters room)
+# attacks_on_sight    -> instant_aggro: true (attacks immediately, before player can react)
 # cowardly            -> flees_at_health_percent: 20
 # brave               -> flees_at_health_percent: 0 (never flees)
 # loner               -> calls_for_help: false

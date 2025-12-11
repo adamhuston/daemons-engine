@@ -99,8 +99,8 @@ def init(name: str, force: bool):
     main_py = '''"""
 Game server entry point.
 
-Run with: uvicorn main:app --reload
-Or use: daemons run
+Run with: daemons run
+Or use: uvicorn daemons.main:app --reload
 """
 
 from daemons.main import app
