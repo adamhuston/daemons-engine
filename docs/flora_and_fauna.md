@@ -115,7 +115,7 @@ Heron
 Humming Bird
 Loon
 Mallard Duck
-Nuthatch 
+Nuthatch
 Owl
 Pelicane
 Pigeon
@@ -132,7 +132,7 @@ Alligator
 Box Turtle
 Bull Frog
 Garter Snake
-Horned Toad 
+Horned Toad
 Iguana
 King Snake
 Lizard

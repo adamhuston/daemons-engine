@@ -28,7 +28,7 @@ cd backend
 alembic upgrade head
 
 # Start the server
-uvicorn app.main:app --reload --log-level info
+uvicorn daemons.main:app --reload --log-level info
 ```
 
 Notes:
@@ -76,12 +76,24 @@ Database migrations (Alembic)
 
 Where to find important code
 ---------------------------
-- `backend/app/main.py` — app startup, seeding, HTTP endpoints, WebSocket entry.
-- `backend/app/db.py` — SQLAlchemy DB engine and session.
-- `backend/app/models.py` — DB models (Room, Player, etc.).
-- `backend/app/engine/loader.py` — loading DB data into in-memory `World`.
-- `backend/app/engine/world.py` — in-memory world model (WorldPlayer, WorldRoom, World).
-- `backend/app/engine/engine.py` — `WorldEngine` logic (game loop, queues, command handlers).
+- `backend/daemons/main.py` — app startup, seeding, HTTP endpoints, WebSocket entry.
+- `backend/daemons/db.py` — SQLAlchemy DB engine and session.
+- `backend/daemons/models.py` — DB models (Room, Player, UserAccount, etc.).
+- `backend/daemons/engine/loader.py` — loading DB data into in-memory `World`.
+- `backend/daemons/engine/world.py` — in-memory world model (WorldPlayer, WorldRoom, WorldEntity, World).
+- `backend/daemons/engine/engine.py` — `WorldEngine` logic (game loop, queues, command handlers).
+- `backend/daemons/engine/systems/` — modular game systems:
+  - `combat.py` — real-time combat with auto-attack
+  - `effects.py` — buffs, debuffs, DoT/HoT
+  - `classes.py` — character classes and abilities
+  - `weather.py` — dynamic weather system (Phase 17.2)
+  - `temperature.py` — temperature calculations (Phase 17.1)
+  - `biome.py` — biome/season system (Phase 17.3)
+  - `flora.py` — plants and harvesting (Phase 17.4)
+  - `fauna.py` — fauna behaviors and spawning (Phase 17.5)
+  - `spawn_conditions.py` — conditional spawning (Phase 17.6)
+  - `population.py` — ecosystem management (Phase 17.6)
+- `backend/daemons/routes/admin.py` — admin REST API endpoints.
 - `client/client.py` — sample Flet client showing how to connect and parse events.
 
 Troubleshooting & contact

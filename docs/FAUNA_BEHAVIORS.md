@@ -29,39 +29,39 @@ fauna_data:
   fauna_type: mammal          # mammal, bird, reptile, amphibian, fish, insect, arachnid
   diet: herbivore             # herbivore, carnivore, omnivore, scavenger
   activity_period: crepuscular # diurnal, nocturnal, crepuscular, always
-  
+
   # Biome compatibility - must match area's biome fauna_tags
   biome_tags:
     - meadow
     - forest
     - grassland
-  
+
   # Tags for predator-prey matching
   fauna_tags:
     - small_prey
     - rodent
-  
+
   # What hunts this creature (for flee behavior)
   predator_tags:
     - canine
     - feline
     - raptor
-  
+
   # Temperature tolerance (Fahrenheit)
   temperature_tolerance: [20, 95]
-  
+
   # Pack spawning
   pack_size: [2, 5]           # Spawn 2-5 at a time
-  
+
   # Territory
   territorial: false
   territory_radius: 3
-  
+
   # Migration
   migratory: false
   migration_seasons: []       # ["winter"] if migratory
   migration_tendency: 0.05    # Chance to explore per tick
-  
+
   # Combat/flee behavior
   aggression: 0.0             # 0.0 = passive, 1.0 = attacks on sight
   flee_threshold: 0.5         # Health % to flee at
@@ -86,29 +86,29 @@ fauna_data:
   fauna_type: mammal
   diet: carnivore
   activity_period: always
-  
+
   biome_tags:
     - forest
     - tundra
     - mountain
-  
+
   fauna_tags:
     - canine
     - pack_hunter
-  
+
   # What this creature hunts
   prey_tags:
     - small_prey
     - rodent
     - deer
-  
+
   temperature_tolerance: [-10, 85]
   pack_size: [3, 6]
   pack_leader_template: fauna_alpha_wolf  # Optional leader variant
-  
+
   territorial: true
   territory_radius: 5
-  
+
   aggression: 0.3
   flee_threshold: 0.2
 

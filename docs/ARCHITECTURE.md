@@ -1,0 +1,701 @@
+# Dungeon Crawler – Architecture & Goals
+
+_Last updated: 2025-12-11_
+
+This document is the high-level specification and context for the dungeon crawler project.
+It is written to be friendly to both humans and LLMs reading the repository.
+
+---
+
+## 1. Project Overview
+
+This project is a real-time, text-based dungeon crawler inspired by classic MUDs.
+
+**Key properties:**
+
+- **Terminal-like UX** (retro, text-first), even on mobile.
+- **Real-time, multi-player** interactions in a shared world.
+- **Client-agnostic backend**:
+  - Backend exposes a WebSocket protocol and HTTP APIs.
+  - Any client (Flet, React, native, etc.) can implement the protocol.
+- **Long-term goal**: fully-featured dungeon with:
+  - stats and progression,
+  - time-based buffs/debuffs,
+  - items and equipment,
+  - enemies and combat,
+  - world scripting and triggers.
+
+---
+
+## 2. High-Level Architecture
+
+### 2.1 Stack
+
+**Backend**
+
+- Python
+- FastAPI (HTTP + WebSocket)
+- Uvicorn (ASGI server)
+- SQLAlchemy (async) with SQLite (for now)
+- In-memory game engine (`WorldEngine`) on top of DB-backed world
+
+**Client (current stub)**
+
+- Flet (Python) desktop client
+- Connects via WebSocket to `/ws/game`
+- Minimal “terminal-style” view to send commands and display messages
+
+### 2.2 Core Concepts
+
+- **Room-based world**:
+  - The world is made of rooms (nodes) with up to 6 exits:
+    - `north`, `south`, `east`, `west`, `up`, `down`
+  - Each room has: `id`, `name`, `description`, exits to other rooms.
+
+- **Players**:
+  - Identified by UUID (`player_id`).
+  - Have a current room and (later) stats, inventory, etc.
+
+- **WorldEngine (in-memory)**:
+  - Holds the runtime `World` (rooms, players, and later NPCs/items).
+  - Processes commands from players.
+  - Generates events and routes them to connected clients.
+
+- **Event-driven server**:
+  - Clients send `command` messages (JSON) over WebSocket.
+  - Server emits `event` messages (JSON) back (e.g., room descriptions, chat).
+
+---
+
+## 3. Current Code Layout (Backend)
+
+> Paths are relative to the `backend/` directory.
+
+### 3.1 Application entry
+
+`app/main.py`
+
+- Creates the FastAPI app.
+- Startup:
+  - Creates DB tables.
+  - Seeds a minimal test world (2 rooms + 1 player).
+  - Loads world data from DB into in-memory `World`.
+  - Instantiates a single `WorldEngine` and starts its async game loop.
+- HTTP endpoints:
+  - `GET /` – health/hello check.
+  - `GET /players` – returns current players from DB for debugging/testing.
+  - **Auth endpoints (Phase 7):**
+    - `POST /auth/register` – Create new user account
+    - `POST /auth/login` – Authenticate and get JWT tokens
+    - `POST /auth/refresh` – Rotate access/refresh tokens
+    - `POST /auth/logout` – Revoke refresh token
+    - `GET /auth/me` – Get current user info from token
+  - **Character endpoints (Phase 7):**
+    - `POST /characters` – Create new character (max 3)
+    - `GET /characters` – List account's characters
+    - `POST /characters/{id}/select` – Set active character
+    - `DELETE /characters/{id}` – Delete character
+- WebSocket endpoints:
+  - `GET /ws/game?player_id=...` (legacy):
+    - Accepts a WS connection for a given player.
+    - Registers the player with `WorldEngine`.
+  - `GET /ws/game/auth?token=...` (Phase 7):
+    - Authenticated WebSocket connection using JWT
+    - Verifies token and loads user's active character
+    - Sets auth_info in context for permission checks
+  - Both endpoints start:
+    - `_ws_receiver`: reads client commands and passes them to `WorldEngine`.
+    - `_ws_sender`: reads server events from a queue and sends them to client.
+
+The `WorldEngine` instance is stored in `app.state` (or a global), and all WS connections share this single engine.
+
+### 3.2 Database layer
+
+`app/db.py`
+
+- Defines `engine` and `AsyncSessionLocal` via SQLAlchemy async APIs.
+- Exposes `get_session()` dependency for FastAPI endpoints.
+
+`app/models.py`
+
+- `Room` model:
+  - `id`, `name`, `description`
+  - `room_type` - Type category with emoji indicators (forest, urban, underground, etc.)
+  - Exit fields: `north_id`, `south_id`, `east_id`, `west_id`, `up_id`, `down_id`.
+  - Self-referential `ForeignKey` to `rooms.id`.
+  - Movement effects: `on_enter_effect`, `on_exit_effect`
+- `Player` model:
+  - `id` (UUID string)
+  - `name`
+  - `current_room_id` (FK to `Room.id`)
+  - **Character progression:**
+    - `character_class` - Class/archetype (adventurer, etc.)
+    - `level` - Character level (default: 1)
+    - `experience` - Experience points (default: 0)
+  - **Base stats (primary attributes):**
+    - `strength`, `dexterity`, `intelligence`, `vitality` (default: 10)
+  - **Derived stats (combat/survival):**
+    - `max_health`, `current_health` (default: 100)
+    - `armor_class` (default: 10)
+    - `max_energy`, `current_energy` (default: 50)
+  - `data` JSON field for misc data (flags, temporary effects, etc.)
+- `ItemTemplate` model:
+  - `id`, `name`, `description`
+  - `item_type`, `item_subtype`, `equipment_slot`
+  - `stat_modifiers` (JSON) - Stat bonuses when equipped
+  - **Weapon stats:** `damage_min`, `damage_max`, `attack_speed`, `damage_type`
+  - `weight`, `max_stack_size`, `has_durability`, `max_durability`
+  - `is_container`, `container_capacity`, `is_consumable`, `consume_effect`
+  - `rarity`, `value`, `flags`, `keywords`
+- `ItemInstance` model:
+  - `id`, `template_id` (FK to ItemTemplate)
+  - Location: `room_id`, `player_id`, or `container_id`
+  - `quantity`, `current_durability`, `equipped_slot`
+- `NpcTemplate` model:
+  - `id`, `name`, `description`
+  - `npc_type` (hostile, neutral, friendly, merchant)
+  - Stats: `level`, `max_health`, `armor_class`, `strength`, `dexterity`, `intelligence`
+  - Combat: `attack_damage_min`, `attack_damage_max`, `attack_speed`, `experience_reward`
+  - `behaviors` (JSON) - List of behavior tags
+  - `drop_table` (JSON), `idle_messages`, `keywords`
+- `NpcInstance` model:
+  - `id`, `template_id` (FK to NpcTemplate)
+  - `room_id`, `spawn_room_id`, `respawn_time`
+  - `instance_data` (JSON) for overrides
+- **Auth models (Phase 7):**
+  - `UserAccount` - Separate from Player (one account can have multiple characters)
+    - `id`, `username`, `email`, `password_hash`
+    - `role` (player, moderator, game_master, admin)
+    - `is_active`, `created_at`, `last_login`
+    - `active_character_id` - Currently selected character
+  - `RefreshToken` - Session management with token rotation
+    - `id`, `account_id`, `token_hash`, `expires_at`, `revoked`
+  - `SecurityEvent` - Audit log for security events
+    - `event_type`, `account_id`, `ip_address`, `timestamp`, `details`
+  - `Player.account_id` - Links characters to accounts (nullable)
+
+### 3.3 In-memory world model
+
+`app/engine/world.py`
+
+- Defines pure Python dataclasses for the runtime world:
+
+  - `WorldPlayer`:
+    - `id`, `name`, `room_id`
+    - `is_connected` - Connection status (False = in stasis)
+    - **Character stats:** `character_class`, `level`, `experience`
+    - **Primary attributes:** `strength`, `dexterity`, `intelligence`, `vitality`
+    - **Combat stats:** `max_health`, `current_health`, `armor_class`, `max_energy`, `current_energy`
+    - **Effects:** `active_effects: Dict[str, Effect]` - Active buffs/debuffs
+    - **Effect methods:** `apply_effect()`, `remove_effect()`, `get_effective_stat()`
+    - `inventory` (currently a simple list; future hook for items)
+  - `WorldRoom`:
+    - `id`, `name`, `description`
+    - `room_type`, `emoji` - Room categorization with visual indicator
+    - `exits: dict[Direction, RoomId]`
+    - `players: set[PlayerId]` – IDs of players currently in the room
+    - `effects` - Movement effects (future hook)
+  - `Effect`:
+    - `effect_id`, `name`, `effect_type` (buff/debuff/dot/hot)
+    - `stat_modifiers: Dict[str, int]` - Stat changes while active
+    - `duration`, `applied_at` - Timing tracking
+    - `interval`, `magnitude` - For periodic effects (DoT/HoT)
+    - `expiration_event_id`, `periodic_event_id` - Time event references
+  - `TimeEvent`:
+    - `event_id`, `execute_at` (Unix timestamp)
+    - `callback` - Async function to execute
+    - `recurring` - Whether to reschedule after execution
+  - `WorldTime`:
+    - `day`, `hour`, `minute` - In-game time tracking
+    - `last_update` - Unix timestamp of last advancement
+    - `advance()` - Updates time based on real seconds elapsed
+    - `get_current_time()` - Calculates current time dynamically
+    - Time conversion: 24 game hours = 12 real minutes
+  - `WorldArea`:
+    - `area_id`, `name`, `description`
+    - `area_time: WorldTime` - Independent time for this area
+    - `time_scale` - Time flow multiplier (e.g., 4.0 = 4x faster)
+    - Environmental properties: `biome`, `climate`, `ambient_lighting`, `weather_profile`
+    - `time_phases` - Custom flavor text for different times of day
+    - `ambient_sound` - Area-specific ambient audio description
+    - `current_season`, `days_per_season`, `season_day` - Seasonal tracking (Phase 17.3)
+    - `weather_immunity`, `weather_profile_data` - Weather system configuration (Phase 17.2)
+    - `base_temperature`, `temperature_variation` - Temperature baseline (Phase 17.1)
+  - `World`:
+    - `rooms: dict[RoomId, WorldRoom]`
+    - `players: dict[PlayerId, WorldPlayer]`
+    - `areas: dict[AreaId, WorldArea]`
+    - `world_time: WorldTime` - Global time for rooms not in areas
+
+This layer is framework-agnostic (no FastAPI/SQLAlchemy here).
+It represents the "live world" in memory.
+
+### 3.4 Game Systems
+
+`app/engine/systems/`
+
+The game engine uses modular systems for different domains:
+
+- **GameContext** (`context.py`):
+  - Shared context object passed to all systems
+  - Contains references to World, all systems, and utility methods
+  - Enables systems to interact without tight coupling
+
+- **TimeEventManager** (`time_manager.py`):
+  - Handles scheduled events and recurring timers
+  - Priority queue (min-heap) of TimeEvents
+  - Used for: effect expiration, respawn timers, periodic world updates
+
+- **EventDispatcher** (`events.py`):
+  - Creates and routes events to players
+  - Handles scoping: player-specific, room-wide, or broadcast
+  - All events flow through `_dispatch_events()`
+
+- **CombatSystem** (`combat.py`):
+  - Manages attack, damage, death, and loot
+  - Supports player vs NPC and NPC vs player combat
+  - Auto-attack scheduling via TimeEventManager
+
+- **EffectSystem** (`effects.py`):
+  - Buffs, debuffs, DoT/HoT effects
+  - Stat modifiers with duration tracking
+  - Periodic damage/healing execution
+
+- **CommandRouter** (`router.py`):
+  - Command parsing and handler dispatch
+  - Registered via `@cmd` decorator
+  - Handles aliases and argument parsing
+
+- **TriggerSystem** (`triggers.py`):
+  - Room-based reactive triggers
+  - Conditions: flag_set, has_item, player_count, etc.
+  - Actions: message, spawn_npc, open_exit, give_item, etc.
+  - Timer triggers for periodic effects
+
+- **QuestSystem** (`quests.py`):
+  - Quest state machine (AVAILABLE → ACCEPTED → IN_PROGRESS → COMPLETED → TURNED_IN)
+  - Objective tracking (KILL, COLLECT, VISIT, TALK, etc.)
+  - NPC dialogue trees with conditions and actions
+  - Quest chains for multi-part storylines
+  - Repeatable quests with cooldowns
+  - Timed quests with failure conditions
+
+- **StateTracker** (`persistence.py`): **(Phase 6)**
+  - Dirty entity tracking for efficient saves
+  - Periodic saves every 60 seconds
+  - Critical saves for important events (death, quest completion)
+  - Graceful shutdown handling
+  - Entity types: players, rooms, NPCs, items, triggers
+  - Item decay system (1 hour default for ground items)
+
+- **AuthSystem** (`auth.py`): **(Phase 7)**
+  - JWT-based authentication with 1-hour access tokens
+  - Refresh token rotation with 7-day expiry
+  - Argon2 password hashing via passlib
+  - UserRole enum: PLAYER, MODERATOR, GAME_MASTER, ADMIN
+  - Permission enum for granular access control
+  - `requires_role()` and `requires_permission()` decorators
+  - Security event logging for audit trail
+
+- **AdminSystem** (`routes/admin.py`): **(Phase 8)**
+  - REST API for administrative operations
+  - Role-based access: MODERATOR, GAME_MASTER, ADMIN
+  - Endpoints for world inspection (players, rooms, NPCs, items)
+  - Player manipulation (teleport, heal, kick, give items)
+  - Entity spawning/despawning
+  - Content hot-reload without server restart
+  - Audit logging for all admin actions
+
+- **ContentReloader** (`routes/admin.py`): **(Phase 8)**
+  - Hot-reload YAML content into running world
+  - Supports: item templates, NPC templates, rooms, areas
+  - Validation before loading
+  - Returns detailed success/error reports
+
+- **Logging** (`logging.py`): **(Phase 8)**
+  - structlog-based structured logging
+  - AdminAuditLogger for admin actions
+  - GameEventLogger for combat, connections, deaths
+  - PerformanceLogger for timing metrics
+  - JSON output for production, pretty output for dev
+
+- **ClassSystem** (`classes.py`): **(Phase 9)**
+  - ClassTemplate dataclass with base stats, stat growth, abilities, resources
+  - AbilityTemplate dataclass with costs, cooldowns, effects, behavior
+  - Resource types: mana, rage, energy, focus (customizable per class)
+  - Active, passive, and reactive ability types
+  - YAML-driven class and ability definitions
+  - Integration with EffectSystem for ability effects
+  - Hot-reload infrastructure for live class/ability updates
+
+- **Persistence Layer** (`engine.py` methods): **(Phase 9i)**
+  - `save_player_stats()` - Persist character sheet, resources, abilities to database
+  - `_serialize_player_data()` - Serialize CharacterSheet to JSON format for Player.data column
+  - `_restore_player_resources()` - Restore resources on login with offline regen calculation
+  - Offline regen: `regen_amount = time_offline * regen_rate`
+  - Auto-called on player disconnect (save) and reconnect (restore + regen)
+  - Resources stored in Player.data JSON column under "resource_pools"
+
+- **AbilityExecutor** (`abilities.py`): **(Phase 9e)**
+  - Validates ability use (learned, level, resources, cooldown, GCD)
+  - Resolves targets (single, AoE, self-targeted)
+  - Executes behavior function from registry
+  - Tracks cooldowns and GCD per player
+  - Emits WebSocket events (ability_cast, ability_error, ability_cast_complete, cooldown_update, resource_update)
+
+- **GroupSystem** (`group_system.py`): **(Phase 10)**
+  - Party formation with leadership and invitations
+  - Group chat and coordinated actions
+  - Maximum 6 players per group
+
+- **ClanSystem** (`clan_system.py`): **(Phase 10)**
+  - Persistent player organizations
+  - Rank hierarchy with permissions
+  - Clan chat, roster management
+
+- **FactionSystem** (`faction_system.py`): **(Phase 10)**
+  - NPC faction reputation tracking
+  - Alignment effects on NPC behavior
+  - Standing levels from Hated to Exalted
+
+- **LightingSystem** (`lighting.py`): **(Phase 11)**
+  - Dynamic light sources and visibility
+  - Time-of-day lighting changes
+  - Light level affects gameplay (stealth, combat)
+
+- **TemperatureSystem** (`temperature.py`): **(Phase 17.1)**
+  - Room temperature calculation based on area, time, weather
+  - Temperature thresholds: FREEZING, COLD, COMFORTABLE, HOT, SCORCHING
+  - Biome and seasonal modifiers
+  - Temperature effects on players (damage, stamina)
+
+- **WeatherSystem** (`weather.py`): **(Phase 17.2)**
+  - Dynamic weather transitions (Markov chain)
+  - Weather types: CLEAR, CLOUDY, RAIN, STORM, SNOW, FOG, WIND
+  - Climate-based weather patterns
+  - Weather effects on visibility, temperature, movement, combat
+  - `weather` command for forecasts
+
+- **BiomeSystem** (`biome.py`): **(Phase 17.3)**
+  - Biome definitions with temperature ranges and weather patterns
+  - Seasonal system with day tracking and season transitions
+  - Season-based modifiers for temperature and weather
+  - Flora/fauna tag compatibility checking
+  - `season` command for current seasonal info
+
+- **FloraSystem** (`flora.py`): **(Phase 17.4)**
+  - Flora templates (trees, shrubs, flowers, fungi)
+  - Harvestable plants with cooldowns
+  - Seasonal variant descriptions
+  - Biome-based flora spawning
+  - `harvest` command for resource gathering
+
+- **FaunaSystem** (`fauna.py`): **(Phase 17.5)**
+  - Fauna properties on NPC templates
+  - Activity periods (diurnal, nocturnal, crepuscular)
+  - Pack spawning, territorial behavior, migration
+  - Predator-prey dynamics
+
+- **SpawnConditionEvaluator** (`spawn_conditions.py`): **(Phase 17.6)**
+  - Condition-based spawning (time, weather, season, temperature)
+  - Population limits per room/area
+  - Flora/fauna dependency checks
+
+- **PopulationManager** (`population.py`): **(Phase 17.6)**
+  - Ecological dynamics for spawn rates
+  - Predation and population control
+  - Death tracking and recovery rates
+
+- **Rate Limiting** (`rate_limit.py`): **(Phase 16.1)**
+  - HTTP endpoint rate limiting via slowapi
+  - WebSocket command/chat throttling
+  - Sliding window algorithm
+
+- **WebSocket Security** (`websocket_security.py`): **(Phase 16.4)**
+  - Message size limits, origin validation
+  - Connection limits per IP/account
+  - Heartbeat/ping-pong for connection health
+
+- **Input Sanitization** (`input_sanitization.py`): **(Phase 16.5)**
+  - Command and chat text sanitization
+  - Unicode exploit prevention (RTL, zero-width, Zalgo)
+  - Player name validation with homoglyph normalization
+
+### 3.5 Admin Routes
+
+`app/routes/admin.py`
+
+- **Server Status:**
+  - `GET /api/admin/server/status` - Uptime, player counts, NPC counts, scheduled events
+
+- **World Inspection:**
+  - `GET /api/admin/world/players` - List online players
+  - `GET /api/admin/world/players/{id}` - Player details
+  - `GET /api/admin/world/rooms` - List rooms (filterable by area)
+  - `GET /api/admin/world/rooms/{id}` - Room details with entities
+  - `GET /api/admin/world/areas` - List areas
+  - `GET /api/admin/world/npcs` - List NPCs (filterable by room, alive status)
+  - `GET /api/admin/world/items` - List items (filterable by location)
+
+- **Player Manipulation:**
+  - `POST /api/admin/players/{id}/teleport` - Move player to room
+  - `POST /api/admin/players/{id}/heal` - Heal player
+  - `POST /api/admin/players/{id}/kick` - Disconnect player
+  - `POST /api/admin/players/{id}/give` - Give item to player
+
+- **Spawning:**
+  - `POST /api/admin/npcs/spawn` - Spawn NPC in room
+  - `DELETE /api/admin/npcs/{id}` - Despawn NPC
+  - `POST /api/admin/items/spawn` - Spawn item in room
+  - `DELETE /api/admin/items/{id}` - Despawn item
+
+- **Broadcasting:**
+  - `POST /api/admin/server/broadcast` - Message all players
+
+- **Content Management:**
+  - `POST /api/admin/content/reload` - Hot-reload YAML content
+  - `POST /api/admin/content/validate` - Validate YAML files
+
+### 3.6 World loader
+
+`app/engine/loader.py`
+
+- `load_world(session: AsyncSession) -> World`:
+  - Loads all `Room` rows → creates `WorldRoom` instances.
+  - Loads all `Player` rows → creates `WorldPlayer` instances.
+  - Adds players to the `players` set of their current room.
+  - Returns a fully-populated `World` object.
+
+- `load_triggers_from_yaml(world)`:
+  - Loads room triggers from `world_data/triggers/`
+  - Attaches triggers to WorldRoom instances
+
+- `load_quests_into_system(quest_system)`:
+  - Loads quest templates from `world_data/quests/`
+  - Parses objectives, rewards, and conditions
+
+- `load_dialogues_into_system(quest_system)`:
+  - Loads NPC dialogue trees from `world_data/dialogues/`
+  - Supports conditions, actions, and quest integration
+
+- `load_quest_chains_into_system(quest_system)`:
+  - Loads quest chains from `world_data/quest_chains/`
+  - Links quests into storylines with bonus rewards
+
+Called on backend startup, after initial seeding, to initialize `WorldEngine`.
+
+### 3.6 Game engine
+
+`app/engine/engine.py`
+
+- Holds the `WorldEngine` class and event logic.
+
+Core responsibilities:
+
+- Maintain the in-memory `World`.
+- Process incoming commands from players.
+- Produce high-level events (room descriptions, chat, movement feedback).
+- Route events to the right players via per-player queues.
+
+Key pieces:
+
+- **Command queue**:
+  - `self._command_queue: asyncio.Queue[(player_id, command_text)]`
+  - `_ws_receiver` pushes commands into this queue.
+- **Listeners map**:
+  - `self._listeners: dict[player_id, asyncio.Queue[event]]`
+  - Each connected player has a queue of outgoing events.
+  - `_ws_sender` reads from these queues and sends messages to clients.
+- **Time event system**:
+  - `self._time_events: list[TimeEvent]` - Min-heap priority queue
+  - `self._time_loop()`: Background async task processing due events
+  - `schedule_event()` - Schedule one-shot or recurring events
+  - `cancel_event()` - Cancel scheduled events by ID
+  - Events execute at precise Unix timestamps (not tick-quantized)
+  - Dynamic sleep until next event (efficient, no wasted CPU)
+- **World time advancement**:
+  - Recurring time event every 30 seconds
+  - Advances `area_time` for each WorldArea based on `time_scale`
+  - Each area progresses independently
+- **Game loop**:
+  - `game_loop()`:
+    - Runs forever in the background (async task).
+    - Pulls `(player_id, command)` from `_command_queue`.
+    - Calls `handle_command(...)`.
+    - Calls `_dispatch_events(events)` to deliver events.
+
+Supported commands (current):
+
+- **Movement:** `n/s/e/w/u/d` and `north/south/east/west/up/down`, `flee`
+- **Look:** `look` / `l`, `look <target>` for detailed inspection
+- **Chat:** `say <message>`, `yell <message>`, `tell <player> <message>`
+- **Stats:** `stats` / `sheet` / `status` - View character sheet
+- **Effects:** `effects` / `status` - View active buffs/debuffs
+- **Emotes:** `smile`, `nod`, `laugh`, `cringe`, `smirk`, `frown`, `wink`, `lookaround`
+- **Time:** `time` - View current in-game time with area context
+- **Inventory:** `inventory` / `inv` / `i` - View inventory
+- **Items:** `get/take/pickup`, `drop`, `give <item> to <player>`, `put/get from container`
+- **Equipment:** `equip/wear/wield`, `unequip/remove`, `use/consume/drink`
+- **Combat:** `attack/kill <target>`, `stop` - Combat control
+- **Abilities:** `cast <ability>` / `ability <ability>` - Use class abilities
+- **Environment:** `weather` / `w`, `season`, `temperature`
+- **Gathering:** `harvest/gather/pick <flora>` - Gather resources from plants
+- **Social:** `group invite/kick/leave/promote`, `follow/unfollow <player>`
+- **Clans:** `clan create/invite/kick/leave/roster/promote/demote`
+- **Debug/Admin:**
+    - `heal <player>`, `hurt <player>` - Modify player health
+    - `bless <player>` - Apply +5 AC buff for 30 seconds
+    - `poison <player>` - Apply DoT (5 damage every 3s for 15s)
+    - `testtimer [seconds]` - Test time event system
+- **Keyword substitution:** `self` → auto-replaced with player name
+
+Event model (current):
+
+- Internally, engine uses events as `dict`s with fields like:
+  - `type`: `"message"` or `"stat_update"`
+  - `scope`: `"player"`, `"room"`, or `"all"` (internal routing only)
+  - `player_id`: target player (for player-scoped events)
+  - `room_id`: source/target room (for room-scoped events)
+  - `text`: message text (for message events)
+  - `payload`: structured data (for stat_update events)
+  - `exclude`: list of player IDs to exclude from room/all broadcasts
+
+- `_dispatch_events`:
+  - Uses `scope` and `exclude` to decide which player queues to push to.
+  - Strips internal fields (`scope`, `exclude`) before events are sent to clients.
+  - The client sees:
+    - `{"type": "message", "player_id": "...", "text": "..."}`
+    - `{"type": "stat_update", "player_id": "...", "payload": {...}}`
+
+**Persistence:**
+- `WorldEngine` has `save_player_stats()` method to sync in-memory stats to database
+- Called automatically on player disconnect
+- Extensible for periodic auto-saves (Phase 2) or event-triggered saves
+- Persisted fields: `current_health`, `current_energy`, `level`, `experience`, `current_room_id`
+
+---
+
+## 4. WebSocket Protocol (Summary)
+
+Full details are in `protocol.md`. This section is a condensed summary for LLMs.
+
+### 4.1 Connection
+
+- **Authenticated (recommended):** `ws://{host}:{port}/ws/game/auth`
+  - Token via `Sec-WebSocket-Protocol: access_token, <jwt_token>` header
+  - Or via query string (deprecated): `?token=<jwt_token>`
+- **Legacy (deprecated):** `ws://{host}:{port}/ws/game?player_id={player_id}`
+  - Direct player_id connection (being phased out)
+  - Subject to rate limiting and deprecation warnings
+
+### 4.2 Client → Server
+
+Message shape (command):
+
+```json
+{
+  "type": "command",
+  "text": "<command-string>"
+}
+```
+
+Supported commands (current):
+
+- `look` / `l`
+- `north`, `south`, `east`, `west`, `up`, `down`
+- `n`, `s`, `e`, `w`, `u`, `d`
+- `say <message>`
+
+Unknown commands produce a `"message"` event explaining the error.
+
+### 4.3 Server → Client
+
+Message shape (printable output):
+
+```
+{
+  "type": "message",
+  "player_id": "uuid-string",
+  "text": "Some text...\nMore text..."
+}
+```
+
+Used for:
+- Room descriptions (look, movement).
+- Movement feedback (“You move north…”, “You can’t go that way.”).
+- Chat (“You say: ...”, “Alice says: ...”).
+- Flavor/error messages.
+
+Future events (planned, not implemented yet):
+- stat_update
+- combat
+- inventory
+- quest
+- effect
+- error (structured error messages)
+
+## 5. Design Goals & Principles
+### 5.1 Backend goals
+
+- **Client-agnostic**:
+    - Backend exposes a stable WebSocket/JSON protocol and HTTP APIs.
+    - No coupling to any specific UI tech (Flet, React, etc.).
+- **Authoritative server**:
+    - All game logic lives server-side.
+    - Clients are thin: they send commands and render events.
+- **In-memory world + DB**:
+    - DB stores persistent data: rooms, players, etc.
+    - On startup, data is loaded into `World`.
+    - The `WorldEngine` mutates this in-memory state.
+    - Persistence back to DB can be periodic or event-driven.
+    - **Phase 1 implemented:** Stats saved to DB on player disconnect via `save_player_stats()`.
+    - **Phase 2 planned:** Periodic auto-saves via tick system.
+
+- **Event-driven, serial command processing**:
+    - Single WorldEngine instance per process.
+    - Commands are serialized through a single async queue.
+    - This simplifies concurrency: no shared-state races inside the engine.
+- **Extensibility**:
+    - Event format has a payload field reserved for structured data.
+    - Models (Player, items, NPCs, etc.) are designed to be extended incrementally.
+
+###  5.2 Future roadmap
+
+See `roadmap.md` for detailed phase tracking and progress.
+
+## 6. Client Notes (for future UIs)
+
+Current stub: client_flet/client.py
+- Single-player debug client to:
+    - connect a specific player_id,
+    - send commands,
+    - display type="message" events in a scrollable log.
+- Client expectations:
+    - Send commands as described in the protocol.
+    - For now, interpret:
+        - event.type === "message" → print event.text.
+    - Be tolerant of:
+        - extra fields in events,
+        - new event type values,
+        - future payload data.
+Long-term, we may have:
+    - A React-based PWA client for browsers and mobile (via installable PWA).
+    - A Flet-based native-like client optionally used for desktop/mobile apps.
+
+## 7. How LLMs Should Use This File
+
+If you (an LLM) are reading this file as context:
+- Treat this document as the source of truth for:
+    - high-level goals,
+    - current architecture design,
+    - the WebSocket protocol.
+- Prefer architectural consistency with:
+    - FastAPI + WorldEngine pattern,
+    - World/Engine separation (DB vs in-memory),
+    - command/event JSON protocol.
+
+When generating new code or features:
+- Do not tightly couple backend logic to a specific frontend.
+- Keep the in-memory World and WorldEngine as the core domain model.
+- Extend the protocol in backwards-compatible ways (add new event types/fields rather than changing existing ones, where possible).
+- Remember that this documentation may be out of date with the current implementation, and you should confirm if dependencies do or not exist by looking for the required files

@@ -174,6 +174,11 @@ pytest --cov=daemons --cov-report=html
 pytest -m unit          # Unit tests
 pytest -m systems       # System tests
 pytest -m integration   # Integration tests
+pytest -m abilities     # Ability system tests
+pytest -m api           # API endpoint tests
+pytest -m social        # Group/Clan/Faction tests
+pytest -m flora         # Flora system tests
+pytest -m fauna         # Fauna system tests
 ```
 
 ### Code Quality
@@ -190,6 +195,32 @@ ruff check backend/ --fix
 black backend/
 isort backend/
 mypy backend/daemons/
+```
+
+---
+
+## Environment Variables
+
+### Security (Phase 16)
+
+```bash
+# Required for production mode
+JWT_SECRET_KEY="your-256-bit-secret-key"
+DAEMONS_ENV="production"
+
+# Optional JWT customization
+JWT_ISSUER="daemons-engine"
+JWT_AUDIENCE="daemons-client"
+
+# WebSocket security
+WS_ALLOWED_ORIGINS="http://localhost:*,https://yourdomain.com"
+WS_MAX_CONNECTIONS_PER_IP=10
+WS_MAX_CONNECTIONS_PER_ACCOUNT=3
+WS_MAX_MESSAGE_SIZE=65536
+
+# Legacy auth deprecation phase (WARN, THROTTLE, or DISABLED)
+WS_LEGACY_DEPRECATION_PHASE="WARN"
+WS_LEGACY_AUTH_ENABLED=true
 ```
 
 ---

@@ -1,9 +1,14 @@
-# Daemons Engine
+# 💀 Daemons Engine
 
 A Python framework for building text-based multiplayer RPGs with real-time WebSocket communication.
 
->  **Pre-Release Beta**  API subject to change. Not recommended for production use.
->  **Latest Roadmap Release:**  Phase 16 - Cybersecurity upgrades, including input validation and production mode
+> ⚠️ **Pre-Release Beta**  Breaking package updates may still occur regularly and unpredictably. There is no timeline yet for a stable Alpha release.
+
+> 🤖 **Extensive use of LLM agents ("clankers")**  This project is an exercise in testing the limits of agentic development processes. Ideologically opposed developers should skip it. As an experimental artifact, the existence of this project should not be mistaken for a positive or negative statement about agentic development. While there has been a rigorous cybersecurity review phase, you use this package at your own risk.
+
+> **Latest Roadmap Release:**  Phase 17 - Environmental systems (Weather, Biomes, Flora, Fauna, Ecosystems)
+
+
 
 ---
 
@@ -172,8 +177,23 @@ my-game/
 ---
 
 ## Documentation
+- [Architecture](docs/ARCHITECTURE.md)
+- [Protocol](docs/protocol.md)
+- [Operations](docs/OPERATIONS.md)
 
-Coming soon
+### LLM Context Files
+
+The `docs/build_docs/` directory contains context articles and implementation plans designed for AI coding assistants (GitHub Copilot, Claude, Cursor, etc.). When we ask an LLM agent to make a detailed plan before implementation, a best practice is to capture the plan in a markdown file so that we can keep the LLM on task and hold it accountable to stated objectives.
+
+**For your own game:** Run the build script to generate context files for your customizations:
+
+```bash
+python docs/build_docs/build_context.py
+```
+
+This will produce `llm_context_architecture.md`, `llm_context_content.md`, `llm_context_index.md`, and `llm_context_protocol.md`.
+
+Delete these files and run `build_context.py` to rebuild the context after a major change. Using the python script and context files will save you tokens!
 
 ---
 

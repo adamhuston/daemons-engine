@@ -10,7 +10,7 @@ Here's a narrative example of how Phase 17 would transform gameplay:
 > look
 
 🌲 Forest Clearing
-The morning mist clings to the dew-covered grass as pale sunlight filters 
+The morning mist clings to the dew-covered grass as pale sunlight filters
 through the canopy. A worn trail leads north toward distant mountains.
 
 Temperature: 52°F (Cool) ❄️
@@ -56,7 +56,7 @@ Forecast: Clouds building. Rain likely by evening.
 You follow the worn trail northward...
 
 ⛰️ Mountain Foothills
-The trail winds upward through rocky terrain. Hardy pine trees 
+The trail winds upward through rocky terrain. Hardy pine trees
 cling to the slopes, and the air grows noticeably cooler.
 
 Temperature: 55°F (Cool) ❄️
@@ -83,7 +83,7 @@ Rain begins to fall, pattering on the leaves around you.
 > look
 
 🌲 Deep Forest
-Rain drips through the canopy as darkness creeps between the trees. 
+Rain drips through the canopy as darkness creeps between the trees.
 The temperature has dropped sharply with the storm.
 
 Temperature: 48°F (Cold) ❄️ - You shiver slightly
@@ -131,7 +131,7 @@ You burst into a clearing - a road! Stone markers gleam in the rain.
 The wolves stop at the treeline, unwilling to approach the King's Highway.
 
 📍 King's Highway - Southern Crossroads
-A well-maintained road intersection. Stone markers point the way 
+A well-maintained road intersection. Stone markers point the way
 to nearby settlements. The cobblestones are slick with rain.
 
 The storm begins to pass. You've escaped the hunt.

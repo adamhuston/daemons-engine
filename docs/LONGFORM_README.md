@@ -73,6 +73,13 @@ class GameContext:
 - `ClanSystem` – Persistent player organizations with ranks and permissions
 - `FactionSystem` – NPC factions with reputation and alignment tracking
 - `LightingSystem` – Dynamic light sources and visibility-based gameplay
+- `TemperatureSystem` – Environmental temperature with biome/weather/time modifiers
+- `WeatherSystem` – Dynamic weather with climate-based Markov transitions
+- `BiomeSystem` – Biome definitions with seasonal cycles and spawn modifiers
+- `FloraSystem` – Plants, trees, and harvestable resources
+- `FaunaSystem` – Wildlife behaviors, pack spawning, migration, predator-prey
+- `SpawnConditionEvaluator` – Condition-based entity spawning
+- `PopulationManager` – Ecological dynamics and population control
 
 ### Serialized Command Processing
 Single `WorldEngine` instance per process. Commands flow through one async queue, eliminating shared-state races inside the engine. The world state is always consistent.
@@ -118,10 +125,11 @@ Reference Flet client included.
 - [QUICKSTART.md](./QUICKSTART.md) – **Full setup guide** (venv, deps, server, client, linting, tests)
 - [ARCHITECTURE.md](./documentation/ARCHITECTURE.md) – Backend and engine design
 - [CONTRIBUTING.md](./CONTRIBUTING.md) – Development workflow
+- [OPERATIONS.md](./documentation/OPERATIONS.md) – Server management and troubleshooting
 - [protocol.md](./documentation/protocol.md) – WebSocket message format
-- [roadmap.md](./documentation/roadmap.md) – Detailed feature roadmap (Phases 0-12 complete)
+- [roadmap.md](./documentation/roadmap.md) – Detailed feature roadmap (Phases 0-17 in progress)
 - [alembic.md](./documentation/alembic.md) – Database migrations
-- [test_architecture.md](./documentation/test_architecture.md) – Testing strategy
+- [TEST_ARCHITECTURE.md](./documentation/TEST_ARCHITECTURE.md) – Testing strategy
 - [COVERAGE_CI_CD.md](./documentation/COVERAGE_CI_CD.md) – CI/CD setup
 
 **Phase Completion Documentation:**
@@ -131,6 +139,8 @@ Reference Flet client included.
 - Phase 10: Social features (groups, clans, factions with reputation)
 - Phase 11: Lighting system with visibility-based gameplay
 - Phase 12: CMS API (schema registry, validation, bulk operations)
+- Phase 16: Cybersecurity (rate limiting, JWT hardening, input sanitization)
+- Phase 17: Environmental systems (weather, temperature, biomes, flora, fauna)
 
 ## Quick Start
 
@@ -205,7 +215,7 @@ python client.py
 
 ## Status
 
-**Current Phase: CMS API Integration**
+**Current Phase: Environmental Systems (Phase 17)**
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -215,15 +225,20 @@ python client.py
 | 10 | Social features: groups, clans, factions | ✅ Complete |
 | 11 | Light and vision system | ✅ Complete |
 | 12 | CMS API integration (schema, validation, bulk ops) | ✅ Complete |
+| 16 | Cybersecurity audit: rate limiting, JWT hardening, input sanitization | ✅ Complete |
+| 17.1-17.6 | Environmental systems: weather, temperature, biomes, flora, fauna, ecosystems | ✅ Complete |
+| 17.7-17.8 | Roads/paths system, final integration | 📝 In Progress |
 | Testing | Comprehensive test suite, CI/CD pipeline, coverage reporting | ✅ Complete |
-| 13+ | Abilities audit, NPC abilities, player QoL, security audit | 📋 Planned |
 
 **Feature Highlights:**
-- 334 passing tests across unit, systems, and integration test suites
-- 11 game systems with hot-reload support for content and behaviors
-- YAML-based content layer with 73 files across 13 content types
+- 400+ passing tests across unit, systems, and integration test suites
+- 17+ game systems with hot-reload support for content and behaviors
+- YAML-based content layer with 80+ files across 15+ content types
 - RESTful CMS API for schema registry, file management, validation, and bulk operations
 - Real-time combat, quest chains, faction reputation, and dynamic lighting
+- Dynamic weather, temperature, and seasonal systems
+- Flora/fauna ecosystems with condition-based spawning
+- Cybersecurity hardening (rate limiting, input sanitization, JWT security)
 - Automated CI/CD via GitHub Actions (Python 3.11-3.13 matrix)
 - Pre-commit hooks for code quality (ruff, black, isort)
 
@@ -232,9 +247,10 @@ python client.py
 - **Backend**: Python 3.11+, FastAPI, Uvicorn
 - **Database**: SQLAlchemy (async) + SQLite with Alembic migrations
 - **Authentication**: python-jose (JWT), passlib/Argon2
-- **Game Systems**: 11 composable systems (combat, quests, abilities, factions, lighting, etc.)
-- **Content**: YAML-based with hot-reload support (73 files, 13 content types)
-- **Testing**: pytest with asyncio support (334 passing tests)
+- **Security**: slowapi rate limiting, input sanitization, WebSocket security
+- **Game Systems**: 17+ composable systems (combat, quests, abilities, factions, lighting, weather, flora, fauna, etc.)
+- **Content**: YAML-based with hot-reload support (80+ files, 15+ content types)
+- **Testing**: pytest with asyncio support (400+ passing tests)
 - **Client**: Flet reference implementation
 - **CI/CD**: GitHub Actions with Python 3.11-3.13 matrix testing
 
@@ -248,6 +264,11 @@ python client.py
 - Dynamic lighting with visibility-based gameplay
 - Effect system for buffs, debuffs, DoTs, and HoTs
 - Trigger system for room/area events and scripted interactions
+- Dynamic weather with climate-based patterns (rain, storms, fog, snow)
+- Temperature system with environmental hazards (freezing, scorching)
+- Biome and seasonal cycles with gameplay effects
+- Flora harvesting with respawn mechanics
+- Fauna ecosystems with predator-prey dynamics and migration
 
 **Social Features:**
 - Group/party system with leadership and coordinated actions
@@ -270,8 +291,9 @@ python client.py
 - Server status monitoring and metrics
 
 **Developer Experience:**
-- Comprehensive test suite with 334 passing tests
+- Comprehensive test suite with 400+ passing tests
 - CI/CD pipeline with automated testing
 - Pre-commit hooks for code quality
 - Structured logging with performance metrics
 - Type hints throughout codebase
+- Input sanitization and security hardening

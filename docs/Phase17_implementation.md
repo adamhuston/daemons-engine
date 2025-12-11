@@ -60,7 +60,7 @@ properties:
   flora_type:
     type: string
     enum: [tree, shrub, grass, flower, fungus, vine, aquatic]
-  
+
   # Environmental Requirements
   biome_tags:
     type: array
@@ -82,7 +82,7 @@ properties:
     type: string
     enum: [arid, dry, moderate, wet, aquatic]
     default: moderate
-  
+
   # Interaction Properties
   harvestable:
     type: boolean
@@ -112,7 +112,7 @@ properties:
   harvest_tool:
     type: string
     description: "Required tool item_type (axe, sickle, etc.)"
-  
+
   # Visual/Seasonal
   seasonal_variants:
     type: object
@@ -125,7 +125,7 @@ properties:
         type: string
       winter:
         type: string
-  
+
   # Gameplay Effects
   provides_cover:
     type: boolean
@@ -142,7 +142,7 @@ properties:
     items:
       type: string
       enum: [north, south, east, west, up, down]
-  
+
   # Spawning
   rarity:
     type: string
@@ -169,21 +169,21 @@ properties:
 # Flora instances (runtime state)
 class FloraInstance(Base):
     __tablename__ = "flora_instances"
-    
+
     id = Column(Integer, primary_key=True)
     template_id = Column(String(64), nullable=False, index=True)
     room_id = Column(String(64), ForeignKey("rooms.id"), nullable=False, index=True)
-    
+
     # State
     quantity = Column(Integer, default=1)  # How many plants in this cluster
     last_harvested_at = Column(DateTime, nullable=True)
     last_harvested_by = Column(Integer, ForeignKey("players.id"), nullable=True)
     harvest_count = Column(Integer, default=0)  # Total times harvested
-    
+
     # Spawn tracking
     spawned_at = Column(DateTime, default=func.now())
     is_permanent = Column(Boolean, default=False)  # Designer-placed vs spawned
-    
+
     # Indexes
     __table_args__ = (
         Index("ix_flora_room_template", "room_id", "template_id"),
@@ -274,28 +274,28 @@ class FloraTemplate:
     name: str
     description: str
     flora_type: FloraType
-    
+
     # Environmental
     biome_tags: list[str] = field(default_factory=list)
     temperature_range: tuple[int, int] = (32, 100)
     light_requirement: LightRequirement = LightRequirement.ANY
     moisture_requirement: str = "moderate"
-    
+
     # Interaction
     harvestable: bool = False
     harvest_items: list[HarvestItem] = field(default_factory=list)
     harvest_cooldown: int = 3600
     harvest_tool: Optional[str] = None
-    
+
     # Visual
     seasonal_variants: dict[str, str] = field(default_factory=dict)
-    
+
     # Gameplay
     provides_cover: bool = False
     cover_bonus: int = 2
     blocks_movement: bool = False
     blocks_directions: list[str] = field(default_factory=list)
-    
+
     # Spawning
     rarity: Rarity = Rarity.COMMON
     cluster_size: tuple[int, int] = (1, 3)
@@ -312,7 +312,7 @@ class FloraInstance:
 
 class FloraSystem:
     """Manages flora templates and instances."""
-    
+
     def __init__(
         self,
         biome_system: BiomeSystem,
@@ -324,29 +324,29 @@ class FloraSystem:
         self.season_system = season_system
         self._templates: dict[str, FloraTemplate] = {}
         self._room_flora_cache: dict[str, list[FloraInstance]] = {}
-    
+
     # Template Management
     def load_templates(self, yaml_path: Path) -> int:
         """Load flora templates from YAML files."""
         pass
-    
+
     def get_template(self, template_id: str) -> Optional[FloraTemplate]:
         """Get a flora template by ID."""
         pass
-    
+
     def get_templates_for_biome(self, biome_id: str) -> list[FloraTemplate]:
         """Get all flora compatible with a biome."""
         pass
-    
+
     # Instance Management
     async def get_room_flora(
-        self, 
+        self,
         room: WorldRoom,
         session: AsyncSession
     ) -> list[FloraInstance]:
         """Get all flora instances in a room."""
         pass
-    
+
     async def spawn_flora(
         self,
         room: WorldRoom,
@@ -357,7 +357,7 @@ class FloraSystem:
     ) -> FloraInstance:
         """Spawn flora in a room."""
         pass
-    
+
     async def despawn_flora(
         self,
         instance_id: int,
@@ -365,7 +365,7 @@ class FloraSystem:
     ) -> bool:
         """Remove a flora instance (marks as depleted, not deleted)."""
         pass
-    
+
     # Respawn System (see Design Decisions section for full details)
     async def process_respawns(
         self,
@@ -374,16 +374,16 @@ class FloraSystem:
         session: AsyncSession
     ) -> int:
         """Process flora respawns using hybrid system.
-        
+
         Uses passive chance + event-triggered respawns:
         - Base passive_respawn_chance per tick
         - Boosted during rain/storms
         - Full refresh on season changes
-        
+
         Returns count of respawned flora.
         """
         pass
-    
+
     def get_respawn_chance(
         self,
         instance: FloraInstance,
@@ -393,18 +393,18 @@ class FloraSystem:
         """Calculate respawn chance based on weather and flora type."""
         config = self.respawn_config
         base_chance = config.passive_respawn_chance
-        
+
         # Weather boost
         if weather_state.weather_type == WeatherType.RAIN:
             base_chance += config.rain_respawn_boost
         elif weather_state.weather_type == WeatherType.STORM:
             base_chance += config.storm_respawn_boost
-        
+
         # Flora type modifier
         type_mod = config.type_modifiers.get(template.flora_type, 1.0)
-        
+
         return min(1.0, base_chance * type_mod)
-    
+
     # Condition Checking
     def can_exist_in_room(
         self,
@@ -413,28 +413,28 @@ class FloraSystem:
         area: WorldArea
     ) -> tuple[bool, list[str]]:
         """Check if flora can exist in room conditions.
-        
+
         Returns (can_exist, list of warning messages).
         """
         warnings = []
-        
+
         # Check biome compatibility
         biome = self.biome_system.get_biome_for_area(area)
         if biome and template.biome_tags:
             if not any(tag in biome.flora_tags for tag in template.biome_tags):
                 return False, ["Incompatible biome"]
-        
+
         # Check temperature
         temp = self.temperature_system.calculate_room_temperature(room, area)
         min_t, max_t = template.temperature_range
         if temp.effective_temperature < min_t or temp.effective_temperature > max_t:
             warnings.append(f"Temperature {temp.effective_temperature}°F outside range")
-        
+
         # Check light (would need LightingSystem integration)
         # Check moisture (would need weather integration)
-        
+
         return len(warnings) == 0, warnings
-    
+
     # Harvest System
     async def can_harvest(
         self,
@@ -446,24 +446,24 @@ class FloraSystem:
         template = self.get_template(instance.template_id)
         if not template:
             return False, "Unknown flora type"
-        
+
         if not template.harvestable:
             return False, f"You cannot harvest {template.name}"
-        
+
         # Check cooldown
         if instance.last_harvested_at:
             elapsed = (datetime.utcnow() - instance.last_harvested_at).total_seconds()
             if elapsed < template.harvest_cooldown:
                 remaining = int(template.harvest_cooldown - elapsed)
                 return False, f"{template.name} was recently harvested. Try again in {remaining}s"
-        
+
         # Check tool requirement
         if template.harvest_tool:
             if not player.has_equipped_item_type(template.harvest_tool):
                 return False, f"You need a {template.harvest_tool} to harvest {template.name}"
-        
+
         return True, ""
-    
+
     async def harvest(
         self,
         player: WorldPlayer,
@@ -471,50 +471,50 @@ class FloraSystem:
         session: AsyncSession
     ) -> HarvestResult:
         """Harvest flora and grant items.
-        
+
         By default, harvesting has no lasting ecosystem impact.
         The sustainability hook (on_harvest) is a no-op unless
         SustainabilityConfig is explicitly enabled.
         See Design Decisions section for extensibility details.
         """
         template = self.get_template(instance.template_id)
-        
+
         # Calculate harvest results
         result = self._calculate_harvest(player, instance, template)
-        
+
         # Mark instance as depleted
         instance.last_harvested_at = datetime.utcnow()
         instance.last_harvested_by = player.id
         instance.harvest_count += 1
-        
+
         # Grant items to player
         for item_id, quantity in result.items_gained:
             await self.item_system.give_item(player, item_id, quantity, session)
-        
+
         # Sustainability hook - no-op by default (see Design Decisions)
         await self.on_harvest(instance, player)
-        
+
         await session.commit()
         return result
-    
+
     async def on_harvest(
         self,
         flora: FloraInstance,
         harvester: WorldPlayer
     ) -> None:
         """Hook for sustainability tracking - no-op by default.
-        
+
         Override or enable SustainabilityConfig to track player impact.
         See Design Decisions section for sustainability system design.
         """
         if not self.sustainability_config or not self.sustainability_config.enabled:
             return
-        
+
         # Track harvesting for sustainability impact
         area_id = self._get_area_for_room(flora.room_id)
         self.sustainability_config.area_harvest_counts[area_id] = \
             self.sustainability_config.area_harvest_counts.get(area_id, 0) + 1
-    
+
     # Display
     def get_description(
         self,
@@ -525,7 +525,7 @@ class FloraSystem:
         if season.value in template.seasonal_variants:
             return template.seasonal_variants[season.value]
         return template.description
-    
+
     def format_room_flora(
         self,
         flora_list: list[FloraInstance],
@@ -542,11 +542,11 @@ class FloraSystem:
 
 class HarvestCommand(BaseCommand):
     """Gather resources from harvestable flora."""
-    
+
     name = "harvest"
     aliases = ["gather", "pick"]
     usage = "harvest <plant>"
-    
+
     async def execute(
         self,
         player: WorldPlayer,
@@ -555,15 +555,15 @@ class HarvestCommand(BaseCommand):
     ) -> CommandResult:
         if not args:
             return CommandResult.error("Harvest what? Usage: harvest <plant>")
-        
+
         target_name = " ".join(args).lower()
-        
+
         # Find flora in room
         flora_list = await engine.flora_system.get_room_flora(
-            player.room, 
+            player.room,
             engine.session
         )
-        
+
         # Match by name
         matched = None
         for instance in flora_list:
@@ -571,32 +571,32 @@ class HarvestCommand(BaseCommand):
             if template and target_name in template.name.lower():
                 matched = (instance, template)
                 break
-        
+
         if not matched:
             return CommandResult.error(f"You don't see any {target_name} here.")
-        
+
         instance, template = matched
-        
+
         # Check harvestability
         can_harvest, reason = await engine.flora_system.can_harvest(
             player, instance, engine.session
         )
         if not can_harvest:
             return CommandResult.error(reason)
-        
+
         # Perform harvest
         result = await engine.flora_system.harvest(
             player, instance, engine.session
         )
-        
+
         # Format output
         output = [f"You harvest from the {template.name}."]
         for item, qty in result.items_gained:
             output.append(f"  + {qty}x {item.name}")
-        
+
         if result.flora_depleted:
             output.append(f"The {template.name} has been exhausted.")
-        
+
         return CommandResult.success("\n".join(output))
 ```
 
@@ -760,7 +760,7 @@ class FaunaProperties:
 
 class FaunaSystem:
     """Extends NPC system with fauna-specific behaviors."""
-    
+
     def __init__(
         self,
         npc_system: NpcSystem,
@@ -774,14 +774,14 @@ class FaunaSystem:
         self.temperature_system = temperature_system
         self.season_system = season_system
         self.time_system = time_system
-    
+
     def get_fauna_properties(self, npc_template: NpcTemplate) -> Optional[FaunaProperties]:
         """Extract fauna properties from NPC template."""
         if not getattr(npc_template, 'is_fauna', False):
             return None
         # Build FaunaProperties from template fields
         pass
-    
+
     def is_active_now(
         self,
         fauna: FaunaProperties,
@@ -789,7 +789,7 @@ class FaunaSystem:
     ) -> bool:
         """Check if fauna is active at current time."""
         time_of_day = self.time_system.get_time_of_day(area)
-        
+
         match fauna.activity_period:
             case ActivityPeriod.DIURNAL:
                 return time_of_day in [TimeOfDay.DAWN, TimeOfDay.DAY]
@@ -800,7 +800,7 @@ class FaunaSystem:
             case ActivityPeriod.ALWAYS:
                 return True
         return True
-    
+
     def is_migrated(
         self,
         fauna: FaunaProperties,
@@ -811,7 +811,7 @@ class FaunaSystem:
             return False
         current_season = self.season_system.get_season(area)
         return current_season.value in fauna.migration_seasons
-    
+
     def can_survive_temperature(
         self,
         fauna: FaunaProperties,
@@ -822,7 +822,7 @@ class FaunaSystem:
         temp = self.temperature_system.calculate_room_temperature(room, area)
         min_t, max_t = fauna.temperature_tolerance
         return min_t <= temp.effective_temperature <= max_t
-    
+
     def calculate_pack_size(
         self,
         fauna: FaunaProperties
@@ -830,7 +830,7 @@ class FaunaSystem:
         """Calculate actual pack size for spawning."""
         min_size, max_size = fauna.pack_size
         return random.randint(min_size, max_size)
-    
+
     async def spawn_pack(
         self,
         template_id: str,
@@ -840,14 +840,14 @@ class FaunaSystem:
         """Spawn a pack of fauna."""
         template = self.npc_system.get_template(template_id)
         fauna = self.get_fauna_properties(template)
-        
+
         if not fauna:
             # Not fauna, spawn single NPC
             return [await self.npc_system.spawn_npc(template_id, room, session)]
-        
+
         pack_size = self.calculate_pack_size(fauna)
         pack = []
-        
+
         # Spawn pack leader if defined
         if fauna.pack_size[0] > 1 and template.pack_leader_template:
             leader = await self.npc_system.spawn_npc(
@@ -855,14 +855,14 @@ class FaunaSystem:
             )
             pack.append(leader)
             pack_size -= 1
-        
+
         # Spawn rest of pack
         for _ in range(pack_size):
             npc = await self.npc_system.spawn_npc(template_id, room, session)
             pack.append(npc)
-        
+
         return pack
-    
+
     def find_prey_in_room(
         self,
         predator: WorldNpc,
@@ -872,15 +872,15 @@ class FaunaSystem:
         fauna = self.get_fauna_properties(predator.template)
         if not fauna or not fauna.prey_tags:
             return []
-        
+
         prey = []
         for npc in room.npcs:
             npc_fauna = self.get_fauna_properties(npc.template)
             if npc_fauna and any(tag in npc_fauna.fauna_tags for tag in fauna.prey_tags):
                 prey.append(npc)
-        
+
         return prey
-    
+
     def find_predators_in_room(
         self,
         prey: WorldNpc,
@@ -890,15 +890,15 @@ class FaunaSystem:
         fauna = self.get_fauna_properties(prey.template)
         if not fauna or not fauna.predator_tags:
             return []
-        
+
         predators = []
         for npc in room.npcs:
             npc_fauna = self.get_fauna_properties(npc.template)
             if npc_fauna and any(tag in npc_fauna.fauna_tags for tag in fauna.predator_tags):
                 predators.append(npc)
-        
+
         return predators
-    
+
     # Death Handling (see Design Decisions section)
     async def handle_fauna_death(
         self,
@@ -907,26 +907,26 @@ class FaunaSystem:
         session: AsyncSession
     ) -> None:
         """Handle fauna death - abstract model, no loot/corpse.
-        
+
         Fauna death is abstract: the creature simply disappears.
         No drops, no corpse entity, no player loot.
         This keeps fauna as world ambiance rather than loot sources.
         """
         logger.debug(f"Fauna {npc.template_id} died in room {npc.room_id}: {cause}")
-        
+
         # Update population tracking
         await self.population_manager.record_death(npc.template_id, npc.room_id)
-        
+
         # Simply remove from world
         await self.npc_system.remove_npc(npc.id, session)
-        
+
         # Optional flavor message for nearby players
         if cause == "combat":
             await self._broadcast_to_room(
-                npc.room_id, 
+                npc.room_id,
                 f"The {npc.name} flees into the underbrush!"
             )
-    
+
     # Cross-Area Migration (see Design Decisions section)
     async def consider_migration(
         self,
@@ -935,7 +935,7 @@ class FaunaSystem:
         session: AsyncSession
     ) -> Optional[WorldRoom]:
         """Determine if fauna should migrate to adjacent area.
-        
+
         Fauna can move between areas with biome awareness:
         - Won't migrate to unsuitable biomes
         - Will attempt to return if in unsuitable climate
@@ -943,51 +943,51 @@ class FaunaSystem:
         fauna = self.get_fauna_properties(npc.template)
         if not fauna:
             return None
-        
+
         current_biome = self.biome_system.get_room_biome(current_room.id)
-        
+
         # Check if current location is suitable
         if not self._is_biome_suitable(fauna, current_biome):
             # Fauna is in unsuitable climate - try to return home
             return await self._find_suitable_adjacent_room(npc, fauna, session)
-        
+
         # Random chance to explore (based on fauna properties)
         migration_chance = getattr(fauna, 'migration_tendency', 0.05)
         if random.random() > migration_chance:
             return None
-        
+
         # Find adjacent rooms including cross-area exits
         adjacent = await self._get_adjacent_rooms(current_room, include_area_exits=True)
-        
+
         # Filter to suitable biomes only
         suitable = [
             room for room in adjacent
             if self._is_biome_suitable(fauna, self.biome_system.get_room_biome(room.id))
         ]
-        
+
         return random.choice(suitable) if suitable else None
-    
+
     def _is_biome_suitable(
-        self, 
-        fauna: FaunaProperties, 
+        self,
+        fauna: FaunaProperties,
         biome: Optional[BiomeDefinition]
     ) -> bool:
         """Check if fauna can survive in this biome."""
         if not biome:
             return True  # Unknown biome, allow
-        
+
         # Check preferred biomes
         if fauna.biome_tags and biome.name not in fauna.biome_tags:
             # Allow if biome has compatible fauna_tags
             if not any(tag in biome.fauna_tags for tag in fauna.biome_tags):
                 return False
-        
+
         # Check temperature tolerance
         if hasattr(fauna, 'temperature_tolerance'):
             min_t, max_t = fauna.temperature_tolerance
             if not (min_t <= biome.base_temperature <= max_t):
                 return False
-        
+
         return True
 ```
 
@@ -998,32 +998,32 @@ class FaunaSystem:
 
 class GrazingBehavior(BehaviorScript):
     """Herbivore behavior: wander and 'eat' flora."""
-    
+
     id = "grazing"
-    
+
     def on_tick(self, npc: WorldNpc, ctx: BehaviorContext) -> BehaviorResult:
         # Check if hungry (custom state)
         hunger = npc.get_state("hunger", 0)
-        
+
         if hunger > 50:
             # Look for edible flora
             flora = ctx.engine.flora_system.get_room_flora(npc.room)
             edible = [f for f in flora if self._is_edible(f)]
-            
+
             if edible:
                 target = random.choice(edible)
                 npc.set_state("hunger", hunger - 30)
                 return BehaviorResult(
                     message=f"{npc.name} grazes on some {target.template.name}."
                 )
-        
+
         # Otherwise, wander
         if random.random() < 0.2:
             direction = random.choice(ctx.available_exits)
             return BehaviorResult(move_direction=direction)
-        
+
         return BehaviorResult()
-    
+
     def _is_edible(self, flora: FloraInstance) -> bool:
         # Grass, flowers, shrubs are edible
         return flora.template.flora_type in [
@@ -1033,40 +1033,40 @@ class GrazingBehavior(BehaviorScript):
 
 class HuntingBehavior(BehaviorScript):
     """Carnivore behavior: seek and attack prey."""
-    
+
     id = "hunting"
-    
+
     def on_tick(self, npc: WorldNpc, ctx: BehaviorContext) -> BehaviorResult:
         fauna_system = ctx.engine.fauna_system
-        
+
         # Look for prey in current room
         prey_list = fauna_system.find_prey_in_room(npc, npc.room)
-        
+
         if prey_list:
             # Attack weakest prey
             target = min(prey_list, key=lambda p: p.current_hp)
             return BehaviorResult(attack_target=target)
-        
+
         # No prey here, track or wander
         # Could implement scent tracking in future
         if random.random() < 0.3:
             direction = random.choice(ctx.available_exits)
             return BehaviorResult(move_direction=direction)
-        
+
         return BehaviorResult()
 
 
 class FleeingBehavior(BehaviorScript):
     """Prey behavior: flee from predators."""
-    
+
     id = "fleeing_predator"
-    
+
     def on_tick(self, npc: WorldNpc, ctx: BehaviorContext) -> BehaviorResult:
         fauna_system = ctx.engine.fauna_system
-        
+
         # Check for predators
         predators = fauna_system.find_predators_in_room(npc, npc.room)
-        
+
         if predators:
             # Flee! Pick exit away from predator
             safe_exits = self._find_safe_exits(npc, predators, ctx)
@@ -1075,9 +1075,9 @@ class FleeingBehavior(BehaviorScript):
                     move_direction=random.choice(safe_exits),
                     message=f"{npc.name} bolts away in fear!"
                 )
-        
+
         return BehaviorResult()
-    
+
     def _find_safe_exits(self, npc, predators, ctx) -> list[str]:
         # Return exits that don't lead toward predators
         # Simplified: just return all exits for now
@@ -1086,24 +1086,24 @@ class FleeingBehavior(BehaviorScript):
 
 class TerritorialBehavior(BehaviorScript):
     """Territorial fauna: attacks intruders."""
-    
+
     id = "territorial"
-    
+
     def on_player_enter(self, npc: WorldNpc, player: WorldPlayer, ctx: BehaviorContext) -> BehaviorResult:
         fauna = ctx.engine.fauna_system.get_fauna_properties(npc.template)
-        
+
         if fauna and fauna.territorial:
             # Check if player is in territory
             spawn_room = npc.get_state("spawn_room")
             distance = ctx.engine.calculate_room_distance(spawn_room, npc.room.id)
-            
+
             if distance <= fauna.territory_radius:
                 # Player entered territory - become aggressive
                 return BehaviorResult(
                     message=f"{npc.name} growls menacingly at you!",
                     attack_target=player
                 )
-        
+
         return BehaviorResult()
 ```
 
@@ -1129,7 +1129,7 @@ spawns:
       quantity:
         type: integer
         default: 1
-      
+
       # NEW: Spawn conditions
       spawn_conditions:
         type: object
@@ -1140,7 +1140,7 @@ spawns:
             items:
               type: string
               enum: [dawn, day, dusk, night]
-          
+
           # Temperature conditions
           temperature_min:
             type: integer
@@ -1152,7 +1152,7 @@ spawns:
               type: integer
             minItems: 2
             maxItems: 2
-          
+
           # Weather conditions
           weather_is:
             type: array
@@ -1167,7 +1167,7 @@ spawns:
             type: number
           weather_intensity_max:
             type: number
-          
+
           # Season conditions
           season_is:
             type: array
@@ -1178,7 +1178,7 @@ spawns:
             type: array
             items:
               type: string
-          
+
           # Biome conditions
           biome_is:
             type: array
@@ -1187,7 +1187,7 @@ spawns:
           biome_match:
             type: boolean
             description: "Only spawn if NPC's biome_tags match room's biome"
-          
+
           # Light conditions
           light_level_min:
             type: integer
@@ -1197,7 +1197,7 @@ spawns:
             type: integer
             minimum: 0
             maximum: 100
-          
+
           # Population conditions
           max_in_area:
             type: integer
@@ -1205,7 +1205,7 @@ spawns:
           max_in_room:
             type: integer
             description: "Maximum of this template in room"
-          
+
           # Dependency conditions
           requires_flora:
             type: array
@@ -1260,7 +1260,7 @@ class EvaluationResult:
 
 class SpawnConditionEvaluator:
     """Evaluates spawn conditions against current environment."""
-    
+
     def __init__(
         self,
         time_system: TimeSystem,
@@ -1280,7 +1280,7 @@ class SpawnConditionEvaluator:
         self.lighting_system = lighting_system
         self.flora_system = flora_system
         self.fauna_system = fauna_system
-    
+
     async def evaluate(
         self,
         conditions: SpawnConditions,
@@ -1292,20 +1292,20 @@ class SpawnConditionEvaluator:
         """Evaluate all spawn conditions."""
         failed = []
         warnings = []
-        
+
         # Time of day
         if conditions.time_of_day:
             current_time = self.time_system.get_time_of_day(area)
             if current_time.value not in conditions.time_of_day:
                 failed.append(f"time_of_day: {current_time.value} not in {conditions.time_of_day}")
-        
+
         # Temperature
         if conditions.temperature_range:
             temp = self.temperature_system.calculate_room_temperature(room, area)
             min_t, max_t = conditions.temperature_range
             if not (min_t <= temp.effective_temperature <= max_t):
                 failed.append(f"temperature: {temp.effective_temperature}°F not in [{min_t}, {max_t}]")
-        
+
         # Weather
         if conditions.weather_is or conditions.weather_not:
             weather = self.weather_system.get_current_weather(area.id)
@@ -1313,7 +1313,7 @@ class SpawnConditionEvaluator:
                 failed.append(f"weather_is: {weather.weather_type.value} not in {conditions.weather_is}")
             if conditions.weather_not and weather.weather_type.value in conditions.weather_not:
                 failed.append(f"weather_not: {weather.weather_type.value} in {conditions.weather_not}")
-        
+
         # Season
         if conditions.season_is or conditions.season_not:
             season = self.season_system.get_season(area)
@@ -1321,7 +1321,7 @@ class SpawnConditionEvaluator:
                 failed.append(f"season_is: {season.value} not in {conditions.season_is}")
             if conditions.season_not and season.value in conditions.season_not:
                 failed.append(f"season_not: {season.value} in {conditions.season_not}")
-        
+
         # Biome match
         if conditions.biome_match:
             fauna = self.fauna_system.get_fauna_properties(template)
@@ -1330,18 +1330,18 @@ class SpawnConditionEvaluator:
                 if biome and fauna.biome_tags:
                     if not any(tag in biome.fauna_tags for tag in fauna.biome_tags):
                         failed.append(f"biome_match: fauna tags {fauna.biome_tags} not in biome {biome.fauna_tags}")
-        
+
         # Population limits
         if conditions.max_in_room:
             count = await self._count_in_room(template.id, room, session)
             if count >= conditions.max_in_room:
                 failed.append(f"max_in_room: {count} >= {conditions.max_in_room}")
-        
+
         if conditions.max_in_area:
             count = await self._count_in_area(template.id, area, session)
             if count >= conditions.max_in_area:
                 failed.append(f"max_in_area: {count} >= {conditions.max_in_area}")
-        
+
         # Flora requirements
         if conditions.requires_flora:
             room_flora = await self.flora_system.get_room_flora(room, session)
@@ -1349,7 +1349,7 @@ class SpawnConditionEvaluator:
             missing = set(conditions.requires_flora) - flora_ids
             if missing:
                 failed.append(f"requires_flora: missing {missing}")
-        
+
         # Fauna requirements (prey must be present)
         if conditions.requires_fauna:
             room_npcs = room.npcs
@@ -1357,7 +1357,7 @@ class SpawnConditionEvaluator:
             missing = set(conditions.requires_fauna) - npc_templates
             if missing:
                 failed.append(f"requires_fauna: missing {missing}")
-        
+
         # Fauna exclusions (predators prevent spawn)
         if conditions.excludes_fauna:
             room_npcs = room.npcs
@@ -1365,16 +1365,16 @@ class SpawnConditionEvaluator:
             present = set(conditions.excludes_fauna) & npc_templates
             if present:
                 failed.append(f"excludes_fauna: {present} present")
-        
+
         return EvaluationResult(
             can_spawn=len(failed) == 0,
             failed_conditions=failed,
             warnings=warnings
         )
-    
+
     async def _count_in_room(self, template_id: str, room: WorldRoom, session: AsyncSession) -> int:
         return sum(1 for npc in room.npcs if npc.template_id == template_id)
-    
+
     async def _count_in_area(self, template_id: str, area: WorldArea, session: AsyncSession) -> int:
         # Query database for count
         pass
@@ -1392,20 +1392,20 @@ from typing import Optional
 class PopulationConfig:
     """Population management settings for an area."""
     area_id: str
-    
+
     # Per-template caps
     template_caps: dict[str, int]  # template_id -> max count
-    
+
     # Ecological dynamics
     predator_pressure: float = 1.0  # Multiplier on prey mortality
     prey_abundance: float = 1.0     # Multiplier on predator spawning
     flora_dependency: float = 1.0   # Herbivore spawn rate from flora
-    
+
     # Recovery rates
     base_recovery_rate: float = 0.1  # Per-tick spawn chance when below cap
     critical_recovery_rate: float = 0.5  # When population < 25% of cap
 
-@dataclass 
+@dataclass
 class PopulationSnapshot:
     """Current population state for an area."""
     area_id: str
@@ -1417,7 +1417,7 @@ class PopulationSnapshot:
 
 class PopulationManager:
     """Manages ecological population dynamics."""
-    
+
     def __init__(
         self,
         fauna_system: FaunaSystem,
@@ -1428,7 +1428,7 @@ class PopulationManager:
         self.flora_system = flora_system
         self.spawn_evaluator = spawn_evaluator
         self._configs: dict[str, PopulationConfig] = {}
-    
+
     def get_population_snapshot(
         self,
         area: WorldArea,
@@ -1436,7 +1436,7 @@ class PopulationManager:
     ) -> PopulationSnapshot:
         """Get current population counts for area."""
         pass
-    
+
     def calculate_spawn_rate(
         self,
         template_id: str,
@@ -1447,46 +1447,46 @@ class PopulationManager:
         config = self._configs.get(area.id)
         if not config:
             return 1.0
-        
+
         current = snapshot.counts.get(template_id, 0)
         cap = config.template_caps.get(template_id, 10)
-        
+
         if current >= cap:
             return 0.0
-        
+
         # Base rate
         ratio = current / cap
         if ratio < 0.25:
             rate = config.critical_recovery_rate
         else:
             rate = config.base_recovery_rate * (1 - ratio)
-        
+
         # Ecological modifiers
         template = self.fauna_system.npc_system.get_template(template_id)
         fauna = self.fauna_system.get_fauna_properties(template)
-        
+
         if fauna:
             match fauna.diet:
                 case Diet.HERBIVORE:
                     # Spawn rate depends on flora
                     flora_ratio = snapshot.total_flora / 100  # Normalize
                     rate *= min(2.0, flora_ratio * config.flora_dependency)
-                
+
                 case Diet.CARNIVORE:
                     # Spawn rate depends on prey
                     prey_count = sum(
-                        snapshot.counts.get(t, 0) 
+                        snapshot.counts.get(t, 0)
                         for t in self._get_prey_templates(fauna)
                     )
                     prey_ratio = prey_count / 50  # Normalize
                     rate *= min(2.0, prey_ratio * config.prey_abundance)
-        
+
         return rate
-    
+
     async def apply_predation(self, area: WorldArea, session: AsyncSession) -> PredationResult:
         """Apply predator-prey dynamics abstractly."""
         result = PredationResult([], [])
-        
+
         for predator in self._get_hungry_predators(area):
             prey = self._find_available_prey(predator, area)
             if prey:
@@ -1495,9 +1495,9 @@ class PopulationManager:
                 result.prey_despawned.append(prey.id)
                 result.predators_fed.append(predator.id)
                 predator.set_state("hunger", 0)
-        
+
         return result
-    
+
     def _get_prey_templates(self, fauna: FaunaProperties) -> list[str]:
         """Get template IDs that match prey_tags."""
         pass
@@ -1511,44 +1511,44 @@ class PopulationManager:
 class WorldEngine:
     def __init__(self, ...):
         # ... existing init ...
-        
+
         # Performance configuration (see Design Decisions section)
         # Adjust ecosystem_tick_interval to tune performance vs responsiveness
         self.perf_config = PerformanceConfig(ecosystem_tick_interval=5.0)
-        
+
         # Track tick counters for multiplier-based scheduling
         self._ecosystem_tick_count = 0
-    
+
     async def housekeeping_tick(self):
         """Extended with ecological processing.
-        
+
         Uses PerformanceConfig to control tick frequency.
         Adjust perf_config.ecosystem_tick_interval to tune performance.
         """
         self._ecosystem_tick_count += 1
-        
+
         # Existing housekeeping...
-        
+
         # Flora respawn (every flora_update_multiplier ticks)
         if self._ecosystem_tick_count % self.perf_config.flora_update_multiplier == 0:
             await self._process_flora_respawns()
-        
+
         # Fauna AI and movement (every fauna_ai_multiplier ticks)
         if self._ecosystem_tick_count % self.perf_config.fauna_ai_multiplier == 0:
             await self._process_fauna_ai()
-        
+
         # Spawn checks (every spawn_check_multiplier ticks)
         if self._ecosystem_tick_count % self.perf_config.spawn_check_multiplier == 0:
             await self._process_fauna_spawns()
-        
+
         # Migration (every migration_multiplier ticks)
         if self._ecosystem_tick_count % self.perf_config.migration_multiplier == 0:
             await self._process_fauna_migration()
-        
+
         # Population dynamics (same as spawn check)
         if self._ecosystem_tick_count % self.perf_config.spawn_check_multiplier == 0:
             await self._process_population_dynamics()
-    
+
     async def _process_fauna_spawns(self):
         """Process fauna spawning with conditions."""
         for area in self.loaded_areas.values():
@@ -1556,33 +1556,33 @@ class WorldEngine:
                 # Check if already spawned
                 if self._is_spawn_active(spawn_def):
                     continue
-                
+
                 # Parse conditions
                 conditions = SpawnConditions.from_dict(
                     spawn_def.get("spawn_conditions", {})
                 )
-                
+
                 # Get template
                 template = self.npc_system.get_template(spawn_def["template_id"])
                 room = self.get_room(spawn_def["room_id"])
-                
+
                 # Evaluate conditions
                 result = await self.spawn_evaluator.evaluate(
                     conditions, room, area, template, self.session
                 )
-                
+
                 if not result.can_spawn:
                     continue
-                
+
                 # Check population rate
                 snapshot = self.population_manager.get_population_snapshot(area)
                 rate = self.population_manager.calculate_spawn_rate(
                     template.id, area, snapshot
                 )
-                
+
                 if random.random() > rate:
                     continue
-                
+
                 # Spawn!
                 fauna = self.fauna_system.get_fauna_properties(template)
                 if fauna:
@@ -1594,7 +1594,7 @@ class WorldEngine:
                         template.id, room, self.session
                     )
                     npcs = [npc]
-                
+
                 # Announce spawn (if visible to players)
                 for npc in npcs:
                     await self._announce_spawn(npc, room)
@@ -1624,7 +1624,7 @@ class FloraRespawnConfig:
     rain_respawn_boost: float = 0.50      # 50% during rain
     storm_respawn_boost: float = 0.75     # 75% during storms
     season_change_refresh: bool = True     # Full refresh on season change
-    
+
     # Per-flora-type modifiers
     type_modifiers: dict[FloraType, float] = field(default_factory=lambda: {
         FloraType.GRASS: 2.0,      # Grass regrows fast
@@ -1649,13 +1649,13 @@ async def handle_fauna_death(self, npc: NPC, cause: str) -> None:
     """Handle fauna death - simple cleanup, no loot/corpse."""
     # Log for debugging/metrics
     logger.debug(f"Fauna {npc.template_id} died in room {npc.room_id}: {cause}")
-    
+
     # Update population tracking
     await self.population_manager.record_death(npc.template_id, npc.room_id)
-    
+
     # Simply remove from world - no corpse, no loot
     await self.remove_npc(npc.id)
-    
+
     # Optionally notify nearby players
     if cause == "combat":
         await self._broadcast_fauna_flees(npc)  # "The rabbit bolts into the underbrush!"
@@ -1678,23 +1678,23 @@ async def handle_fauna_death(self, npc: NPC, cause: str) -> None:
 class SustainabilityConfig:
     """Optional sustainability tracking - disabled by default."""
     enabled: bool = False
-    
+
     # If enabled, track harvesting impact
     overharvest_threshold: int = 10       # Harvests before impact triggers
     recovery_penalty_duration: int = 100   # Ticks before normal respawn resumes
-    
+
     # Per-area tracking (only populated if enabled)
     area_harvest_counts: dict[str, int] = field(default_factory=dict)
 
 class FloraSystem:
     def __init__(self, sustainability_config: Optional[SustainabilityConfig] = None):
         self.sustainability = sustainability_config or SustainabilityConfig()
-    
+
     async def on_harvest(self, flora: FloraInstance, harvester: Character) -> None:
         """Hook for sustainability tracking - no-op by default."""
         if not self.sustainability.enabled:
             return
-        
+
         # Track harvesting for sustainability impact
         area_id = self.get_area_for_room(flora.room_id)
         self.sustainability.area_harvest_counts[area_id] = \
@@ -1714,47 +1714,47 @@ Fauna can **migrate between areas** with **biome-aware behavior**:
 ```python
 class FaunaMigrationBehavior:
     """Handles fauna movement between areas with biome awareness."""
-    
+
     async def consider_migration(self, npc: NPC, current_room: Room) -> Optional[Room]:
         """Determine if fauna should migrate to adjacent area."""
         fauna = self.fauna_system.get_fauna_properties(npc.template_id)
         if not fauna:
             return None
-        
+
         current_biome = self.biome_system.get_room_biome(current_room.id)
-        
+
         # Check if current location is suitable
         if not self._is_biome_suitable(fauna, current_biome):
             # Fauna is in unsuitable climate - try to return home
             return await self._find_suitable_adjacent_room(npc, fauna)
-        
+
         # Random chance to explore adjacent areas
         if random.random() > fauna.migration_tendency:
             return None
-        
+
         # Find adjacent rooms (including cross-area)
         adjacent = await self.get_adjacent_rooms(current_room, include_area_exits=True)
-        
+
         # Filter to suitable biomes only
         suitable = [
             room for room in adjacent
             if self._is_biome_suitable(fauna, self.biome_system.get_room_biome(room.id))
         ]
-        
+
         if suitable:
             return random.choice(suitable)
         return None
-    
+
     def _is_biome_suitable(self, fauna: FaunaProperties, biome: BiomeDefinition) -> bool:
         """Check if fauna can survive in this biome."""
         # Check biome tags against fauna preferences
         if fauna.preferred_biomes and biome.name not in fauna.preferred_biomes:
             return False
-        
+
         # Check temperature tolerance
         if not (fauna.temp_min <= biome.base_temperature <= fauna.temp_max):
             return False
-        
+
         return True
 ```
 
@@ -1768,28 +1768,28 @@ Performance uses a **balanced approach** with an **easily adjustable variable**:
 @dataclass
 class PerformanceConfig:
     """Ecosystem performance configuration - easily adjustable."""
-    
+
     # Master tick interval (seconds) - adjust this one variable to tune performance
     ecosystem_tick_interval: float = 5.0  # Default: 5 seconds
-    
+
     # Derived intervals (multiples of master tick)
     flora_update_multiplier: int = 2      # Every 2 ecosystem ticks (10s)
     fauna_ai_multiplier: int = 1          # Every ecosystem tick (5s)
     spawn_check_multiplier: int = 4       # Every 4 ecosystem ticks (20s)
     migration_multiplier: int = 6         # Every 6 ecosystem ticks (30s)
-    
+
     # Batch processing limits
     max_fauna_per_tick: int = 50          # Process at most 50 fauna per tick
     max_flora_per_tick: int = 100         # Process at most 100 flora per tick
-    
+
     # Population caps (hard limits)
     max_fauna_per_area: int = 20
     max_flora_per_room: int = 10
-    
+
     @property
     def flora_tick_interval(self) -> float:
         return self.ecosystem_tick_interval * self.flora_update_multiplier
-    
+
     @property
     def spawn_tick_interval(self) -> float:
         return self.ecosystem_tick_interval * self.spawn_check_multiplier

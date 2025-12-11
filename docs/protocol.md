@@ -4,10 +4,24 @@ This document describes the communication protocol between a Daemons engine serv
 
 ## Connection
 
-**Endpoint:** `ws://host:port/ws/game?player_id={player_id}`
+**Authenticated Endpoint (recommended):** `ws://host:port/ws/game/auth`
 
-**Query Parameters:**
+Authentication via header (recommended):
+```
+Sec-WebSocket-Protocol: access_token, <jwt_token>
+```
+
+Authentication via query string (deprecated):
+```
+ws://host:port/ws/game/auth?token=<jwt_token>
+```
+
+**Legacy Endpoint (deprecated):** `ws://host:port/ws/game?player_id={player_id}`
+
+**Query Parameters (legacy):**
 - `player_id` (required): UUID of the player connecting
+
+> **Note:** The legacy endpoint is being phased out. Use authenticated connections for new clients.
 
 ## Client → Server Messages
 
@@ -59,6 +73,29 @@ All messages are JSON objects sent as text frames.
 ### Combat
 - `attack <target>`, `kill <target>`, `k <target>` - Start attacking a target
 - `stop` - Stop auto-attacking and disengage from combat
+
+### Abilities (Phase 9)
+- `cast <ability>`, `ability <ability>`, `skill <ability>` - Use an ability
+- `abilities`, `skills` - List available abilities
+
+### Environment (Phase 17)
+- `weather`, `w` - View current weather and forecast
+- `season`, `seasons` - View current season and biome info
+- `temperature`, `temp` - View current temperature
+- `harvest <plant>`, `gather <plant>`, `pick <plant>` - Gather resources from flora
+
+### Social (Phase 10)
+- `tell <player> <message>`, `whisper <player> <message>` - Private message
+- `yell <message>` - Speak loudly (heard in adjacent rooms)
+- `follow <player>` - Follow another player
+- `unfollow` - Stop following
+- `group invite <player>` - Invite to party
+- `group kick <player>` - Remove from party
+- `group leave` - Leave current party
+- `group promote <player>` - Promote to leader
+- `clan create <name>` - Create a clan
+- `clan invite <player>` - Invite to clan
+- `clan roster` - View clan members
 
 ### Debug/Admin Commands
 - `heal <player_name>` - Heal a player for 20 HP
@@ -361,6 +398,70 @@ The server maintains an event-driven time system:
 - **Debuff** - Negative stat modifiers
 - **DoT** - Damage over time (e.g., Poison)
 - **HoT** - Healing over time
+
+## Environmental Systems (Phase 17)
+
+### Weather System
+Dynamic weather that changes over time and affects gameplay:
+
+**Weather Types:**
+- `CLEAR` - No precipitation, good visibility
+- `CLOUDY` - Overcast skies, slightly reduced visibility
+- `OVERCAST` - Heavy clouds, dim conditions
+- `RAIN` - Light, moderate, or heavy precipitation
+- `STORM` - Thunderstorm with lightning
+- `SNOW` - Flurries to blizzard conditions
+- `FOG` - Reduces visibility significantly
+- `WIND` - Affects ranged attacks and spell casting
+
+**Weather Effects:**
+- Visibility modifiers (fog/rain reduce light_level)
+- Temperature modifiers (rain cools, clear sun heats)
+- Movement modifiers (blizzard/storm = slower travel)
+- Combat modifiers (ranged_penalty, casting_penalty)
+
+Use `weather` command for current conditions and forecast.
+
+### Temperature System
+Room temperature based on area, time of day, weather, and biome:
+
+**Temperature Levels:**
+- `FREEZING` (< 32°F) - Cold damage, movement penalty
+- `COLD` (32-50°F) - Stamina regen reduced
+- `COMFORTABLE` (50-80°F) - No effects
+- `HOT` (80-100°F) - Stamina regen reduced
+- `SCORCHING` (> 100°F) - Heat damage, movement penalty
+
+Use `temperature` command to check current temperature.
+
+### Season System
+Seasonal cycles with gameplay effects:
+
+**Seasons:** Spring, Summer, Fall, Winter
+
+**Seasonal Effects:**
+- Temperature modifiers (-15°F in winter, +10°F in summer)
+- Weather probability changes
+- Flora availability and respawn rates
+- Fauna migration patterns
+
+Use `season` command for current seasonal information.
+
+### Flora System
+Harvestable plants and resources:
+
+- Flora templates define harvestable items, cooldowns, and seasonal variants
+- Use `harvest <plant>` to gather resources
+- Respawn rates vary by flora type and season
+- Biome-specific flora (desert cacti, forest berries, etc.)
+
+### Fauna System
+Wildlife with ecological behaviors:
+
+- Activity periods (diurnal, nocturnal, crepuscular)
+- Pack spawning with alpha leaders
+- Territorial behavior and migration
+- Predator-prey dynamics
 
 ## Connection Lifecycle
 

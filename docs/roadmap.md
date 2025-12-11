@@ -1853,17 +1853,17 @@ Stub client tweaks
     name: string                    # "Oak Tree"
     description: string             # Flavor text
     flora_type: enum                # tree, shrub, grass, flower, fungus
-    
+
     # Environmental requirements
     biome_tags: [list]              # Compatible biomes
     temperature_range: [min, max]   # Survival range
     light_requirement: enum         # full_sun, partial_shade, shade, any
-    
+
     # Interaction
     harvestable: bool               # Can players gather from it?
     harvest_items: [list]           # Items gained: [{item_id, quantity, chance}]
     harvest_cooldown: int           # Seconds until re-harvestable
-    
+
     # Visual/Seasonal
     seasonal_variants: dict         # {spring: desc, summer: desc, fall: desc, winter: desc}
     provides_cover: bool            # Affects visibility/stealth
