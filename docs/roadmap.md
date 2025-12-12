@@ -6,29 +6,29 @@ Before adding big systems, make the core loop solid.
 
 **Goals**: No silent failures; predictable behavior under load.
 
-### Backend tasks ✅
+### Backend tasks ✅ COMPLETE
 
 - ✅ Logging & observability
-    - ✅ Structured logs for: player connect/disconnect, commands received, errors in engine/WS tasks
-    - ✅ Metrics hooks and counters for active players
+    - [x] Structured logs for: player connect/disconnect, commands received, errors in engine/WS tasks
+    - [x] Metrics hooks and counters for active players
 - ✅ Error handling
-    - ✅ Graceful exception handling in _ws_sender / _ws_receiver
-    - ✅ Graceful handling of bad JSON / unknown commands
+    - [x] Graceful exception handling in _ws_sender / _ws_receiver
+    - [x] Graceful handling of bad JSON / unknown commands
 - ✅ Protocol documentation
-    - ✅ protocol.md: client→server commands and server→client event shapes
+    - [x] protocol.md: client→server commands and server→client event shapes
 
 
 
-## Phase 1  Player stats and progression **COMPLETE**
+## Phase 1  Player stats and progression ✅ COMPLETE
 
 **Goals**: A player is more than just a name + room.
 
 ### Backend model changes ✅
 
 - ✅ Extended Player model:
-    - ✅ Base stats: str, dex, int, vit, con, wis, cha
-    - ✅ Derived stats: hp, max_hp, mp, max_mp, level, xp
-    - ✅ Class/archetype tracking
+    - [x] Base stats: str, dex, int, vit, con, wis, cha
+    - [x] Derived stats: hp, max_hp, mp, max_mp, level, xp
+    - [x] Class/archetype tracking
 - ✅ Enhanced WorldPlayer with stat fields
 - ✅ Stat update events with payloads
 
@@ -40,7 +40,7 @@ Before adding big systems, make the core loop solid.
 
 
 
-## Phase 2  Time & tick system (for effects/debuffs)  **COMPLETE**
+## Phase 2  Time & tick system (for effects/debuffs)  ✅ COMPLETE
 
 **Goals**: Server time becomes first-class; you can have timed buffs/debuffs, regen, DoTs, etc.
 
@@ -75,26 +75,26 @@ Before adding big systems, make the core loop solid.
 - ✅ time command with area context
 - ✅ Sample areas (Ethereal Nexus 4x, Temporal Rift 2x)
 
-## Phase 3 - Items & inventory  **COMPLETE**
+## Phase 3 - Items & inventory ✅ COMPLETE
 
 **Goals**: Physical objects in the world, inventory management, equipment.
 
 ### Backend Model ✅
 
-- DB:
-    - ✅ ItemTemplate (static: name, type, modifiers, description, keywords).
-    - ✅ ItemInstance (dynamic: owner, location, durability, unique flags).
-    - ✅ PlayerInventory (capacity limits, weight/slot tracking).
+- ✅ DB:
+    - [x] ItemTemplate (static: name, type, modifiers, description, keywords).
+    - [x] ItemInstance (dynamic: owner, location, durability, unique flags).
+    - [x] PlayerInventory (capacity limits, weight/slot tracking).
 
-- World:
-    - ✅ WorldItem for runtime representation.
-    - ✅ ItemTemplate dataclass with full properties.
-    - ✅ Attach items to:
-        - ✅ rooms (ground items)
-        - ✅ other items (containers)
-        - ✅ players (inventory and equipment).
+- ✅ World:
+    - [x] WorldItem for runtime representation.
+    - [x] ItemTemplate dataclass with full properties.
+    - [x] Attach items to:
+        - [x] rooms (ground items)
+        - [x] other items (containers)
+        - [x] players (inventory and equipment).
 
-### YAML Content System ✅
+### YAML Content System ✅ COMPLETE
 
 - ✅ world_data/items/ directory structure (weapons/, armor/, consumables/, containers/)
 - ✅ world_data/item_instances/ for spawn configurations
@@ -103,44 +103,44 @@ Before adding big systems, make the core loop solid.
 
 ### Engine Changes ✅
 
-- Loader:
-    - ✅ Load templates + instances into World.
-    - ✅ Link items to players/rooms on startup.
-    - ✅ Restore equipped items and apply stat effects.
+- ✅ Loader:
+    - [x] Load templates + instances into World.
+    - [x] Link items to players/rooms on startup.
+    - [x] Restore equipped items and apply stat effects.
 
-- Core item mechanics:
-    - ✅ inventory/inv/i: View inventory with weight/slots.
-    - ✅ get/take/pickup <item>: Pick up from room (one at a time for stacks).
-    - ✅ drop <item>: Drop to room.
-    - ✅ give <item> <player>: Transfer to another player.
-    - ✅ equip/wear/wield <item>: Equip to appropriate slot.
-    - ✅ unequip/remove <item>: Unequip item.
-    - ✅ use/consume/drink <item>: Use consumable items.
-    - ✅ look <item>: Detailed item inspection with properties.
-    - ✅ put <item> in <container>: Store items in containers.
-    - ✅ get <item> from <container>: Retrieve from containers.
+- ✅ Core item mechanics:
+    - [x] inventory/inv/i: View inventory with weight/slots.
+    - [x] get/take/pickup <item>: Pick up from room (one at a time for stacks).
+    - [x] drop <item>: Drop to room.
+    - [x] give <item> <player>: Transfer to another player.
+    - [x] equip/wear/wield <item>: Equip to appropriate slot.
+    - [x] unequip/remove <item>: Unequip item.
+    - [x] use/consume/drink <item>: Use consumable items.
+    - [x] look <item>: Detailed item inspection with properties.
+    - [x] put <item> in <container>: Store items in containers.
+    - [x] get <item> from <container>: Retrieve from containers.
 
-- Stat interactions:
-    - ✅ Equipment applies stat modifiers via Effect system.
-    - ✅ On equip: create permanent effect with stat bonuses.
-    - ✅ On unequip: remove effect, recalculate stats.
-    - ✅ Consumables apply temporary effects (buffs, healing).
+- ✅ Stat interactions:
+    - [x] Equipment applies stat modifiers via Effect system.
+    - [x] On equip: create permanent effect with stat bonuses.
+    - [x] On unequip: remove effect, recalculate stats.
+    - [x] Consumables apply temporary effects (buffs, healing).
 
-- Quality of Life:
-    - ✅ Partial name matching ("lea" finds "leather backpack").
-    - ✅ Keyword system (items can have multiple searchable names).
-    - ✅ Stack handling (pick up one at a time).
-    - ✅ Weight and slot-based inventory limits.
-    - ✅ O(1) container contents lookup via index (not O(n) world scan).
+- ✅ Quality of Life:
+    - [x] Partial name matching ("lea" finds "leather backpack").
+    - [x] Keyword system (items can have multiple searchable names).
+    - [x] Stack handling (pick up one at a time).
+    - [x] Weight and slot-based inventory limits.
+    - [x] O(1) container contents lookup via index (not O(n) world scan).
 
 ### Events ✅
 
-- Room broadcasts:
-    - ✅ "Alice drops Rusty Sword."
-    - ✅ "Bob picks up Health Potion."
-    - ✅ "Alice gives Health Potion to Bob."
-- Stat updates:
-    - ✅ stat_update events on equip/unequip/consume.
+- ✅ Room broadcasts:
+    - [x] "Alice drops Rusty Sword."
+    - [x] "Bob picks up Health Potion."
+    - [x] "Alice gives Health Potion to Bob."
+- ✅ Stat updates:
+    - [x] stat_update events on equip/unequip/consume.
 
 ### Persistence ✅
 
@@ -150,280 +150,278 @@ Before adding big systems, make the core loop solid.
 
 
 
-## Phase 4 - NPCs & Combat System  **COMPLETE**
+## Phase 4 - NPCs & Combat System  ✅ COMPLETE
 
 **Goals**: NPCs in rooms with real-time combat and AI behaviors.
 
 ### Backend Model ✅
 
-- DB:
-    - ✅ NpcTemplate with stats, behavior flags, loot tables, attack stats
-    - ✅ NpcInstance for spawned NPCs
-- World:
-    - ✅ WorldEntity unified base class for players and NPCs
-    - ✅ WorldNpc extends WorldEntity with NPC-specific fields
-    - ✅ EntityType enum (PLAYER, NPC)
-    - ✅ Targetable protocol for unified command targeting
-    - ✅ NPCs attached to rooms via entities set
+- ✅ DB:
+    - [x] NpcTemplate with stats, behavior flags, loot tables, attack stats
+    - [x] NpcInstance for spawned NPCs
+- ✅ World:
+    - [x] WorldEntity unified base class for players and NPCs
+    - [x] WorldNpc extends WorldEntity with NPC-specific fields
+    - [x] EntityType enum (PLAYER, NPC)
+    - [x] Targetable protocol for unified command targeting
+    - [x] NPCs attached to rooms via entities set
 
 ### Real-Time Combat System ✅
 
-- Architecture:
-    - ✅ Real-time combat (not turn-based) with weapon swing timers
-    - ✅ CombatState dataclass tracking phase, target, timing
-    - ✅ CombatPhase enum: IDLE → WINDUP → SWING → RECOVERY
-    - ✅ WeaponStats: damage_min/max, swing_speed, damage_type
-    - ✅ Auto-attack continues until target dies or combat cancelled
+- ✅ Architecture:
+    - [x] Real-time combat (not turn-based) with weapon swing timers
+    - [x] CombatState dataclass tracking phase, target, timing
+    - [x] CombatPhase enum: IDLE → WINDUP → SWING → RECOVERY
+    - [x] WeaponStats: damage_min/max, swing_speed, damage_type
+    - [x] Auto-attack continues until target dies or combat cancelled
 
-- Combat Flow:
-    - ✅ `attack <target>` / `kill <target>` - Start attacking
-    - ✅ `stop` - Disengage from combat
-    - ✅ Movement blocked while in combat (must flee)
-    - ✅ Player auto-retaliation when attacked
-    - ✅ NPC retaliation via CombatSystem
-    - ✅ Swing timer based on weapon speed
-    - ✅ Damage calculation with strength modifier and armor reduction
-    - ✅ Critical hit system (10% chance, 1.5x damage)
+- ✅ Combat Flow:
+    - [x] `attack <target>` / `kill <target>` - Start attacking
+    - [x] `stop` - Disengage from combat
+    - [x] Movement blocked while in combat (must flee)
+    - [x] Player auto-retaliation when attacked
+    - [x] NPC retaliation via CombatSystem
+    - [x] Swing timer based on weapon speed
+    - [x] Damage calculation with strength modifier and armor reduction
+    - [x] Critical hit system (10% chance, 1.5x damage)
 
-- Death & Rewards:
-    - ✅ HP tracking and death detection
-    - ✅ Death messages broadcast to room
-    - ✅ XP rewards for killing NPCs
-    - ✅ NPC respawn timers with area defaults and per-NPC overrides
-    - ✅ Player respawn with countdown timer and area entry point
-    - ✅ Loot drops from NPC drop tables
+- ✅ Death & Rewards:
+    - [x] HP tracking and death detection
+    - [x] Death messages broadcast to room
+    - [x] XP rewards for killing NPCs
+    - [x] NPC respawn timers with area defaults and per-NPC overrides
+    - [x] Player respawn with countdown timer and area entry point
+    - [x] Loot drops from NPC drop tables
 
 ### Weapon & Equipment System ✅
 
-- ItemTemplate weapon stats:
-    - ✅ damage_min, damage_max, attack_speed, damage_type
-    - ✅ Migration adds columns to item_templates
-    - ✅ YAML weapon files updated with combat stats
-- Equipment integration:
-    - ✅ `get_weapon_stats(item_templates)` checks equipped weapon
-    - ✅ Falls back to unarmed (base) stats if no weapon
-    - ✅ Both players AND NPCs benefit from equipped weapons
+- ✅ ItemTemplate weapon stats:
+    - [x] damage_min, damage_max, attack_speed, damage_type
+    - [x] Migration adds columns to item_templates
+    - [x] YAML weapon files updated with combat stats
+- ✅ Equipment integration:
+    - [x] `get_weapon_stats(item_templates)` checks equipped weapon
+    - [x] Falls back to unarmed (base) stats if no weapon
+    - [x] Both players AND NPCs benefit from equipped weapons
 
 ### Behavior Script System ✅
 
-- Modular architecture:
-    - ✅ `backend/app/engine/behaviors/` package
-    - ✅ Dynamic loading from directory (mod-friendly)
-    - ✅ `@behavior` decorator for registration
-    - ✅ BehaviorScript base class with async hooks
+- ✅ Modular architecture:
+    - [x] `backend/app/engine/behaviors/` package
+    - [x] Dynamic loading from directory (mod-friendly)
+    - [x] `@behavior` decorator for registration
+    - [x] BehaviorScript base class with async hooks
 
-- Available hooks:
-    - ✅ on_spawn, on_death
-    - ✅ on_idle_tick, on_wander_tick
-    - ✅ on_player_enter, on_player_leave
-    - ✅ on_combat_start, on_damaged, on_combat_tick
-    - ✅ on_talked_to, on_given_item
+- ✅ Available hooks:
+    - [x] on_spawn, on_death
+    - [x] on_idle_tick, on_wander_tick
+    - [x] on_player_enter, on_player_leave
+    - [x] on_combat_start, on_damaged, on_combat_tick
+    - [x] on_talked_to, on_given_item
 
-- Built-in behaviors:
-    - ✅ Wandering: wanders_rarely, wanders_sometimes, wanders_frequently, wanders_nowhere
-    - ✅ Combat: aggressive (attacks on sight), defensive (retaliates), pacifist
-    - ✅ Flee: cowardly, cautious, brave, fearless
-    - ✅ Social: calls_for_help, loner
-    - ✅ Idle: talkative, chatty, quiet, silent
-    - ✅ Roles: merchant, guard, patrol
+- ✅ Built-in behaviors:
+    - [x] Wandering: wanders_rarely, wanders_sometimes, wanders_frequently, wanders_nowhere
+    - [x] Combat: aggressive (attacks on sight), defensive (retaliates), pacifist
+    - [x] Flee: cowardly, cautious, brave, fearless
+    - [x] Social: calls_for_help, loner
+    - [x] Idle: talkative, chatty, quiet, silent
+    - [x] Roles: merchant, guard, patrol
 
-- NPC AI:
-    - ✅ Per-NPC timers (idle_event_id, wander_event_id)
-    - ✅ Behaviors resolved from YAML tags at load time
-    - ✅ Priority system for behavior execution
-    - ✅ BehaviorResult controls movement, attacks, messages
+- ✅ NPC AI:
+    - [x] Per-NPC timers (idle_event_id, wander_event_id)
+    - [x] Behaviors resolved from YAML tags at load time
+    - [x] Priority system for behavior execution
+    - [x] BehaviorResult controls movement, attacks, messages
 
 ### Events ✅
 
-- Combat broadcasts:
-    - ✅ "⚔️ Alice attacks Goblin!"
-    - ✅ "Alice hits Goblin for 5 damage! **CRITICAL!**"
-    - ✅ "💀 Goblin has been slain by Alice!"
-- Stat updates:
-    - ✅ HP changes via stat_update events
-- Movement:
-    - ✅ Arrival messages use "from above/below" for vertical movement
-- Player death:
-    - ✅ respawn_countdown event type for client UI
-    - ✅ Flavorful death and respawn messages
-- NPC reactions:
-    - ✅ Aggressive NPCs attack when players enter room
-    - ✅ NPCs call for help (allies join fight)
-    - ✅ NPCs can flee when damaged
+- ✅ Combat broadcasts:
+    - [x] "⚔️ Alice attacks Goblin!"
+    - [x] "Alice hits Goblin for 5 damage! **CRITICAL!**"
+    - [x] "💀 Goblin has been slain by Alice!"
+- ✅ Stat updates:
+    - [x] HP changes via stat_update events
+- ✅ Movement:
+    - [x] Arrival messages use "from above/below" for vertical movement
+- ✅ Player death:
+    - [x] respawn_countdown event type for client UI
+    - [x] Flavorful death and respawn messages
+- ✅ NPC reactions:
+    - [x] Aggressive NPCs attack when players enter room
+    - [x] NPCs call for help (allies join fight)
+    - [x] NPCs can flee when damaged
 
 ### YAML Content ✅
 
-- NPC templates: goblin_scout, skeleton_warrior, ethereal_wisp, wandering_merchant
-- NPC spawns configured per-area
-- Behavior tags in YAML: `behaviors: [wanders_sometimes, aggressive, cowardly]`
+- ✅ NPC templates: goblin_scout, skeleton_warrior, ethereal_wisp, wandering_merchant
+- ✅ NPC spawns configured per-area
+- ✅ Behavior tags in YAML: `behaviors: [wanders_sometimes, aggressive, cowardly]`
 
 
 
-## Phase 5 - World structure, triggers, and scripting  **COMPLETE**
+## Phase 5 - World structure, triggers, and scripting  ✅ COMPLETE
 
 **Goal**: Richer world behavior without hardcoding everything in Python.
 
 ### Phase 5.1 - Core Trigger Infrastructure ✅
 
-- Trigger System Architecture:
-    - ✅ TriggerSystem class following GameContext pattern
-    - ✅ RoomTrigger dataclass: id, event, conditions, actions, cooldown, max_fires, enabled
-    - ✅ TriggerCondition and TriggerAction dataclasses with type + params
-    - ✅ TriggerState for runtime tracking (fire_count, last_fired_at, timer_event_id)
-    - ✅ TriggerContext passed to all handlers with player, room, area, direction, command
+- ✅ Trigger System Architecture:
+    - [x] TriggerSystem class following GameContext pattern
+    - [x] RoomTrigger dataclass: id, event, conditions, actions, cooldown, max_fires, enabled
+    - [x] TriggerCondition and TriggerAction dataclasses with type + params
+    - [x] TriggerState for runtime tracking (fire_count, last_fired_at, timer_event_id)
+    - [x] TriggerContext passed to all handlers with player, room, area, direction, command
 
-- Core Event Types:
-    - ✅ on_enter: Fires when player enters a room
-    - ✅ on_exit: Fires when player leaves a room
-    - ✅ Variable substitution: {player.name}, {room.name}, {direction}
-    - ✅ Cooldown enforcement per player
-    - ✅ max_fires enforcement with fire_count tracking
+- ✅ Core Event Types:
+    - [x] on_enter: Fires when player enters a room
+    - [x] on_exit: Fires when player leaves a room
+    - [x] Variable substitution: {player.name}, {room.name}, {direction}
+    - [x] Cooldown enforcement per player
+    - [x] max_fires enforcement with fire_count tracking
 
-- Basic Conditions:
-    - ✅ flag_set: Check room_flags for specific flag value
-    - ✅ has_item: Check if player has item (by template_id or keywords)
-    - ✅ level: Check player level (min_level, max_level)
+- ✅ Basic Conditions:
+    - [x] flag_set: Check room_flags for specific flag value
+    - [x] has_item: Check if player has item (by template_id or keywords)
+    - [x] level: Check player level (min_level, max_level)
 
-- Basic Actions:
-    - ✅ message_player: Send message to triggering player
-    - ✅ message_room: Broadcast to all players in room
-    - ✅ set_flag: Set room flag to value
-    - ✅ toggle_flag: Toggle boolean room flag
+- ✅ Basic Actions:
+    - [x] message_player: Send message to triggering player
+    - [x] message_room: Broadcast to all players in room
+    - [x] set_flag: Set room flag to value
+    - [x] toggle_flag: Toggle boolean room flag
 
 ### Phase 5.2 - Commands, Timers & Expanded Conditions ✅
 
-- Command Triggers:
-    - ✅ on_command: Fires on specific player commands
-    - ✅ fnmatch pattern matching ("pull *", "open *door*", "press button")
-    - ✅ Integrated into router as pre-command hook
-    - ✅ Returns True to block further command processing
+- ✅ Command Triggers:
+    - [x] on_command: Fires on specific player commands
+    - [x] fnmatch pattern matching ("pull *", "open *door*", "press button")
+    - [x] Integrated into router as pre-command hook
+    - [x] Returns True to block further command processing
 
-- Timer Triggers:
-    - ✅ on_timer: Periodic automatic triggers
-    - ✅ timer_interval and timer_initial_delay configuration
-    - ✅ Integration with TimeEventManager
-    - ✅ start_room_timers() called on player enter
-    - ✅ Recurring=True for continuous operation
+- ✅ Timer Triggers:
+    - [x] on_timer: Periodic automatic triggers
+    - [x] timer_interval and timer_initial_delay configuration
+    - [x] Integration with TimeEventManager
+    - [x] start_room_timers() called on player enter
+    - [x] Recurring=True for continuous operation
 
-- Expanded Conditions:
-    - ✅ health_percent: Check player health percentage (min, max)
-    - ✅ in_combat: Check if player is in combat
-    - ✅ has_effect: Check if player has specific effect
-    - ✅ entity_present: Check for NPC by template_id in room
-    - ✅ player_count: Check room player count (min, max)
+- ✅ Expanded Conditions:
+    - [x] health_percent: Check player health percentage (min, max)
+    - [x] in_combat: Check if player is in combat
+    - [x] has_effect: Check if player has specific effect
+    - [x] entity_present: Check for NPC by template_id in room
+    - [x] player_count: Check room player count (min, max)
 
-- Expanded Actions:
-    - ✅ damage: Deal damage to triggering player
-    - ✅ heal: Heal triggering player
-    - ✅ apply_effect: Apply effect to player (via EffectSystem)
-    - ✅ spawn_npc: Spawn NPC from template in room
-    - ✅ despawn_npc: Remove NPC from room
+- ✅ Expanded Actions:
+    - [x] damage: Deal damage to triggering player
+    - [x] heal: Heal triggering player
+    - [x] apply_effect: Apply effect to player (via EffectSystem)
+    - [x] spawn_npc: Spawn NPC from template in room
+    - [x] despawn_npc: Remove NPC from room
 
 ### Phase 5.3 - Dynamic World State ✅
 
-- Exit Manipulation:
-    - ✅ WorldRoom.dynamic_exits dict for runtime exit overrides
-    - ✅ get_effective_exits() method combines base exits + dynamic
-    - ✅ open_exit action: Opens an exit to destination room
-    - ✅ close_exit action: Closes/removes an exit
+- ✅ Exit Manipulation:
+    - [x] WorldRoom.dynamic_exits dict for runtime exit overrides
+    - [x] get_effective_exits() method combines base exits + dynamic
+    - [x] open_exit action: Opens an exit to destination room
+    - [x] close_exit action: Closes/removes an exit
 
-- Description System:
-    - ✅ WorldRoom.dynamic_description for runtime description override
-    - ✅ get_effective_description() returns dynamic or base description
-    - ✅ set_description action: Override room description
-    - ✅ reset_description action: Restore original description
+- ✅ Description System:
+    - [x] WorldRoom.dynamic_description for runtime description override
+    - [x] get_effective_description() returns dynamic or base description
+    - [x] set_description action: Override room description
+    - [x] reset_description action: Restore original description
 
-- Item Actions:
-    - ✅ spawn_item: Create item instance in room
-    - ✅ despawn_item: Remove item from room
-    - ✅ give_item: Give item to player
-    - ✅ take_item: Remove item from player
+- ✅ Item Actions:
+    - [x] spawn_item: Create item instance in room
+    - [x] despawn_item: Remove item from room
+    - [x] give_item: Give item to player
+    - [x] take_item: Remove item from player
 
-- Trigger Control:
-    - ✅ enable_trigger: Enable a disabled trigger
-    - ✅ disable_trigger: Disable a trigger
-    - ✅ fire_trigger: Manually fire another trigger
+- ✅ Trigger Control:
+    - [x] enable_trigger: Enable a disabled trigger
+    - [x] disable_trigger: Disable a trigger
+    - [x] fire_trigger: Manually fire another trigger
 
-- Engine Integration:
-    - ✅ _look() uses get_effective_description()
-    - ✅ Movement commands use get_effective_exits()
+- ✅ Engine Integration:
+    - [x] _look() uses get_effective_description()
+    - [x] Movement commands use get_effective_exits()
 
 ### Phase 5.4 - Area Enhancements & YAML Loading ✅
 
-- WorldArea Extensions:
-    - ✅ recommended_level, theme, area_flags fields
-    - ✅ triggers and trigger_states for area-level triggers
-    - ✅ Loaded from YAML area files
+- ✅ WorldArea Extensions:
+    - [x] recommended_level, theme, area_flags fields
+    - [x] triggers and trigger_states for area-level triggers
+    - [x] Loaded from YAML area files
 
-- Area Triggers:
-    - ✅ on_area_enter: Fires when entering area from different area
-    - ✅ on_area_exit: Fires when leaving area to different area
-    - ✅ fire_area_event() with area state management
-    - ✅ Area transition detection in _move_player()
+- ✅ Area Triggers:
+    - [x] on_area_enter: Fires when entering area from different area
+    - [x] on_area_exit: Fires when leaving area to different area
+    - [x] fire_area_event() with area state management
+    - [x] Area transition detection in _move_player()
 
-- Timer Initialization:
-    - ✅ initialize_all_timers() for room and area on_timer triggers
-    - ✅ Called from start_time_system() at startup
+- ✅ Timer Initialization:
+    - [x] initialize_all_timers() for room and area on_timer triggers
+    - [x] Called from start_time_system() at startup
 
-- YAML Trigger Loading:
-    - ✅ load_triggers_from_yaml() in loader.py
-    - ✅ _parse_trigger() parses conditions/actions from YAML
-    - ✅ Called from main.py after load_world()
-    - ✅ Supports both room and area trigger definitions
+- ✅ YAML Trigger Loading:
+    - [x] load_triggers_from_yaml() in loader.py
+    - [x] _parse_trigger() parses conditions/actions from YAML
+    - [x] Called from main.py after load_world()
+    - [x] Supports both room and area trigger definitions
 
-- Example Content:
-    - ✅ room_1_1_1.yaml: Central hub with welcome, meditate, touch, pulse triggers
-    - ✅ room_0_0_0.yaml: Origin with conditional and level-gated triggers
-    - ✅ ethereal_nexus.yaml: Area enter/exit triggers
+- ✅ Example Content:
+    - [x] room_1_1_1.yaml: Central hub with welcome, meditate, touch, pulse triggers
+    - [x] room_0_0_0.yaml: Origin with conditional and level-gated triggers
+    - [x] ethereal_nexus.yaml: Area enter/exit triggers
 
 ## Phase X - Quest System and Narrative Progression ✅ COMPLETE
 
 **Goals**: Structured narrative experiences, player-driven story progression, and meaningful rewards.
 
-**Status**: ✅ All phases complete (X.1-X.4 including reconciliation)
-
 ### Core Quest Infrastructure ✅
 
-- Quest System Architecture:
-    - ✅ QuestSystem class following GameContext pattern
-    - ✅ QuestTemplate dataclass: id, name, description, objectives, rewards, prerequisites
-    - ✅ QuestStatus enum: NOT_AVAILABLE → AVAILABLE → ACCEPTED → IN_PROGRESS → COMPLETED → TURNED_IN
-    - ✅ QuestProgress dataclass for player-specific quest state tracking
-    - ✅ QuestObjective dataclass with type-specific parameters
+- ✅ Quest System Architecture:
+    - [x] QuestSystem class following GameContext pattern
+    - [x] QuestTemplate dataclass: id, name, description, objectives, rewards, prerequisites
+    - [x] QuestStatus enum: NOT_AVAILABLE → AVAILABLE → ACCEPTED → IN_PROGRESS → COMPLETED → TURNED_IN
+    - [x] QuestProgress dataclass for player-specific quest state tracking
+    - [x] QuestObjective dataclass with type-specific parameters
 
-- Objective Types:
-    - ✅ KILL: Kill N of NPC template
-    - ✅ COLLECT: Collect N of item template
-    - ✅ DELIVER: Bring item to NPC
-    - ✅ VISIT: Enter a specific room
-    - ✅ INTERACT: Use command in room (trigger-based)
-    - ✅ ESCORT: Keep NPC alive to destination
-    - ✅ DEFEND: Prevent NPCs from reaching location
-    - ✅ TALK: Speak to NPC
-    - ✅ USE_ITEM: Use specific item
+- ✅ Objective Types:
+    - [x] KILL: Kill N of NPC template
+    - [x] COLLECT: Collect N of item template
+    - [x] DELIVER: Bring item to NPC
+    - [x] VISIT: Enter a specific room
+    - [x] INTERACT: Use command in room (trigger-based)
+    - [x] ESCORT: Keep NPC alive to destination
+    - [x] DEFEND: Prevent NPCs from reaching location
+    - [x] TALK: Speak to NPC
+    - [x] USE_ITEM: Use specific item
 
-- Quest Rewards:
-    - ✅ Experience points
-    - ✅ Items (via ItemSystem.give_item())
-    - ✅ Effects (via EffectSystem.apply_effect())
-    - ✅ Flags (player and room)
-    - Currency (future)
-    - Reputation (future)
+- ✅ Quest Rewards:
+    - [x] Experience points
+    - [x] Items (via ItemSystem.give_item())
+    - [x] Effects (via EffectSystem.apply_effect())
+    - [x] Flags (player and room)
+    - [x] Currency (future)
+    - [x] Reputation (future)
 
 ### NPC Dialogue System ✅
 
-- Dialogue Data Structures:
-    - ✅ DialogueTree: Complete dialogue for an NPC
-    - ✅ DialogueNode: A node with text, options, conditions, actions
-    - ✅ DialogueOption: Player response with conditions and quest integration
-    - ✅ Variable substitution: {player.name}, {quest.progress}
+- ✅ Dialogue Data Structures:
+    - [x] DialogueTree: Complete dialogue for an NPC
+    - [x] DialogueNode: A node with text, options, conditions, actions
+    - [x] DialogueOption: Player response with conditions and quest integration
+    - [x] Variable substitution: {player.name}, {quest.progress}
 
-- Dialogue Flow:
-    - ✅ `talk <npc>` command initiates dialogue
-    - ✅ Numbered option selection (1, 2, 3...)
-    - ✅ Condition evaluation for available options
-    - ✅ Context-sensitive entry points based on quest status
-    - ✅ Quest accept/turn-in integration
+- ✅ Dialogue Flow:
+    - [x] `talk <npc>` command initiates dialogue
+    - [x] Numbered option selection (1, 2, 3...)
+    - [x] Condition evaluation for available options
+    - [x] Context-sensitive entry points based on quest status
+    - [x] Quest accept/turn-in integration
 
 ### Player Commands ✅
 
@@ -497,16 +495,16 @@ Before adding big systems, make the core loop solid.
 
 ---
 
-## Phase X.R - Reconciliation & Code Hygiene
+## Phase X.R - Reconciliation & Code Hygiene ✅ COMPLETE
 
 **Goals**: Audit the codebase to eliminate dead code, redundant systems, and orphaned implementations left behind from iterative development. Ensure architectural consistency across all systems.
 
 ### Code Audit Checklist
 
-- [x] **Time Systems**: Verify only one time management system is active ✅
-  - ✅ Only `TimeEventManager` handles scheduling (single instance in WorldEngine)
-  - ✅ Single game_loop in engine.py
-  - ✅ No duplicate schedulers or tick loops
+- ✅ **Time Systems**: Verify only one time management system is active ✅
+  - [x] Only `TimeEventManager` handles scheduling (single instance in WorldEngine)
+  - [x] Single game_loop in engine.py
+  - [x] No duplicate schedulers or tick loops
 
 - [x] **Event Systems**: Confirm single source of truth for events ✅
   - ✅ `EventDispatcher` is the sole event router
@@ -940,16 +938,16 @@ Before adding big systems, make the core loop solid.
 - [ ] Documentation: ARCHITECTURE.md updates, content creator guide (future)
 - [ ] Performance profiling (future)
 
-### Phase 10 - Socializing and worldbuilding ✅ COMPLETE
+## Phase 10 - Socializing and worldbuilding ✅ COMPLETE
 
-**Phase 10.1: Groups, Tells, Follow** ✅ COMPLETE
+### Phase 10.1: Groups, Tells, Follow ✅ COMPLETE
 - ✅ GroupSystem with O(1) lookups and auto-disband
 - ✅ Group/tell/follow/yell commands with full subcommands
 - ✅ Event routing for group/tell/follow scopes
 - ✅ 80+ comprehensive tests
 - ✅ Integration documentation
 
-**Phase 10.2: Persistent Clans** ✅ COMPLETE
+### Phase 10.2: Persistent Clans ✅ COMPLETE
 - ✅ Database migration with clans and clan_members tables
 - ✅ Clan and ClanMember ORM models with relationships
 - ✅ ClanSystem with async DB loading, CRUD operations
@@ -959,7 +957,7 @@ Before adding big systems, make the core loop solid.
 - ✅ WorldEngine integration with async initialization
 - ✅ 50+ comprehensive tests
 
-**Phase 10.3: Factions with Reputation** ✅ COMPLETE
+### Phase 10.3: Factions with Reputation
 - ✅ Database migration with factions and faction_npc_members tables
 - ✅ Faction and FactionNPCMember ORM models
 - ✅ FactionSystem with YAML loading, reputation tracking, alignment tiers
@@ -970,11 +968,11 @@ Before adding big systems, make the core loop solid.
 - ✅ WorldEngine integration with YAML loading at startup
 - ✅ 45+ comprehensive tests
 
-### Phase 11 - Light and Vision System ✅ COMPLETE
+## Phase 11 - Light and Vision System ✅ COMPLETE
 
 **Goals**: Dynamic lighting system with visibility-based gameplay, environmental atmosphere, and light-dependent triggers.
 
-**Phase 11.1: Core Light Calculation System** ✅
+### Phase 11.1: Core Light Calculation System
 - ✅ LightingSystem class with 0-100 light scale
 - ✅ 5 visibility levels: NONE (0-10), MINIMAL (11-25), PARTIAL (26-50), NORMAL (51-75), ENHANCED (76-100)
 - ✅ Database migration k3l4m5n6o7p8_phase11_light_system.py
@@ -983,54 +981,54 @@ Before adding big systems, make the core loop solid.
 - ✅ AMBIENT_LIGHTING_VALUES mapping: pitch_black(0), dark(10), dim(20), shadowed(35), normal(60), bright(85), prismatic(90)
 - ✅ TIME_IMMUNE_BIOMES: underground, ethereal, void, planar
 
-**Phase 11.2: Visibility Filtering** ✅
+### Phase 11.2: Visibility Filtering
 - ✅ Modified _look() command with light level checks
 - ✅ Modified _look_at_target() requiring minimum light
 - ✅ Entity filtering based on visibility thresholds
 - ✅ Admin lightlevel debugging command showing:
-  - Base ambient lighting from area
-  - Time-of-day modifier calculation
-  - Active light sources (spells/items)
-  - Darkness penalties
-  - Final effective light level
+  - [x] Base ambient lighting from area
+  - [x] Time-of-day modifier calculation
+  - [x] Active light sources (spells/items)
+  - [x] Darkness penalties
+  - [x] Final effective light level
 
-**Phase 11.3: System Integration** ✅
-- Spell Integration:
-  - ✅ create_light_behavior() calls lighting_system.update_light_source()
-  - ✅ darkness_behavior() applies negative light intensity
-  - ✅ Light/darkness spells affect room lighting
-- Time Integration:
-  - ✅ Time-of-day modifiers: Night(-20), Dawn/Dusk(-10), Day(0)
-  - ✅ recalculate_all_rooms() triggered on time period changes
-  - ✅ Batch updates during dawn/dusk transitions
-- Item Light Sources:
-  - ✅ Equip/unequip handlers activate/deactivate light sources
-  - ✅ 4 sample light items: Torch (35, 30min), Lantern (45, permanent), Glowstone (50, permanent, +1 INT), Candle (20, 15min)
-  - ✅ Duration tracking and automatic expiration
+### Phase 11.3: System Integration
+- ✅ Spell Integration:
+  - [x] create_light_behavior() calls lighting_system.update_light_source()
+  - [x] darkness_behavior() applies negative light intensity
+  - [x] Light/darkness spells affect room lighting
+- ✅ Time Integration:
+  - [x] Time-of-day modifiers: Night(-20), Dawn/Dusk(-10), Day(0)
+  - [x] recalculate_all_rooms() triggered on time period changes
+  - [x] Batch updates during dawn/dusk transitions
+- ✅ Item Light Sources:
+  - [x] Equip/unequip handlers activate/deactivate light sources
+  - [x] 4 sample light items: Torch (35, 30min), Lantern (45, permanent), Glowstone (50, permanent, +1 INT), Candle (20, 15min)
+  - [x] Duration tracking and automatic expiration
 
-**Phase 11.4: Environmental Content** ✅
-- Areas Created:
-  - ✅ Dark Caves (ambient: dim, biome: underground, danger: 3)
-  - ✅ Sunlit Meadow (ambient: bright, biome: grassland, danger: 1)
-- Rooms Created (9 total):
-  - ✅ Cave rooms: entrance(40), tunnel(5), bioluminescent chamber(65), deep cave(0)
-  - ✅ Meadow rooms: center(95), shaded grove(70), open field(default), eastern rise(90), flower garden(default)
+### Phase 11.4: Environmental Content
+- ✅ Areas Created:
+  - [x] Dark Caves (ambient: dim, biome: underground, danger: 3)
+  - [x] Sunlit Meadow (ambient: bright, biome: grassland, danger: 1)
+- ✅ Rooms Created (9 total):
+  - [x] Cave rooms: entrance(40), tunnel(5), bioluminescent chamber(65), deep cave(0)
+  - [x] Meadow rooms: center(95), shaded grove(70), open field(default), eastern rise(90), flower garden(default)
 - ✅ All content loaded into database
 - ✅ Demonstrates full range of lighting values (0-95)
 
-**Phase 11.5: Trigger Conditions and Events** ✅
-- New Trigger Conditions:
-  - ✅ light_level: Check room light with comparison operators
-  - ✅ visibility_level: Check specific visibility threshold (none/minimal/partial/normal/enhanced)
-- New Trigger Actions:
-  - ✅ stumble_in_darkness: Damage player in low light with room notification
-- Sample Triggers:
-  - ✅ darkness_stumble.yaml: Damage when entering very dark rooms
-  - ✅ bright_light_secret.yaml: Reveal hidden passage in enhanced light
-  - ✅ shadow_spawn_darkness.yaml: Spawn hostile NPCs in darkness
-  - ✅ light_dependent_desc.yaml: Change room description based on light
+### Phase 11.5: Trigger Conditions and Events
+- ✅ New Trigger Conditions:
+  - [x] light_level: Check room light with comparison operators
+  - [x] visibility_level: Check specific visibility threshold (none/minimal/partial/normal/enhanced)
+- ✅ New Trigger Actions:
+  - [x] stumble_in_darkness: Damage player in low light with room notification
+- ✅ Sample Triggers:
+  - [x] darkness_stumble.yaml: Damage when entering very dark rooms
+  - [x] bright_light_secret.yaml: Reveal hidden passage in enhanced light
+  - [x] shadow_spawn_darkness.yaml: Spawn hostile NPCs in darkness
+  - [x] light_dependent_desc.yaml: Change room description based on light
 
-**Testing and Validation** ✅
+### Testing and Validation
 - ✅ Comprehensive test suite (test_phase11.py)
 - ✅ 26/26 tests passing (100% pass rate)
 - ✅ Tests cover: light calculation, time integration, light sources, visibility filtering, item properties, environmental content, trigger integration
@@ -1048,29 +1046,29 @@ Before adding big systems, make the core loop solid.
 **Purpose**: Enable CMS to dynamically fetch schema definitions for all content types
 
 - ✅ **Core Endpoint**:
-    - ✅ `GET /api/admin/schemas` - Return all `_schema.yaml` files with metadata
-    - ✅ Response includes: content, last_modified, checksum (SHA256)
-    - ✅ Optional filtering by content_type (rooms, items, npcs, etc.)
-    - ✅ Proper JSON formatting with schema count and success status
+    - [x] `GET /api/admin/schemas` - Return all `_schema.yaml` files with metadata
+    - [x] Response includes: content, last_modified, checksum (SHA256)
+    - [x] Optional filtering by content_type (rooms, items, npcs, etc.)
+    - [x] Proper JSON formatting with schema count and success status
 
 - ✅ **Schema Metadata**:
-    - ✅ `GET /api/admin/schemas/version` - Current schema version info
-    - ✅ Response includes: version, engine_version, last_modified, schema_count
-    - ✅ Used for cache invalidation in CMS
+    - [x] `GET /api/admin/schemas/version` - Current schema version info
+    - [x] Response includes: version, engine_version, last_modified, schema_count
+    - [x] Used for cache invalidation in CMS
 
 - ✅ **Integration**:
-    - ✅ SchemaRegistry class in `backend/app/engine/systems/schema_registry.py`
-    - ✅ Caches parsed schemas on server startup (13 schemas loaded)
-    - ✅ Hot-reload support via `POST /api/admin/schemas/reload` endpoint
-    - ✅ SHA256 checksums for content validation
-    - ✅ Integrated with WorldEngine and GameContext
+    - [x] SchemaRegistry class in `backend/app/engine/systems/schema_registry.py`
+    - [x] Caches parsed schemas on server startup (13 schemas loaded)
+    - [x] Hot-reload support via `POST /api/admin/schemas/reload` endpoint
+    - [x] SHA256 checksums for content validation
+    - [x] Integrated with WorldEngine and GameContext
 
 - ✅ **Testing**:
-    - ✅ All schemas load correctly from world_data subdirectories
-    - ✅ Filtering by content type works properly
-    - ✅ Checksums computed correctly
-    - ✅ Version metadata tracks most recent schema update
-    - ✅ Reload functionality verified
+    - [x] All schemas load correctly from world_data subdirectories
+    - [x] Filtering by content type works properly
+    - [x] Checksums computed correctly
+    - [x] Version metadata tracks most recent schema update
+    - [x] Reload functionality verified
 
 **Status**: ✅ Complete - Ready for CMS Phase 1 (TypeScript type generation)
 
@@ -1079,42 +1077,42 @@ Before adding big systems, make the core loop solid.
 **Purpose**: Enable CMS to upload, download, and list YAML content files
 
 - ✅ **File Operations**:
-    - ✅ `GET /api/admin/content/files` - List all YAML files in world_data/
-    - ✅ Supports filtering by content_type
-    - ✅ Optional include_schema_files parameter
-    - ✅ Returns file metadata: path, size, last_modified, content_type
-    - ✅ Includes file statistics per content type
+    - [x] `GET /api/admin/content/files` - List all YAML files in world_data/
+    - [x] Supports filtering by content_type
+    - [x] Optional include_schema_files parameter
+    - [x] Returns file metadata: path, size, last_modified, content_type
+    - [x] Includes file statistics per content type
 
 - ✅ **Download Content**:
-    - ✅ `GET /api/admin/content/download?file_path=<path>` - Download raw YAML
-    - ✅ Returns content, checksum, last_modified
-    - ✅ Supports all content types (rooms, items, npcs, etc.)
-    - ✅ Path traversal attack prevention
+    - [x] `GET /api/admin/content/download?file_path=<path>` - Download raw YAML
+    - [x] Returns content, checksum, last_modified
+    - [x] Supports all content types (rooms, items, npcs, etc.)
+    - [x] Path traversal attack prevention
 
 - ✅ **Upload/Update Content**:
-    - ✅ `POST /api/admin/content/upload` - Create or update YAML file
-    - ✅ Request: file_path, content (raw YAML string), validate_only flag
-    - ✅ Optional `validate_only=true` for dry-run validation
-    - ✅ Response: validation_errors, file_written, checksum
-    - ✅ Atomic write operations (temp file + rename)
-    - ✅ YAML syntax validation before writing
+    - [x] `POST /api/admin/content/upload` - Create or update YAML file
+    - [x] Request: file_path, content (raw YAML string), validate_only flag
+    - [x] Optional `validate_only=true` for dry-run validation
+    - [x] Response: validation_errors, file_written, checksum
+    - [x] Atomic write operations (temp file + rename)
+    - [x] YAML syntax validation before writing
 
 - ✅ **File Management**:
-    - ✅ `DELETE /api/admin/content/file` - Delete YAML files
-    - ✅ `GET /api/admin/content/stats` - File counts per content type
-    - ✅ Schema file deletion protection
+    - [x] `DELETE /api/admin/content/file` - Delete YAML files
+    - [x] `GET /api/admin/content/stats` - File counts per content type
+    - [x] Schema file deletion protection
 
 - ✅ **Security Features**:
-    - ✅ Path traversal attack prevention (all unsafe paths blocked)
-    - ✅ File path validation relative to world_data root
-    - ✅ Atomic file operations prevent partial writes
-    - ✅ Schema files protected from deletion
+    - [x] Path traversal attack prevention (all unsafe paths blocked)
+    - [x] File path validation relative to world_data root
+    - [x] Atomic file operations prevent partial writes
+    - [x] Schema files protected from deletion
 
 - ✅ **Integration**:
-    - ✅ FileManager class in `backend/app/engine/systems/file_manager.py`
-    - ✅ Integrated with WorldEngine and GameContext
-    - ✅ 73 YAML files managed across 13 content types
-    - ✅ Comprehensive test suite with security validation
+    - [x] FileManager class in `backend/app/engine/systems/file_manager.py`
+    - [x] Integrated with WorldEngine and GameContext
+    - [x] 73 YAML files managed across 13 content types
+    - [x] Comprehensive test suite with security validation
 
 **Status**: ✅ Complete - Ready for CMS Phase 2 (File explorer and editor)
 
@@ -1123,26 +1121,26 @@ Before adding big systems, make the core loop solid.
 **Purpose**: Provide real-time validation feedback during content editing
 
 - ✅ **Enhanced Validation Endpoints**:
-    - ✅ `POST /api/admin/content/validate-enhanced` - Full validation with line/column errors
-    - ✅ `POST /api/admin/content/validate-references` - Reference-only validation
-    - ✅ `POST /api/admin/content/rebuild-reference-cache` - Cache rebuild after bulk changes
-    - ✅ Accepts raw YAML string (not just file_path)
-    - ✅ Validates syntax with YAML parser (line/column extraction)
-    - ✅ Validates schema conformance (required fields, types)
-    - ✅ Validates references (foreign keys to rooms, items, NPCs, etc.)
+    - [x] `POST /api/admin/content/validate-enhanced` - Full validation with line/column errors
+    - [x] `POST /api/admin/content/validate-references` - Reference-only validation
+    - [x] `POST /api/admin/content/rebuild-reference-cache` - Cache rebuild after bulk changes
+    - [x] Accepts raw YAML string (not just file_path)
+    - [x] Validates syntax with YAML parser (line/column extraction)
+    - [x] Validates schema conformance (required fields, types)
+    - [x] Validates references (foreign keys to rooms, items, NPCs, etc.)
 
 - ✅ **Validation Features**:
-    - ✅ Syntax validation: Line/column error positions from YAMLError
-    - ✅ Schema validation: Required field checking for 11 content types
-    - ✅ Reference validation: Cross-content link checking (exits, abilities, factions, etc.)
-    - ✅ Error severity: Errors (blocking) and warnings (non-blocking)
-    - ✅ Helpful suggestions: Fix hints for common errors
+    - [x] Syntax validation: Line/column error positions from YAMLError
+    - [x] Schema validation: Required field checking for 11 content types
+    - [x] Reference validation: Cross-content link checking (exits, abilities, factions, etc.)
+    - [x] Error severity: Errors (blocking) and warnings (non-blocking)
+    - [x] Helpful suggestions: Fix hints for common errors
 
 - ✅ **Reference Validation**:
-    - ✅ Detects: invalid room exits, missing abilities, non-existent factions/dialogues
-    - ✅ Returns: field path, line/column, error message, suggestion
-    - ✅ Cross-content validation (e.g., quest references NPC that exists)
-    - ✅ Reference cache with O(1) lookups for all entity types
+    - [x] Detects: invalid room exits, missing abilities, non-existent factions/dialogues
+    - [x] Returns: field path, line/column, error message, suggestion
+    - [x] Cross-content validation (e.g., quest references NPC that exists)
+    - [x] Reference cache with O(1) lookups for all entity types
 
 - ✅ **Validation Response Format**:
     ```json
@@ -1187,11 +1185,11 @@ Before adding big systems, make the core loop solid.
     ```
 
 - ✅ **Integration**:
-    - ✅ ValidationService class in `backend/app/engine/systems/validation_service.py`
-    - ✅ ReferenceCache indexes 11 entity types (rooms, items, NPCs, abilities, etc.)
-    - ✅ Integrated with WorldEngine and GameContext
-    - ✅ Works with SchemaRegistry and FileManager
-    - ✅ Comprehensive test suite (6 test suites, all passing)
+    - [x] ValidationService class in `backend/app/engine/systems/validation_service.py`
+    - [x] ReferenceCache indexes 11 entity types (rooms, items, NPCs, abilities, etc.)
+    - [x] Integrated with WorldEngine and GameContext
+    - [x] Works with SchemaRegistry and FileManager
+    - [x] Comprehensive test suite (6 test suites, all passing)
 
 **Status**: ✅ Complete - Ready for CMS Phase 2A (Monaco editor with real-time validation)
 
@@ -1200,36 +1198,36 @@ Before adding big systems, make the core loop solid.
 **Purpose**: Enable CMS to query and search existing content for references and dependencies
 
 - ✅ **Content Search**:
-    - ✅ `GET /api/admin/content/search?q=<query>&type=<type>` - Full-text search
-    - ✅ Search across: IDs, names, descriptions, content-specific fields
-    - ✅ Returns matching content with context snippets and relevance scores
-    - ✅ Supports filtering by content_type
-    - ✅ Exact ID matches score highest (10.0), partial matches lower
+    - [x] `GET /api/admin/content/search?q=<query>&type=<type>` - Full-text search
+    - [x] Search across: IDs, names, descriptions, content-specific fields
+    - [x] Returns matching content with context snippets and relevance scores
+    - [x] Supports filtering by content_type
+    - [x] Exact ID matches score highest (10.0), partial matches lower
 
 - ✅ **Dependency Graph**:
-    - ✅ `GET /api/admin/content/dependencies?entity_type=<type>&entity_id=<id>` - Get dependencies
-    - ✅ Returns: what this entity references (outgoing), what references it (incoming)
-    - ✅ Bidirectional tracking: rooms→exits, classes→abilities, NPCs→factions, etc.
-    - ✅ Safe delete checking with blocking reference list
-    - ✅ Orphaned entity detection
+    - [x] `GET /api/admin/content/dependencies?entity_type=<type>&entity_id=<id>` - Get dependencies
+    - [x] Returns: what this entity references (outgoing), what references it (incoming)
+    - [x] Bidirectional tracking: rooms→exits, classes→abilities, NPCs→factions, etc.
+    - [x] Safe delete checking with blocking reference list
+    - [x] Orphaned entity detection
 
 - ✅ **Content Analytics**:
-    - ✅ `GET /api/admin/content/analytics` - Comprehensive health metrics
-    - ✅ Entity counts by type (rooms, items, NPCs, quests, etc.)
-    - ✅ Broken reference detection and reporting
-    - ✅ Orphaned content identification
-    - ✅ Most referenced entities ranking
-    - ✅ Average references per entity
+    - [x] `GET /api/admin/content/analytics` - Comprehensive health metrics
+    - [x] Entity counts by type (rooms, items, NPCs, quests, etc.)
+    - [x] Broken reference detection and reporting
+    - [x] Orphaned content identification
+    - [x] Most referenced entities ranking
+    - [x] Average references per entity
 
 - ✅ **Graph Management**:
-    - ✅ `POST /api/admin/content/rebuild-dependency-graph` - Rebuild after bulk changes
-    - ✅ Automatic bidirectional indexing
+    - [x] `POST /api/admin/content/rebuild-dependency-graph` - Rebuild after bulk changes
+    - [x] Automatic bidirectional indexing
 
 - ✅ **Integration**:
-    - ✅ QueryService class in `backend/app/engine/systems/query_service.py`
-    - ✅ Integrated with FileManager and ValidationService
-    - ✅ 6 test suites, all passing
-    - ✅ O(1) dependency lookups via graph indexing
+    - [x] QueryService class in `backend/app/engine/systems/query_service.py`
+    - [x] Integrated with FileManager and ValidationService
+    - [x] 6 test suites, all passing
+    - [x] O(1) dependency lookups via graph indexing
 
 **Status**: ✅ Complete - Ready for CMS Phase 3A (dependency visualization, safe deletion)
 
@@ -1238,42 +1236,42 @@ Before adding big systems, make the core loop solid.
 **Purpose**: Enable efficient bulk import/export for large content sets
 
 - ✅ **Bulk Import**:
-    - ✅ `POST /api/admin/content/bulk-import` - Import multiple YAML files
-    - ✅ Accepts: {file_path: yaml_content} dictionary
-    - ✅ Pre-validates all files before writing any (atomic operations)
-    - ✅ Returns: total_files, files_validated, files_written, files_failed, detailed results per file
-    - ✅ Transaction-like behavior: rollback_on_error option (all or nothing)
-    - ✅ validate_only mode for dry-run testing
-    - ✅ Automatic backup of existing files before import
-    - ✅ Full rollback capability on validation failures
+    - [x] `POST /api/admin/content/bulk-import` - Import multiple YAML files
+    - [x] Accepts: {file_path: yaml_content} dictionary
+    - [x] Pre-validates all files before writing any (atomic operations)
+    - [x] Returns: total_files, files_validated, files_written, files_failed, detailed results per file
+    - [x] Transaction-like behavior: rollback_on_error option (all or nothing)
+    - [x] validate_only mode for dry-run testing
+    - [x] Automatic backup of existing files before import
+    - [x] Full rollback capability on validation failures
 
 - ✅ **Bulk Export**:
-    - ✅ `POST /api/admin/content/bulk-export` - Export content to ZIP archive
-    - ✅ Filters: content_type, include_schema_files, specific file_paths
-    - ✅ ZIP format with manifest.json metadata
-    - ✅ Manifest includes: export timestamp, file count, content types, engine version
-    - ✅ Preserves directory structure (rooms/, items/, npcs/, etc.)
-    - ✅ Streaming ZIP response for large datasets
+    - [x] `POST /api/admin/content/bulk-export` - Export content to ZIP archive
+    - [x] Filters: content_type, include_schema_files, specific file_paths
+    - [x] ZIP format with manifest.json metadata
+    - [x] Manifest includes: export timestamp, file count, content types, engine version
+    - [x] Preserves directory structure (rooms/, items/, npcs/, etc.)
+    - [x] Streaming ZIP response for large datasets
 
 - ✅ **Batch Validation**:
-    - ✅ `POST /api/admin/content/batch-validate` - Validate multiple files at once
-    - ✅ Returns: total_files, valid_files, invalid_files, detailed ValidationResult per file
-    - ✅ Parallel validation for performance
-    - ✅ Used during bulk import preview
+    - [x] `POST /api/admin/content/batch-validate` - Validate multiple files at once
+    - [x] Returns: total_files, valid_files, invalid_files, detailed ValidationResult per file
+    - [x] Parallel validation for performance
+    - [x] Used during bulk import preview
 
 - ✅ **Async Architecture Refactor**:
-    - ✅ Converted FileManager to fully async (aiofiles for non-blocking I/O)
-    - ✅ Converted QueryService to async (search, build_dependency_graph, get_analytics, get_dependencies)
-    - ✅ Converted ValidationService to async (validate_full, validate_references, build_reference_cache)
-    - ✅ All admin route endpoints properly await async service calls
-    - ✅ Eliminates event loop blocking throughout CMS API
-    - ✅ Enables proper concurrent I/O operations
+    - [x] Converted FileManager to fully async (aiofiles for non-blocking I/O)
+    - [x] Converted QueryService to async (search, build_dependency_graph, get_analytics, get_dependencies)
+    - [x] Converted ValidationService to async (validate_full, validate_references, build_reference_cache)
+    - [x] All admin route endpoints properly await async service calls
+    - [x] Eliminates event loop blocking throughout CMS API
+    - [x] Enables proper concurrent I/O operations
 
 - ✅ **Integration**:
-    - ✅ BulkService class in `backend/app/engine/systems/bulk_service.py`
-    - ✅ Integrated with FileManager, ValidationService, SchemaRegistry
-    - ✅ Works with WorldEngine and GameContext
-    - ✅ Comprehensive test suite (17 tests, 9 core tests passing)
+    - [x] BulkService class in `backend/app/engine/systems/bulk_service.py`
+    - [x] Integrated with FileManager, ValidationService, SchemaRegistry
+    - [x] Works with WorldEngine and GameContext
+    - [x] Comprehensive test suite (17 tests, 9 core tests passing)
 
 **Status**: ✅ Complete - Ready for CMS Phase 4 (bulk import/export features)
 
@@ -1321,51 +1319,9 @@ Before adding big systems, make the core loop solid.
 
 **Priority**: Medium (nice-to-have for Phase 5 CMS preview features)
 
-### Implementation Phases
-
-**Phase 12.1-12.3 (Critical Path)** - Blocks CMS Phase 1-2:
-1. Schema Registry API
-2. YAML File Management API
-3. Enhanced Validation API
-
-**Phase 12.4-12.5 (Important)** - ✅ Complete:
-4. ✅ Content Querying API
-5. ✅ Bulk Operations API
-
-**Phase 12.6-12.7 (Optional)** - Nice-to-have features:
-6. Git Integration (can be client-side)
-7. Real-Time Preview (advanced feature)
-
-### Technical Considerations
-
-**Security**:
-- All endpoints require `GAME_MASTER` or `ADMIN` role
-- Path traversal prevention in file operations
-- Content size limits (prevent DoS via huge YAML files)
-- Rate limiting on validation endpoints
-
-**Performance**:
-- Schema caching with invalidation
-- Reference cache for O(1) validation lookups
-- Streaming responses for bulk operations
-- Async file I/O for all operations
-
-**Error Handling**:
-- Detailed error messages with line/column info
-- Validation errors vs warnings
-- Graceful degradation if git operations fail
-- Transaction rollback on bulk import failures
-
-### Documentation Updates
-
-- [ ] Update protocol.md with new endpoints
-- [ ] API documentation with request/response examples
-- [ ] CMS integration guide
-- [ ] Schema versioning documentation
-
 ---
 
-### Phase 13 - Test Engine & CI/CD ✅ COMPLETE
+## Phase 13 - Test Engine & CI/CD ✅ COMPLETE
 
 **Goals**: Build robust testing infrastructure and continuous integration pipeline before auditing ability behaviors.
 
@@ -1390,25 +1346,25 @@ Before adding big systems, make the core loop solid.
 
 ---
 
-### Phase 14 - Entity Abilities ✅ COMPLETE
+## Phase 14 - Entity Abilities ✅ COMPLETE
 
 **Goals**: Extend the ability system from players to all entities (NPCs, magic items, environmental objects).
 
-**Phase 14.1: Universal Entity Ability Support** ✅
+### Phase 14.1: Universal Entity Ability Support ✅
 - ✅ Moved `character_sheet` to WorldEntity base class
 - ✅ Moved 6 helper methods to WorldEntity (has_character_sheet, get_class_id, etc.)
 - ✅ Updated NpcTemplate with class_id, default_abilities, ability_loadout fields
 - ✅ Database migration l4m5n6o7p8q9_phase14_npc_abilities.py
 - ✅ Updated ORM model in models.py
 
-**Phase 14.2: Ability System Generalization** ✅
+### Phase 14.2: Ability System Generalization ✅
 - ✅ Refactored AbilityExecutor to accept WorldEntity instead of WorldPlayer
 - ✅ Updated all method type hints and docstrings
 - ✅ Verified all 24 ability behaviors are entity-agnostic
 - ✅ Implemented NPC resource regeneration in engine.py
 - ✅ All 25 ability tests pass
 
-**Phase 14.3: NPC AI Integration** ✅
+### Phase 14.3: NPC AI Integration ✅
 - ✅ Added ability hooks to BehaviorScript base class
 - ✅ Extended BehaviorContext with ability helpers (get_available_abilities, etc.)
 - ✅ Added `cast_ability` to BehaviorResult
@@ -1417,41 +1373,34 @@ Before adding big systems, make the core loop solid.
 - ✅ Integrated ability casting into combat flow via on_combat_action hook
 - ✅ Added _npc_cast_ability helper to WorldEngine
 
-**Phase 14.4: Content & Loading** ✅
+### Phase 14.4: Content & Loading ✅
 - ✅ Updated NPC YAML schema with class_id, default_abilities, ability_loadout, ai_behavior
 - ✅ Added create_npc_character_sheet() helper in loader.py
 - ✅ NPC character sheets initialized after ClassSystem loads
 - ✅ Character sheet restored on NPC respawn
 - ✅ Created example NPCs:
-  - goblin_shaman.yaml (Mage with CasterAI)
-  - skeleton_champion.yaml (Warrior with BruteAI)
-  - forest_guardian.yaml (Nature mage with TacticalCasterAI)
+  - [x] goblin_shaman.yaml (Mage with CasterAI)
+  - [x] skeleton_champion.yaml (Warrior with BruteAI)
+  - [x] forest_guardian.yaml (Nature mage with TacticalCasterAI)
 
-**Phase 14.5: Events & Admin Integration** ✅
+### Phase 14.5: Events & Admin Integration ✅
 - ✅ Added `entity_type` field to `ability_cast` and `ability_cast_complete` events
 - ✅ NPC ability casts broadcast flavor messages to room (⚡ format)
 - ✅ Extended `NpcSummary` model with ability fields (class_id, has_abilities, resource_pools, etc.)
 - ✅ Added `verbose=True` query param to `GET /world/npcs` for ability details
 
-**Phase 14.6: Testing** ✅
+### Phase 14.6: Testing ✅
 - ✅ Added `with_character_sheet()` method to WorldNpcBuilder
 - ✅ Added `npc_mage_sheet` and `mock_npc_caster` fixtures
 - ✅ Comprehensive test suite (test_npc_abilities.py - 16 tests):
-  - NPC ability casting with character_sheet
-  - NPC without character_sheet validation
-  - NPC ability learning validation
-  - NPC mana consumption
-  - NPC cooldown tracking (independent from players)
-  - Entity type in ability events
-  - Builder pattern tests
-  - Integration tests (NPC targeting players, GCD, multiple NPCs)
-
-**Documentation**:
-- [ ] Update ARCHITECTURE.md with NPC ability system details
-- [ ] Update protocol.md with NPC ability events
-- [ ] Create content creator guide for designing NPCs with abilities
-- [ ] Document NPC AI behavior hooks and patterns
-- [ ] Add examples to YAML schema documentation
+  - [x] NPC ability casting with character_sheet
+  - [x] NPC without character_sheet validation
+  - [x] NPC ability learning validation
+  - [x] NPC mana consumption
+  - [x] NPC cooldown tracking (independent from players)
+  - [x] Entity type in ability events
+  - [x] Builder pattern tests
+  - [x] Integration tests (NPC targeting players, GCD, multiple NPCs)
 
 ### Future Enhancements
 
@@ -1478,35 +1427,33 @@ Before adding big systems, make the core loop solid.
 
 ---
 
-### Phase π - PyPI Distribution ✅
+## Phase π - PyPI Distribution ✅
 
 **Goals**: Make the engine easily installable via pip and provide CLI commands for running the server and client.
 
-**Package Refactoring** ✅
+### Package Refactoring ✅
 - ✅ Restructured codebase for PyPI compatibility
 - ✅ Created proper package structure with `pyproject.toml`
 - ✅ Published to PyPI as `daemons-engine`
 - ✅ Easy installation: `pip install daemons-engine`
 
-**CLI Commands** ✅
+### CLI Commands ✅
 - ✅ `daemons server` - Start the game server
 - ✅ `daemons client` - Launch the game client
 - ✅ Unified entry point for all engine functionality
 
 ---
 
-### Phase 15 - Player quality of life ⬜
+## Phase 15 - Player quality of life ⬜
 In-game documentation: listing all commands, player role, etc
 Stub client tweaks
 
 
-### Phase 16 - Cybersecurity Audit and Hardening ⬜
+## Phase 16 - Cybersecurity Audit and Hardening ✅
 
 **Goals**: Harden the engine against common web attacks, ensure secure authentication, and protect against malicious input from clients.
 
-**Status**: 🔄 In Progress (16.1, 16.2, 16.3 Complete)
-
-**Existing Strengths**:
+### Existing Strengths:
 - ✅ SQLAlchemy ORM (parameterized queries prevent SQL injection)
 - ✅ Argon2 password hashing (OWASP recommended)
 - ✅ JWT with refresh token rotation
@@ -1515,27 +1462,27 @@ Stub client tweaks
 - ✅ Safe YAML loading (yaml.safe_load)
 - ✅ Security event logging (SecurityEvent table)
 
-#### Phase 16.1 - Rate Limiting ✅
+### Phase 16.1 - Rate Limiting ✅
 
 **Purpose**: Prevent brute-force attacks and API abuse
 
 - ✅ Integrated `slowapi` library for HTTP rate limiting
 - ✅ Rate limit auth endpoints:
-    - ✅ `POST /auth/login` - 5 attempts per minute per IP
-    - ✅ `POST /auth/register` - 3 attempts per minute per IP
-    - ✅ `POST /auth/refresh` - 10 attempts per minute per token
-    - ✅ `POST /auth/logout` - 10 attempts per minute per IP
+    - [x] `POST /auth/login` - 5 attempts per minute per IP
+    - [x] `POST /auth/register` - 3 attempts per minute per IP
+    - [x] `POST /auth/refresh` - 10 attempts per minute per token
+    - [x] `POST /auth/logout` - 10 attempts per minute per IP
 - ✅ Rate limit WebSocket messages:
-    - ✅ Commands per second limit (30/sec)
-    - ✅ Chat message throttling (5/sec)
+    - [x] Commands per second limit (30/sec)
+    - [x] Chat message throttling (5/sec)
 - ✅ Created `rate_limit.py` module with:
-    - ✅ `WebSocketRateLimiter` class for connection-based throttling
-    - ✅ Sliding window algorithm for accurate rate tracking
-    - ✅ Configurable limits via `RATE_LIMITS` dictionary
+    - [x] `WebSocketRateLimiter` class for connection-based throttling
+    - [x] Sliding window algorithm for accurate rate tracking
+    - [x] Configurable limits via `RATE_LIMITS` dictionary
 - ✅ Return `429 Too Many Requests` with `Retry-After` header
 - ✅ X-Forwarded-For header support for reverse proxy setups
 
-#### Phase 16.2 - Account Lockout ✅
+### Phase 16.2 - Account Lockout ✅
 
 **Purpose**: Prevent credential stuffing and brute-force password attacks
 
@@ -1543,120 +1490,120 @@ Stub client tweaks
 - ✅ Add `locked_until` timestamp column to `UserAccount`
 - ✅ Created Alembic migration `n6o7p8q9r0s1_phase16_2_account_lockout.py`
 - ✅ Implement lockout logic in `AuthSystem.login()`:
-    - ✅ Lock account after 5 failed attempts (`MAX_FAILED_LOGIN_ATTEMPTS`)
-    - ✅ 15-minute lockout duration (`LOCKOUT_DURATION_SECONDS`)
-    - ✅ Reset counter on successful login
-    - ✅ Auto-unlock when lockout expires
+    - [x] Lock account after 5 failed attempts (`MAX_FAILED_LOGIN_ATTEMPTS`)
+    - [x] 15-minute lockout duration (`LOCKOUT_DURATION_SECONDS`)
+    - [x] Reset counter on successful login
+    - [x] Auto-unlock when lockout expires
 - ✅ Log lockout events to `SecurityEvent` table:
-    - ✅ Added `ACCOUNT_LOCKED` event type
-    - ✅ Added `ACCOUNT_UNLOCKED` event type
+    - [x] Added `ACCOUNT_LOCKED` event type
+    - [x] Added `ACCOUNT_UNLOCKED` event type
 - ✅ Admin endpoint `POST /admin/unlock-account` to unlock accounts manually
 - ⏭️ CAPTCHA integration skipped (can be added later if needed)
 
-#### Phase 16.3 - JWT Hardening ✅
+### Phase 16.3 - JWT Hardening ✅
 
 **Purpose**: Secure token handling and prevent token-based attacks
 
 - ✅ Production mode SECRET_KEY enforcement:
-    - ✅ `DAEMONS_ENV=production` triggers production mode
-    - ✅ Startup error if `JWT_SECRET_KEY` not set in production
-    - ✅ Helpful error message with key generation command
+    - [x] `DAEMONS_ENV=production` triggers production mode
+    - [x] Startup error if `JWT_SECRET_KEY` not set in production
+    - [x] Helpful error message with key generation command
 - ✅ CLI `--production` flag for `daemons run`:
-    - ✅ Sets `DAEMONS_ENV=production` automatically
-    - ✅ Prompts user to generate secret key if not set
-    - ✅ Option to set key for current session interactively
-    - ✅ Shows commands for PowerShell, Bash, and .env file
+    - [x] Sets `DAEMONS_ENV=production` automatically
+    - [x] Prompts user to generate secret key if not set
+    - [x] Option to set key for current session interactively
+    - [x] Shows commands for PowerShell, Bash, and .env file
 - ✅ Add token claims validation:
-    - ✅ `iss` (issuer) claim: configurable via `JWT_ISSUER` env var
-    - ✅ `aud` (audience) claim: configurable via `JWT_AUDIENCE` env var
-    - ✅ `exp` validation with 30-second clock skew tolerance (`CLOCK_SKEW_TOLERANCE_SECONDS`)
-    - ✅ Required claims: `iat`, `exp`, `sub`
+    - [x] `iss` (issuer) claim: configurable via `JWT_ISSUER` env var
+    - [x] `aud` (audience) claim: configurable via `JWT_AUDIENCE` env var
+    - [x] `exp` validation with 30-second clock skew tolerance (`CLOCK_SKEW_TOLERANCE_SECONDS`)
+    - [x] Required claims: `iat`, `exp`, `sub`
 - ✅ Move token from URL query string to header for authenticated WebSocket:
-    - ✅ `Sec-WebSocket-Protocol: access_token, <token>` header support
-    - ✅ Query string still works (deprecated, logs warning)
-    - ✅ Server responds with `access_token` subprotocol
+    - [x] `Sec-WebSocket-Protocol: access_token, <token>` header support
+    - [x] Query string still works (deprecated, logs warning)
+    - [x] Server responds with `access_token` subprotocol
 - ⏭️ Token binding (fingerprint) - Deferred (optional, adds complexity)
 - ⏭️ Token revocation list - Deferred (existing refresh token revocation sufficient)
 
-#### Phase 16.4 - WebSocket Security ✅
+### Phase 16.4 - WebSocket Security ✅
 
 **Purpose**: Harden WebSocket connections against abuse and attacks
 
 - ✅ Add message size limits:
-    - ✅ Configure `max_size` parameter (64KB default, configurable via `WS_MAX_MESSAGE_SIZE`)
-    - ✅ Reject oversized messages gracefully with informative error response
+    - [x] Configure `max_size` parameter (64KB default, configurable via `WS_MAX_MESSAGE_SIZE`)
+    - [x] Reject oversized messages gracefully with informative error response
 - ✅ Implement origin validation:
-    - ✅ Check `Origin` header against allowed list
-    - ✅ Configurable allowed origins via `WS_ALLOWED_ORIGINS` environment variable
-    - ✅ Wildcard pattern support (e.g., `*.example.com`)
-    - ✅ Can be disabled via `WS_ORIGIN_VALIDATION_ENABLED=false`
+    - [x] Check `Origin` header against allowed list
+    - [x] Configurable allowed origins via `WS_ALLOWED_ORIGINS` environment variable
+    - [x] Wildcard pattern support (e.g., `*.example.com`)
+    - [x] Can be disabled via `WS_ORIGIN_VALIDATION_ENABLED=false`
 - ✅ Connection limits:
-    - ✅ Max connections per IP (default 10, configurable via `WS_MAX_CONNECTIONS_PER_IP`)
-    - ✅ Max connections per account (default 3, configurable via `WS_MAX_CONNECTIONS_PER_ACCOUNT`)
-    - ✅ Automatic cleanup on disconnect
+    - [x] Max connections per IP (default 10, configurable via `WS_MAX_CONNECTIONS_PER_IP`)
+    - [x] Max connections per account (default 3, configurable via `WS_MAX_CONNECTIONS_PER_ACCOUNT`)
+    - [x] Automatic cleanup on disconnect
 - ✅ Message validation:
-    - ✅ JSON schema validation for incoming messages
-    - ✅ Command text length limit (500 chars)
-    - ✅ Control character filtering
-    - ✅ Reject malformed payloads early with informative errors
+    - [x] JSON schema validation for incoming messages
+    - [x] Command text length limit (500 chars)
+    - [x] Control character filtering
+    - [x] Reject malformed payloads early with informative errors
 - ✅ Add heartbeat/ping-pong for connection health:
-    - ✅ `HeartbeatManager` tracks connection health
-    - ✅ Configurable interval and timeout
-    - ✅ Clients can send `{"type": "ping"}`, server responds with `{"type": "pong"}`
+    - [x] `HeartbeatManager` tracks connection health
+    - [x] Configurable interval and timeout
+    - [x] Clients can send `{"type": "ping"}`, server responds with `{"type": "pong"}`
 - ✅ Unified `WebSocketSecurityManager` coordinates all features
 - ✅ Comprehensive unit tests (56 tests)
 
-#### Phase 16.5 - Input Sanitization ✅
+### Phase 16.5 - Input Sanitization ✅
 
 **Purpose**: Protect against exploits, code injections, and server crashes from malformed input
 
 - ✅ Command input validation:
-    - ✅ Maximum command length (500 chars, configurable)
-    - ✅ Strip control characters (null bytes, escape sequences, C1 controls)
-    - ✅ Remove bidirectional text overrides (RTL/LTR exploits)
-    - ✅ Remove invisible/zero-width characters
-    - ✅ Normalize Unicode whitespace
-    - ✅ Limit combining marks (Zalgo text prevention)
+    - [x] Maximum command length (500 chars, configurable)
+    - [x] Strip control characters (null bytes, escape sequences, C1 controls)
+    - [x] Remove bidirectional text overrides (RTL/LTR exploits)
+    - [x] Remove invisible/zero-width characters
+    - [x] Normalize Unicode whitespace
+    - [x] Limit combining marks (Zalgo text prevention)
 - ✅ Chat/text sanitization:
-    - ✅ Prevent Unicode exploits (RTL override, zero-width chars)
-    - ✅ Limit combining marks to prevent visual disruption
-    - ✅ Maximum chat length (1000 chars)
-    - ✅ Preserve emoji and normal punctuation
+    - [x] Prevent Unicode exploits (RTL override, zero-width chars)
+    - [x] Limit combining marks to prevent visual disruption
+    - [x] Maximum chat length (1000 chars)
+    - [x] Preserve emoji and normal punctuation
 - ✅ Player name validation:
-    - ✅ Alphanumeric + spaces, hyphens, apostrophes only
-    - ✅ Length limits (2-24 characters)
-    - ✅ Must start with letter, no consecutive special chars
-    - ✅ Homoglyph/confusable character normalization (Cyrillic, Greek, fullwidth)
-    - ✅ Remove invisible characters that could hide content
+    - [x] Alphanumeric + spaces, hyphens, apostrophes only
+    - [x] Length limits (2-24 characters)
+    - [x] Must start with letter, no consecutive special chars
+    - [x] Homoglyph/confusable character normalization (Cyrillic, Greek, fullwidth)
+    - [x] Remove invisible characters that could hide content
 - ✅ Integrated into:
-    - ✅ `engine.handle_command()` - all commands sanitized
-    - ✅ `POST /characters` - character names validated
+    - [x] `engine.handle_command()` - all commands sanitized
+    - [x] `POST /characters` - character names validated
 - ✅ Comprehensive unit tests (65 tests)
 - ⏭️ YAML content validation - Deferred (admin content, covered by schema validation)
 - ⏭️ Profanity filter - Deferred (game design decision, not security)
 
-#### Phase 16.6 - Legacy Endpoint Deprecation ✅
+### Phase 16.6 - Legacy Endpoint Deprecation ✅
 
 **Purpose**: Remove security risks from deprecated authentication paths
 
 - ✅ Add deprecation warnings to `/ws/game?player_id=`:
-    - ✅ Log warning on each connection (with metrics tracking)
-    - ✅ Send deprecation warning message to clients on connect
+    - [x] Log warning on each connection (with metrics tracking)
+    - [x] Send deprecation warning message to clients on connect
 - ✅ Implement sunset timeline via `WS_LEGACY_DEPRECATION_PHASE`:
-    - ✅ Phase 1 (WARN): Warnings only, normal operation
-    - ✅ Phase 2 (THROTTLE): Heavy rate limits (10 cmd/min, 5 chat/min)
-    - ✅ Phase 3 (DISABLED): Endpoint completely disabled
+    - [x] Phase 1 (WARN): Warnings only, normal operation
+    - [x] Phase 2 (THROTTLE): Heavy rate limits (10 cmd/min, 5 chat/min)
+    - [x] Phase 3 (DISABLED): Endpoint completely disabled
 - ✅ Document migration path in deprecation message (points to `/ws/game/auth`)
 - ✅ Add feature flag `WS_LEGACY_AUTH_ENABLED` to disable legacy auth
 - ✅ Stricter connection limits for legacy (3/IP vs 10/IP for authenticated)
 - ✅ Created `legacy_deprecation.py` with:
-    - ✅ `LegacyDeprecationConfig` - env-based configuration
-    - ✅ `LegacyDeprecationManager` - connection tracking and validation
-    - ✅ `DeprecationPhase` enum (WARN, THROTTLE, DISABLED)
+    - [x] `LegacyDeprecationConfig` - env-based configuration
+    - [x] `LegacyDeprecationManager` - connection tracking and validation
+    - [x] `DeprecationPhase` enum (WARN, THROTTLE, DISABLED)
 - ✅ Integrated into `main.py` legacy WebSocket endpoint
 - ✅ Comprehensive unit tests (43 tests)
 
-#### Security Testing & Validation
+### Security Testing & Validation
 
 - [ ] Run `bandit` static analysis on codebase
 - [ ] Run `safety check` for dependency vulnerabilities
@@ -1664,86 +1611,86 @@ Stub client tweaks
 - [ ] Consider OWASP ZAP automated scanning
 - [ ] Document security practices in SECURITY.md
 
-### Phase 17 - Areas Engine Update ⬜
+## Phase 17 - Areas Engine Update ✅ COMPLETE
 
 **Goals**: Expand environmental simulation with dynamic weather, temperature, flora/fauna ecosystems, biome coherence, and terrain features like roads and paths.
 
 **Status**: Not Started | **Priority**: Medium (worldbuilding enhancement)
 
-**Existing Foundation**:
-- ✅ Areas have: `biome`, `climate`, `weather_profile`, `ambient_lighting`, `time_scale`
-- ✅ LightingSystem with time-of-day modifiers and biome immunity
-- ✅ NPC respawn system with area-wide defaults and per-NPC overrides
-- ✅ Trigger system for condition-based events (light_level, visibility_level)
-- ✅ Item templates with environmental properties (provides_light, etc.)
-- ✅ Room `room_type` field for terrain classification
+### Existing Foundation:
+- [x] Areas have: `biome`, `climate`, `weather_profile`, `ambient_lighting`, `time_scale`
+- [x] LightingSystem with time-of-day modifiers and biome immunity
+- [x] NPC respawn system with area-wide defaults and per-NPC overrides
+- [x] Trigger system for condition-based events (light_level, visibility_level)
+- [x] Item templates with environmental properties (provides_light, etc.)
+- [x] Room `room_type` field for terrain classification
 
 ---
 
-#### Phase 17.1 - Temperature System ⬜
+### Phase 17.1 - Temperature System ✅
 
 **Purpose**: Add temperature as a gameplay mechanic affecting players, NPCs, and spawn conditions
 
-- [ ] **Database Schema**:
-    - [ ] Add `base_temperature` to areas table (int, -50 to 150°F, default 70)
-    - [ ] Add `temperature_variation` to areas (int, daily variance, default 20)
-    - [ ] Add `temperature_override` to rooms table (nullable int)
-    - [ ] Create Alembic migration `phase17_1_temperature.py`
+- ✅ **Database Schema**:
+    - [x] Add `base_temperature` to areas table (int, -50 to 150°F, default 70)
+    - [x] Add `temperature_variation` to areas (int, daily variance, default 20)
+    - [x] Add `temperature_override` to rooms table (nullable int)
+    - [x] Create Alembic migration `phase17_1_temperature.py`
 
-- [ ] **TemperatureSystem Class** (`backend/daemons/engine/systems/temperature.py`):
-    - [ ] `calculate_room_temperature(room, current_time)` → int
-    - [ ] Base = area.base_temperature ± time-of-day modifier
-    - [ ] Time modifiers: night(-15), dawn(-5), day(0), dusk(-5)
-    - [ ] Room override replaces calculation (like lighting_override)
-    - [ ] Biome modifiers: arctic(-40), desert(+30), underground(constant)
+- ✅ **TemperatureSystem Class** (`backend/daemons/engine/systems/temperature.py`):
+    - [x] `calculate_room_temperature(room, current_time)` → int
+    - [x] Base = area.base_temperature ± time-of-day modifier
+    - [x] Time modifiers: night(-15), dawn(-5), day(0), dusk(-5)
+    - [x] Room override replaces calculation (like lighting_override)
+    - [x] Biome modifiers: arctic(-40), desert(+30), underground(constant)
 
-- [ ] **Temperature Thresholds**:
-    - [ ] FREEZING (< 32°F): Cold damage tick, movement penalty
-    - [ ] COLD (32-50°F): Stamina regen reduced
-    - [ ] COMFORTABLE (50-80°F): No effect
-    - [ ] HOT (80-100°F): Stamina regen reduced
-    - [ ] SCORCHING (> 100°F): Heat damage tick, movement penalty
+- ✅ **Temperature Thresholds**:
+    - [x] FREEZING (< 32°F): Cold damage tick, movement penalty
+    - [x] COLD (32-50°F): Stamina regen reduced
+    - [x] COMFORTABLE (50-80°F): No effect
+    - [x] HOT (80-100°F): Stamina regen reduced
+    - [x] SCORCHING (> 100°F): Heat damage tick, movement penalty
 
-- [ ] **WorldArea/WorldRoom Updates**:
-    - [ ] Add `base_temperature` and `temperature_variation` to WorldArea
-    - [ ] Add `temperature_override` to WorldRoom
-    - [ ] Integrate with loader.py for YAML loading
+- ✅ **WorldArea/WorldRoom Updates**:
+    - [x] Add `base_temperature` and `temperature_variation` to WorldArea
+    - [x] Add `temperature_override` to WorldRoom
+    - [x] Integrate with loader.py for YAML loading
 
-- [ ] **Trigger Conditions**:
-    - [ ] `temperature_above`: Fire when room temp > threshold
-    - [ ] `temperature_below`: Fire when room temp < threshold
-    - [ ] `temperature_range`: Fire when temp within range
+- ✅ **Trigger Conditions**:
+    - [x] `temperature_above`: Fire when room temp > threshold
+    - [x] `temperature_below`: Fire when room temp < threshold
+    - [x] `temperature_range`: Fire when temp within range
 
-- [ ] **Player Effects**:
-    - [ ] Temperature damage ticks (configurable in d20.py)
-    - [ ] `temperature` command to check current temperature
-    - [ ] Temperature shown in `look` output for extreme conditions
+- ✅ **Player Effects**:
+    - [x] Temperature damage ticks (configurable in d20.py)
+    - [x] `temperature` command to check current temperature
+    - [x] Temperature shown in `look` output for extreme conditions
 
-- [ ] **Testing**:
-    - [ ] Unit tests for TemperatureSystem calculations
-    - [ ] Integration tests for temperature triggers
+- ✅ **Testing**:
+    - [x] Unit tests for TemperatureSystem calculations
+    - [x] Integration tests for temperature triggers
     - [x] Test biome modifiers and time-of-day variations
 
 ---
 
-#### Phase 17.2 - Weather System ✅
+### Phase 17.2 - Weather System ✅
 
 **Purpose**: Dynamic weather that changes over time and affects gameplay
 
-- [x] **Database Schema**:
+- ✅ **Database Schema**:
     - [x] Create `weather_states` table (id, area_id, weather_type, intensity, started_at, duration)
     - [x] Expand areas `weather_profile` into `weather_profile_data` JSON field
     - [x] Add `weather_immunity` boolean to areas (for underground, indoor, etc.)
     - [x] Create Alembic migration `q9r0s1t2u3v4_phase17_2_weather.py`
 
-- [x] **Weather Types** (enum):
+- ✅ **Weather Types** (enum):
     - [x] CLEAR, CLOUDY, OVERCAST
     - [x] RAIN, STORM (thunderstorm)
     - [x] SNOW
     - [x] FOG
     - [x] WIND
 
-- [x] **WeatherSystem Class** (`backend/daemons/engine/systems/weather.py`):
+- ✅ **WeatherSystem Class** (`backend/daemons/engine/systems/weather.py`):
     - [x] `get_current_weather(area_id)` → WeatherState
     - [x] `advance_weather(area_id)` → WeatherState (transition logic)
     - [x] Weather transitions based on climate + randomness
@@ -1751,38 +1698,38 @@ Stub client tweaks
     - [x] `get_forecast(area_id)` → WeatherForecast
     - [x] `check_weather_condition()` for trigger integration
 
-- [x] **Weather Effects**:
+- ✅ **Weather Effects**:
     - [x] Visibility modifiers (fog/rain reduce visibility)
     - [x] Temperature modifiers (rain cools, clear sun heats) - integrated with TemperatureSystem
     - [x] Movement modifiers (storm/snow = slower travel)
     - [x] Combat modifiers (ranged_penalty, casting_penalty)
 
-- [x] **Weather Patterns by Climate**:
+- ✅ **Weather Patterns by Climate**:
     - [x] Weather-immune biomes: underground, cave, ethereal, void, planar
     - [x] Markov transitions ensure realistic weather progression
 
-- [x] **Integration**:
+- ✅ **Integration**:
     - [x] Weather shown in `look` output (when notable)
     - [x] `weather` / `w` command for detailed forecast
     - [x] Trigger conditions: `weather_is`, `weather_intensity`, `weather_not`
     - [x] Temperature system reads weather temperature_modifier
 
-- [x] **Area YAML Schema Update**:
+- ✅ **Area YAML Schema Update**:
     - [x] Added `weather_profile_data` and `weather_immunity` fields to `_schema.yaml`
 
 ---
 
-#### Phase 17.3 - Biome Coherence System ✅
+### Phase 17.3 - Biome Coherence System ✅
 
 **Purpose**: Define biomes as coherent combinations of temperature + weather + climate + flora + fauna
 
-- [x] **Database Schema**:
+- ✅ **Database Schema**:
     - [x] Add `current_season` to areas table (string, default "spring")
     - [x] Add `days_per_season` to areas table (int, default 7)
     - [x] Add `season_day`, `season_locked`, `seasonal_modifiers` to areas
     - [x] Create Alembic migration `r0s1t2u3v4w5_phase17_3_biomes.py`
 
-- [x] **Biome Definition Schema** (`world_data/biomes/_schema.yaml`):
+- ✅ **Biome Definition Schema** (`world_data/biomes/_schema.yaml`):
     - [x] id, name, description
     - [x] temperature_range: [min, max]
     - [x] climate_types: [list]
@@ -1792,7 +1739,7 @@ Stub client tweaks
     - [x] spawn_modifiers for creature spawning
     - [x] danger_modifier, magic_affinity, movement_modifier, visibility_modifier
 
-- [x] **Predefined Biomes** (`world_data/biomes/`):
+- ✅ **Predefined Biomes** (`world_data/biomes/`):
     - [x] `temperate_forest.yaml`: 40-85°F, deciduous, deer/wolves/bears
     - [x] `desert.yaml`: 35-120°F, arid, snakes/lizards/vultures
     - [x] `arctic.yaml`: -50-45°F, frozen, polar bears/seals/arctic foxes
@@ -1801,7 +1748,7 @@ Stub client tweaks
     - [x] `tropical.yaml`: 70-95°F, rainforest, monkeys/jaguars/parrots
     - [x] `underground.yaml`: 50-65°F constant, cave, bats/spiders/oozes
 
-- [x] **BiomeSystem Class** (`backend/daemons/engine/systems/biome.py`):
+- ✅ **BiomeSystem Class** (`backend/daemons/engine/systems/biome.py`):
     - [x] Load biome definitions from YAML files
     - [x] `get_biome(biome_id)` → BiomeDefinition
     - [x] `get_biome_for_area(area)` → BiomeDefinition
@@ -1811,7 +1758,7 @@ Stub client tweaks
     - [x] `get_spawn_modifier(area, modifier_key, season)` → float
     - [x] `get_movement_modifier(area)`, `get_visibility_modifier(area)`, `get_danger_modifier(area)`
 
-- [x] **SeasonSystem Class** (`backend/daemons/engine/systems/biome.py`):
+- ✅ **SeasonSystem Class** (`backend/daemons/engine/systems/biome.py`):
     - [x] `get_season(area)` → Season enum
     - [x] `get_season_state(area)` → SeasonState
     - [x] `advance_day(area)` → bool (True if season changed)
@@ -1820,34 +1767,34 @@ Stub client tweaks
     - [x] `get_weather_modifiers(area)` → dict
     - [x] Season-immune biomes: underground, cave, ethereal, void, planar
 
-- [x] **Integration with Temperature/Weather**:
+- ✅ **Integration with Temperature/Weather**:
     - [x] TemperatureSystem accepts BiomeSystem and applies seasonal_modifier
     - [x] TemperatureState includes seasonal_modifier field
     - [x] Temperature command displays seasonal modifier breakdown
     - [x] Season modifiers affect weather probabilities
 
-- [x] **Player Commands**:
+- ✅ **Player Commands**:
     - [x] `season` / `seasons` command to check current season
     - [x] Displays current season, biome, seasonal effects
 
-- [x] **Trigger Conditions**:
+- ✅ **Trigger Conditions**:
     - [x] `season_is`: Fire when season matches (spring, summer, fall, winter)
     - [x] `season_not`: Fire when season does NOT match
     - [x] `biome_is`: Fire when area biome matches
     - [x] `biome_has_tag`: Fire when biome has specific tag
 
-- [x] **Testing**:
+- ✅ **Testing**:
     - [x] Unit tests for BiomeSystem (43 tests)
     - [x] Tests for SeasonSystem including seasonal cycle
     - [x] Tests for temperature/weather integration
 
 ---
 
-#### Phase 17.4 - Flora System ✅
+### Phase 17.4 - Flora System ✅
 
 **Purpose**: Define plants, trees, and vegetation as interactive world objects
 
-- [x] **Flora Template Schema** (`world_data/flora/_schema.yaml`):
+- ✅ **Flora Template Schema** (`world_data/flora/_schema.yaml`):
     ```yaml
     id: string                      # e.g., "flora_oak_tree"
     name: string                    # "Oak Tree"
@@ -1870,7 +1817,7 @@ Stub client tweaks
     blocks_movement: bool           # Large trees might block some directions
     ```
 
-- [x] **Flora Templates** (7 initial templates):
+- ✅ **Flora Templates** (7 initial templates):
     - [x] oak_tree.yaml - Large deciduous tree
     - [x] wild_berries.yaml - Harvestable shrub
     - [x] healing_herbs.yaml - Medicinal flowers
@@ -1879,7 +1826,7 @@ Stub client tweaks
     - [x] swamp_reeds.yaml - Wetland grass
     - [x] frost_flower.yaml - Tundra flower
 
-- [x] **FloraSystem Class** (`backend/daemons/engine/systems/flora.py`):
+- ✅ **FloraSystem Class** (`backend/daemons/engine/systems/flora.py`):
     - [x] FloraType, LightRequirement, Rarity enums
     - [x] FloraTemplate, FloraInstance dataclasses
     - [x] Template loading from YAML files
@@ -1888,24 +1835,24 @@ Stub client tweaks
     - [x] `can_exist_in_room(template, room)` - check conditions
     - [x] Seasonal variant descriptions
 
-- [x] **Room Flora System**:
+- ✅ **Room Flora System**:
     - [x] Flora instances stored in database (FloraInstance model)
     - [x] Flora instances track: template_id, room_id, last_harvested, quantity
     - [x] Flora shown in room descriptions via `format_room_flora()`
 
-- [x] **Harvest Command**:
+- ✅ **Harvest Command**:
     - [x] `harvest <plant>` (aliases: gather, pick) - gather resources
     - [x] Cooldown per-player-per-flora instance
     - [x] Quantity tracking (depletes, respawns)
     - [x] HarvestResult dataclass with items and messages
 
-- [x] **Flora Respawn System**:
+- ✅ **Flora Respawn System**:
     - [x] Hybrid passive + event-triggered respawns (Design Decision #1)
     - [x] FloraRespawnConfig with customizable rates
     - [x] `process_respawns(session, area_id)` for tick-based respawns
     - [x] Integration with ecosystem tick
 
-- [x] **Unit Tests** (`test_flora.py`):
+- ✅ **Unit Tests** (`test_flora.py`):
     - [x] Flora enum tests
     - [x] Template loading tests
     - [x] Instance management tests
@@ -1916,11 +1863,11 @@ Stub client tweaks
 
 ---
 
-#### Phase 17.5 - Fauna System ✅
+### Phase 17.5 - Fauna System ✅
 
 **Purpose**: Extend NPC templates with fauna-specific properties for wildlife behavior
 
-- [x] **FaunaProperties Dataclass** (NPC extension):
+- ✅ **FaunaProperties Dataclass** (NPC extension):
     ```yaml
     template_id: string
     fauna_type: enum                # mammal, bird, reptile, amphibian, fish, insect
@@ -1942,7 +1889,7 @@ Stub client tweaks
     flee_threshold: float           # Health % to flee
     ```
 
-- [x] **FaunaSystem Class** (`backend/daemons/engine/systems/fauna.py`):
+- ✅ **FaunaSystem Class** (`backend/daemons/engine/systems/fauna.py`):
     - [x] ActivityPeriod, Diet, FaunaType, TimeOfDay enums
     - [x] FaunaProperties.from_npc_template() extraction
     - [x] `get_fauna_properties(template_id)` with caching
@@ -1959,7 +1906,7 @@ Stub client tweaks
     - [x] `get_fauna_in_area(area_id)` utility
     - [x] `get_population_snapshot(area_id)` statistics
 
-- [x] **Fauna AI Behaviors** (`backend/daemons/engine/systems/fauna_behaviors.py`):
+- ✅ **Fauna AI Behaviors** (`backend/daemons/engine/systems/fauna_behaviors.py`):
     - [x] BehaviorResult, BehaviorContext dataclasses
     - [x] BaseBehavior with on_tick, on_player_enter, on_damage_taken hooks
     - [x] GrazingBehavior: Herbivores wander and "eat" flora
@@ -1968,7 +1915,7 @@ Stub client tweaks
     - [x] TerritorialBehavior: Attacks NPCs entering territory
     - [x] BiomeAwareMigration: Cross-area movement with biome checks
 
-- [x] **Unit Tests** (`test_fauna.py`):
+- ✅ **Unit Tests** (`test_fauna.py`):
     - [x] Fauna enum tests
     - [x] FaunaProperties dataclass tests
     - [x] FaunaSystem basic tests
@@ -1982,11 +1929,11 @@ Stub client tweaks
 
 ---
 
-#### Phase 17.6 - Condition-Dependent Spawn Cycles ✅
+### Phase 17.6 - Condition-Dependent Spawn Cycles ✅
 
 **Purpose**: Flora and fauna spawn based on environmental conditions
 
-- [x] **SpawnConditions Dataclass** (`backend/daemons/engine/systems/spawn_conditions.py`):
+- ✅ **SpawnConditions Dataclass** (`backend/daemons/engine/systems/spawn_conditions.py`):
     - [x] time_of_day: [dawn, day, dusk, night]
     - [x] temperature_range: [min, max]
     - [x] weather_is: [list] / weather_not: [list]
@@ -2001,7 +1948,7 @@ Stub client tweaks
     - [x] `from_dict(data)` parser from YAML
     - [x] `has_conditions()` check
 
-- [x] **SpawnConditionEvaluator Class**:
+- ✅ **SpawnConditionEvaluator Class**:
     - [x] Integrates with all environmental systems
     - [x] `evaluate(conditions, room_id, area_id, template_id, session)` async
     - [x] EvaluationResult with can_spawn, failed_conditions, warnings
@@ -2015,7 +1962,7 @@ Stub client tweaks
     - [x] Flora/fauna dependency checks
     - [x] `evaluate_all_spawns(spawn_defs, area_id, session)` batch
 
-- [x] **PopulationManager Class** (`backend/daemons/engine/systems/population.py`):
+- ✅ **PopulationManager Class** (`backend/daemons/engine/systems/population.py`):
     - [x] PopulationConfig per-area settings
     - [x] PopulationSnapshot current state tracking
     - [x] PredationResult, SpawnResult dataclasses
@@ -2030,7 +1977,7 @@ Stub client tweaks
     - [x] `record_death(template_id, room_id)` for tracking
     - [x] `get_area_health(area_id)` ecological metrics
 
-- [x] **Engine Integration** (`backend/daemons/engine/engine.py`):
+- ✅ **Engine Integration** (`backend/daemons/engine/engine.py`):
     - [x] Initialize FaunaSystem with all dependencies
     - [x] Initialize SpawnConditionEvaluator
     - [x] Initialize PopulationManager
@@ -2043,7 +1990,7 @@ Stub client tweaks
     - [x] `_process_fauna_migration(area_id, session)` every 10th tick
     - [x] Player presence optimization (skip empty areas)
 
-- [x] **Unit Tests** (`test_spawn_population.py`):
+- ✅ **Unit Tests** (`test_spawn_population.py`):
     - [x] SpawnConditions parsing tests
     - [x] SpawnConditionEvaluator condition tests
     - [x] PopulationConfig tests
@@ -2061,7 +2008,7 @@ Stub client tweaks
 
 ---
 
-#### Phase 17.7 - Seasonal Spawning ⬜
+### Phase 17.7 - Seasonal Spawning ⬜
 
 **Purpose**: Future enhancement for seasonal spawn variations
     - [ ] Some fauna only in certain seasons
@@ -2070,7 +2017,7 @@ Stub client tweaks
 
 ---
 
-#### Phase 17.7 - Roads and Paths System ⬜
+### Phase 17.7 - Roads and Paths System ⬜
 
 **Purpose**: Track player movement patterns, create dynamic trails, and define road networks
 
@@ -2113,7 +2060,7 @@ Stub client tweaks
 
 ---
 
-#### Phase 17.8 - Integration & Polish ⬜
+### Phase 17.8 - Integration & Polish ⬜
 
 - [ ] **YAML Schema Updates**:
     - [ ] Update `areas/_schema.yaml` with new fields
@@ -2149,23 +2096,12 @@ Stub client tweaks
 
 ---
 
-#### Implementation Order
+## Phase Q - The Great Bug Hunt
+A human playtests all functions. The human tells the bot everything it got wrong. The bot systematically fixes all errors.
 
-1. **Phase 17.1** (Temperature) - Foundation for weather integration
-2. **Phase 17.2** (Weather) - Builds on temperature
-3. **Phase 17.3** (Biomes) - Defines coherent environments
-4. **Phase 17.4** (Flora) - Static environmental content
-5. **Phase 17.5** (Fauna) - Extends NPC system
-6. **Phase 17.6** (Spawn Cycles) - Ties flora/fauna to conditions
-7. **Phase 17.7** (Roads) - Travel and tracking
-8. **Phase 17.8** (Integration) - Polish and documentation
+See [QA Todos](docs/build_docs/qa_todos.md)
 
-**Estimated Effort**: Large phase, recommend splitting into 17.1-17.3 (core environmental) and 17.4-17.7 (content systems)
-
-### Phase 18 - Knobs and Levers: comprehensive In-game commands and API Routes documentation
-User-focused documentation for in-game commands and API routes for development
-
-### Phase 19 - Mechanic's Manual: comprehensive guide for modders
+## Mechanic's Manual: comprehensive guide for modders
 Modder-focused guide to easily extending the engine codebase
 
 ## Phase Z - Backlogged Niceties & polish
