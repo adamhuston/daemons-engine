@@ -2,16 +2,91 @@ Thank you for your interest in contributing! This document explains how to set u
 
 Table of Contents
 - Purpose
+- Contribution workflow
 - Dev quickstart
 - Running the sample client
 - Seeding and creating dev test players
 - Database migrations (Alembic)
 - Where to find important code
+- Code style & guidelines
 - Troubleshooting & contact
 
 Purpose
 -------
 This file provides a quick onboarding guide and describes the expected steps for contributing code. It complements the `ARCHITECTURE.md`, `protocol.md`, and `alembic.md` documents.
+
+Contribution Workflow
+---------------------
+We welcome contributions! Please follow these steps:
+
+### 1. Fork and clone
+1. Fork the repository on GitHub.
+2. Clone your fork locally:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/daemons-engine.git
+   cd daemons-engine
+   ```
+3. Add the upstream remote:
+   ```bash
+   git remote add upstream https://github.com/adamhuston/daemons-engine.git
+   ```
+
+### 2. Create a feature branch
+Always create a new branch for your work. Never commit directly to `main`.
+
+```bash
+git checkout main
+git pull upstream main
+git checkout -b feature/your-feature-name
+```
+
+Use descriptive branch names:
+- `feature/add-inventory-system` — for new features
+- `fix/combat-damage-calculation` — for bug fixes
+- `docs/update-api-reference` — for documentation
+- `refactor/engine-cleanup` — for refactoring
+
+### 3. Make your changes
+- Write clear, focused commits with descriptive messages.
+- Follow the code style guidelines below.
+- Add or update tests for your changes.
+- Run the test suite to ensure nothing is broken:
+  ```bash
+  cd backend
+  pytest
+  ```
+
+### 4. Keep your branch updated
+Before submitting, sync with upstream:
+```bash
+git fetch upstream
+git rebase upstream/main
+```
+
+Resolve any conflicts if they arise.
+
+### 5. Submit a pull request
+1. Push your branch to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+2. Open a pull request on GitHub against `adamhuston/daemons-engine:main`.
+3. Fill out the PR template (if provided) with:
+   - A clear description of what the PR does
+   - Any related issue numbers (e.g., "Fixes #42")
+   - Screenshots or examples if applicable
+
+### 6. Code review process
+- All PRs require at least one maintainer review before merging.
+- Address review feedback by pushing additional commits to your branch.
+- Once approved, a maintainer will merge your PR.
+- Please be patient—reviews may take a few days.
+
+### What makes a good PR?
+- **Small and focused**: One feature or fix per PR is easier to review.
+- **Well-tested**: Include tests that cover your changes.
+- **Documented**: Update docs if you change behavior or add features.
+- **Clean history**: Squash WIP commits before requesting review.
 
 Dev Quickstart
 --------------
@@ -95,6 +170,14 @@ Where to find important code
   - `population.py` — ecosystem management (Phase 17.6)
 - `backend/daemons/routes/admin.py` — admin REST API endpoints.
 - `client/client.py` — sample Flet client showing how to connect and parse events.
+
+Code Style & Guidelines
+-----------------------
+- **Python**: Follow PEP 8. Use type hints where practical.
+- **Formatting**: We recommend using `black` for Python formatting.
+- **Naming**: Use descriptive names; prefer clarity over brevity.
+- **Comments**: Explain *why*, not *what*. Code should be self-documenting.
+- **Tests**: Place tests in `backend/tests/`. Mirror the source structure.
 
 Troubleshooting & contact
 -------------------------

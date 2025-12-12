@@ -21,10 +21,6 @@ build/
 *.egg-info/
 *.egg
 
-docs/build_docs/*
-docs/pypi.md
-docs/deployment_cheatsheet.md 
-
 
 # Testing
 .pytest_cache/
