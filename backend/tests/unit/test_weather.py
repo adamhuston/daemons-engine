@@ -554,7 +554,7 @@ class TestWeatherConditionChecks:
         # Check condition
         result = weather_system.check_weather_condition(
             "area_forest",
-            condition_type="is",
+            condition_type="weather_is",
             weather_type=state.weather_type.value,
         )
         assert result is True

@@ -740,10 +740,11 @@ class TestPopulationManager:
 
     def test_has_player_in_room(self, population_manager, mock_world):
         """Test checking for player in room."""
-        from daemons.engine.world import WorldPlayer
+        from daemons.engine.world import WorldPlayer, EntityType
         
         player = WorldPlayer(
             id="player_1",
+            entity_type=EntityType.PLAYER,
             name="TestPlayer",
             room_id="room_forest_1",
             character_class="adventurer",

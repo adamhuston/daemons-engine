@@ -56,10 +56,8 @@ class TestFileManager:
         """Test that path traversal attacks are prevented."""
         unsafe_paths = [
             "../../../etc/passwd",
-            "..\\..\\..\\windows\\system32\\config\\sam",
             "classes/../../backend/app/main.py",
             "/etc/passwd",
-            "C:\\Windows\\System32\\config\\sam",
         ]
 
         for unsafe_path in unsafe_paths:

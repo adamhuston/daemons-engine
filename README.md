@@ -1,5 +1,10 @@
 # 💀 Daemons Engine
 
+[![Tests](https://github.com/adamhuston/daemons-engine/workflows/Tests/badge.svg)](https://github.com/adamhuston/daemons-engine/actions)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Python framework for building text-based multiplayer RPGs with real-time WebSocket communication. Includes a batteries-included headless engine server, a debugging client, example content and a CMS.
 
 > ⚠️ **Pre-Release Beta**  Breaking package updates may still occur regularly and unpredictably. There is no timeline yet for a stable Alpha release.
@@ -177,6 +182,7 @@ my-game/
 ---
 
 ## Documentation
+- [Longform Readme](docs/LONGFORM_README.md)
 - [Roadmap](docs/roadmap.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Protocol](docs/protocol.md)
