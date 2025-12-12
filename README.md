@@ -1,6 +1,6 @@
 # 💀 Daemons Engine
 
-[![PyPI Downloads](https://static.pepy.tech/personalized-badge/daemons-engine?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/daemons-engine)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/daemons-engine?period=total&units=INTERNATIONAL_SYSTEM&left_color=GRAY&right_color=BRIGHTGREEN&left_text=downloads)](https://pepy.tech/projects/daemons-engine)
 [![Tests](https://img.shields.io/github/actions/workflow/status/adamhuston/daemons-engine/tests.yml?branch=main&label=tests)](https://github.com/adamhuston/daemons-engine/actions/workflows/tests.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
