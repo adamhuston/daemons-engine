@@ -1,17 +1,12 @@
 # Database Schema Reference
-# Complete documentation of all database tables and fields
-# Source: backend/app/models.py
-# For CMS developers integrating with the Daemons game engine
-
----
 
 ## Overview
 
-The Daemons game engine uses SQLAlchemy ORM with SQLite database. All models inherit from `Base` (DeclarativeBase) and follow a consistent naming convention for constraints.
+Technical reference for **backend developers and CMS integrators** documenting all SQLAlchemy database tables, columns, constraints, and JSON field formats. For YAML content schemas used by content creators, see `SCHEMAS_FOR_CONTENT_CREATORS.md`.
 
-**Database Location**: `backend/daemons.db` (created automatically)
-
-**Migration System**: Alembic (see `backend/alembic/` directory)
+**Database**: SQLite via SQLAlchemy ORM  
+**Location**: `backend/daemons.db`  
+**Migrations**: Alembic (`backend/alembic/`)
 
 ---
 

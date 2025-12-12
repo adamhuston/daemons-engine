@@ -1,6 +1,8 @@
-# Schema Documentation Summary
+# Content Creator's Schema Guide
 
-This document provides a comprehensive overview of all schema documentation created for the Daemons MUD engine and CMS integration.
+## Overview
+
+This guide helps **content creators** navigate the YAML schema documentation for creating game content. Each content type (areas, rooms, items, NPCs, quests, etc.) has a `_schema.yaml` file with field definitions, examples, and validation rules. For database-level details, see `SCHEMAS_FOR_DEVS.md`.
 
 ## Documentation Structure
 

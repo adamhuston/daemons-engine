@@ -76,6 +76,20 @@ AI Assistant: *Reads completed PHASE10_design.md*
 ### The Key Insight
 **We design together, then build together.** The design document becomes our shared memory—capturing decisions made during collaborative design sessions so the AI (and future developers) understand not just *what* to build, but *why* we chose this approach.
 
+## When to Create Separate Implementation Docs
+
+For most phases, the design doc's "Implementation Phases" section is sufficient. However, consider creating a separate `PHASEX_implementation.md` when:
+
+| Situation | Why It Helps |
+|-----------|--------------|
+| **Complex refactoring** | Implementation order differs significantly from design structure |
+| **Multiple contributors** | Need to assign/track work across team members or AI sessions |
+| **Long-running phases** | Progress tracking and checkpointing across weeks/months |
+| **Significant unknowns** | Design is intentionally high-level; details emerge during planning |
+| **Migration work** | Step-by-step data migration plans with rollback procedures |
+
+**Process**: Create implementation doc *from* the design doc, breaking the "Implementation Phases" section into granular, ordered tasks with acceptance criteria. Reference both docs when prompting the AI.
+
 ## Benefits
 
 ✅ **Reduces context switching**: AI doesn't need to explore entire codebase
@@ -83,6 +97,5 @@ AI Assistant: *Reads completed PHASE10_design.md*
 ✅ **Enables parallel work**: Multiple AI sessions can work on different phases
 ✅ **Preserves intent**: Design rationale prevents accidental anti-patterns
 ✅ **Accelerates onboarding**: New AI assistants (or humans) understand decisions quickly
-
 
 **Note**: These documents are living specifications. Update them as you build to keep AI assistants aligned with actual implementation.

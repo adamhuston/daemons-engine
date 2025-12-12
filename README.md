@@ -1,10 +1,10 @@
 # 💀 Daemons Engine
 
-A Python framework for building text-based multiplayer RPGs with real-time WebSocket communication.
+A Python framework for building text-based multiplayer RPGs with real-time WebSocket communication. Includes a batteries-included headless engine server, a debugging client, example content and a CMS.
 
 > ⚠️ **Pre-Release Beta**  Breaking package updates may still occur regularly and unpredictably. There is no timeline yet for a stable Alpha release.
 
-> 🤖 **Extensive use of LLM agents ("clankers")**  This project is an exercise in testing the limits of agentic development processes. Ideologically opposed developers should skip it. As an experimental artifact, the existence of this project should not be mistaken for a positive or negative statement about agentic development. While there has been a rigorous cybersecurity review phase, you use this package at your own risk.
+> 🤖 **Clanker Alert: Extensive use of LLM generated code**  This project is an exercise in testing the limits of agentic development processes. Ideologically opposed developers should skip it. As an experimental artifact, the existence of this project should not be mistaken for a positive or negative statement about agentic development. Although we can say there has been a rigorous cybersecurity review and the engine has over 800 tests, this software is provided "as-is" and "without warranty of any kind", per the MIT license.
 
 > **Latest Roadmap Release:**  Phase 17 - Environmental systems (Weather, Biomes, Flora, Fauna, Ecosystems)
 
@@ -177,9 +177,11 @@ my-game/
 ---
 
 ## Documentation
+- [Roadmap](docs/roadmap.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Protocol](docs/protocol.md)
 - [Operations](docs/OPERATIONS.md)
+- [Contributions](CONTRIBUTING.md)
 
 ### LLM Context Files
 
@@ -193,7 +195,7 @@ python docs/build_docs/build_context.py
 
 This will produce `llm_context_architecture.md`, `llm_context_content.md`, `llm_context_index.md`, and `llm_context_protocol.md`.
 
-Delete these files and run `build_context.py` to rebuild the context after a major change. Using the python script and context files will save you tokens!
+Delete these files and run `build_context.py` to rebuild the context after a major change. 
 
 ---
 
