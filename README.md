@@ -1,6 +1,7 @@
 # 💀 Daemons Engine
 
-[![Tests](https://github.com/adamhuston/daemons-engine/workflows/Tests/badge.svg)](https://github.com/adamhuston/daemons-engine/actions)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/daemons-engine?period=total&units=INTERNATIONAL_SYSTEM&left_color=GRAY&right_color=BRIGHTGREEN&left_text=downloads)](https://pepy.tech/projects/daemons-engine)
+[![Tests](https://img.shields.io/github/actions/workflow/status/adamhuston/daemons-engine/tests.yml?branch=main&label=tests)](https://github.com/adamhuston/daemons-engine/actions/workflows/tests.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -182,12 +183,12 @@ my-game/
 ---
 
 ## Documentation
-- [Longform Readme](docs/LONGFORM_README.md)
-- [Roadmap](docs/roadmap.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Protocol](docs/protocol.md)
-- [Operations](docs/OPERATIONS.md)
-- [Contributions](CONTRIBUTING.md)
+- [Longform Readme](https://github.com/adamhuston/daemons-engine/blob/main/docs/LONGFORM_README.md)
+- [Roadmap](https://github.com/adamhuston/daemons-engine/blob/main/docs/roadmap.md)
+- [Architecture](https://github.com/adamhuston/daemons-engine/blob/main/docs/ARCHITECTURE.md)
+- [Protocol](https://github.com/adamhuston/daemons-engine/blob/main/docs/protocol.md)
+- [Operations](https://github.com/adamhuston/daemons-engine/blob/main/docs/OPERATIONS.md)
+- [Contributions](https://github.com/adamhuston/daemons-engine/blob/main/CONTRIBUTING.md)
 
 ### LLM Context Files
 
@@ -201,7 +202,7 @@ python docs/build_docs/build_context.py
 
 This will produce `llm_context_architecture.md`, `llm_context_content.md`, `llm_context_index.md`, and `llm_context_protocol.md`.
 
-Delete these files and run `build_context.py` to rebuild the context after a major change. 
+Delete these files and run `build_context.py` to rebuild the context after a major change.
 
 ---
 
