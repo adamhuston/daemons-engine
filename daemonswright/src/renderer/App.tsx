@@ -92,6 +92,9 @@ function App() {
   // Current view mode (YAML editor or Room Builder)
   const [currentView, setCurrentView] = useState<EditorView>('yaml');
 
+  // Entity editor category (for navigation from WorldSummary)
+  const [entityEditorCategory, setEntityEditorCategory] = useState<string | undefined>(undefined);
+
   // Error panel drawer state
   const [errorPanelOpen, setErrorPanelOpen] = useState(false);
 
@@ -180,6 +183,14 @@ function App() {
     selectFile(filePath);
   }, [selectFile]);
 
+  // Handle navigation from WorldSummary to specific editors
+  const handleWorldSummaryNavigate = useCallback((view: EditorView, category?: string) => {
+    setCurrentView(view);
+    if (view === 'entity-editor' && category) {
+      setEntityEditorCategory(category);
+    }
+  }, []);
+
   // Validate when selected file or its content changes (including on first load)
   // But only after schemas have finished loading
   useEffect(() => {
@@ -232,7 +243,7 @@ function App() {
   return (
     <AppLoader 
       isLoading={!appReady} 
-      minDisplayTime={1500} 
+      minDisplayTime={0} 
       message="Loading world data..."
     >
       <Layout className="app-layout">
@@ -382,6 +393,7 @@ function App() {
               <EntityEditor
                 worldDataPath={worldDataPath}
                 schemas={schemas}
+                initialCategory={entityEditorCategory}
               />
             </Suspense>
           ) : currentView === 'quest-designer' ? (
@@ -398,7 +410,10 @@ function App() {
             </Suspense>
           ) : (
             <Suspense fallback={<EditorFallback />}>
-              <WorldSummary worldDataPath={worldDataPath} />
+              <WorldSummary 
+                worldDataPath={worldDataPath} 
+                onNavigate={handleWorldSummaryNavigate}
+              />
             </Suspense>
           )}
         </Content>

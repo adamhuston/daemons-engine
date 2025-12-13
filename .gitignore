@@ -20,6 +20,9 @@ dist/
 build/
 *.egg-info/
 *.egg
+docs/cicd.md 
+docs/deployment_cheatsheet.md 
+docs/pypi.md 
 
 
 # Testing

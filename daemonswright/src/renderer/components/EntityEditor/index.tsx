@@ -60,10 +60,11 @@ interface EntityFile {
 interface EntityEditorProps {
   worldDataPath: string | null;
   schemas: Record<string, SchemaDefinition>;
+  initialCategory?: string; // Optional initial category to select on mount
 }
 
-export function EntityEditor({ worldDataPath, schemas }: EntityEditorProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>('npcs');
+export function EntityEditor({ worldDataPath, schemas, initialCategory }: EntityEditorProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || 'npcs');
   const [entities, setEntities] = useState<EntityFile[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<EntityFile | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,6 +73,13 @@ export function EntityEditor({ worldDataPath, schemas }: EntityEditorProps) {
   const [createForm] = Form.useForm();
   const [viewMode, setViewMode] = useState<'form' | 'yaml'>('form');
   const [yamlContent, setYamlContent] = useState<string>('');
+
+  // Update selected category when initialCategory prop changes
+  useEffect(() => {
+    if (initialCategory && ENTITY_CATEGORIES.some(c => c.key === initialCategory)) {
+      setSelectedCategory(initialCategory);
+    }
+  }, [initialCategory]);
 
   // Get the current category config
   const currentCategory = useMemo(

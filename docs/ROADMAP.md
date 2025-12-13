@@ -42,6 +42,8 @@ Before adding big systems, make the core loop solid.
 
 ## Phase 2  Time & tick system (for effects/debuffs)  ✅ COMPLETE
 
+> 📄 **Documentation**: [phase2_time_NOTES.md](./build_docs/phase2_time_NOTES.md)
+
 **Goals**: Server time becomes first-class; you can have timed buffs/debuffs, regen, DoTs, etc.
 
 **Note**: The original design called for traditional "ticks" but we implemented an event-driven architecture instead.
@@ -261,6 +263,8 @@ Before adding big systems, make the core loop solid.
 
 ## Phase 5 - World structure, triggers, and scripting  ✅ COMPLETE
 
+> 📄 **Documentation**: [phase5_triggers.md](./build_docs/phase5_triggers.md)
+
 **Goal**: Richer world behavior without hardcoding everything in Python.
 
 ### Phase 5.1 - Core Trigger Infrastructure ✅
@@ -377,6 +381,8 @@ Before adding big systems, make the core loop solid.
     - ✅ ethereal_nexus.yaml: Area enter/exit triggers
 
 ## Phase X - Quest System and Narrative Progression ✅ COMPLETE
+
+> 📄 **Documentation**: [phaseX_quests.md](./build_docs/phaseX_quests.md)
 
 **Goals**: Structured narrative experiences, player-driven story progression, and meaningful rewards.
 
@@ -570,6 +576,8 @@ Before adding big systems, make the core loop solid.
 
 ## Phase 6 - Persistence & scaling  ✅ COMPLETE
 
+> 📄 **Documentation**: [phase6_persistence.md](./build_docs/phase6_persistence.md)
+
 **Goals**: Don't lose progress on restart. Support more players in the future.
 
 ### Implementation Summary
@@ -623,6 +631,8 @@ Before adding big systems, make the core loop solid.
 
 ## Phase 7 - Accounts, auth, and security ✅ COMPLETE ✅
 
+> 📄 **Documentation**: [phase7_auth.md](./build_docs/phase7_auth.md)
+
 **Goals**: Move from "just a player_id" to real accounts.
 
 ### Implementation Complete ✅
@@ -671,6 +681,8 @@ Before adding big systems, make the core loop solid.
 -  ✅ Legacy mode toggle for backward compatibility
 
 ## Phase 8 - Admin & content tools ✅ COMPLETE
+
+> 📄 **Documentation**: [phase8_admin.MD](./build_docs/phase8_admin.MD)
 
 **Goals**: Operate and extend the game without editing code.
 
@@ -791,6 +803,8 @@ Before adding big systems, make the core loop solid.
 - ✅ Added `structlog==25.3.0` to requirements.txt
 
 ## Phase 9 - Classes & Abilities ✅ COMPLETE ✅
+
+> 📄 **Documentation**: [phase9_classes_design.md](./build_docs/phase9_classes_design.md) | [phase9_classes_implementation.md](./build_docs/phase9_classes_implementation.md)
 
 **Goals**: Extensible character class system with unique abilities, resource management, and progression paths.
 
@@ -940,6 +954,8 @@ Before adding big systems, make the core loop solid.
 
 ## Phase 10 - Socializing and worldbuilding ✅ COMPLETE
 
+> 📄 **Documentation**: [phase10_socials.md](./build_docs/phase10_socials.md) | [phase10_socials_design.md](./build_docs/phase10_socials_design.md) | [phase10_socials_implementation.md](./build_docs/phase10_socials_implementation.md) | [phase10_socials_research_summary.md](./build_docs/phase10_socials_research_summary.md)
+
 ### Phase 10.1: Groups, Tells, Follow ✅ COMPLETE
 - ✅ GroupSystem with O(1) lookups and auto-disband
 - ✅ Group/tell/follow/yell commands with full subcommands
@@ -969,6 +985,8 @@ Before adding big systems, make the core loop solid.
 - ✅ 45+ comprehensive tests
 
 ## Phase 11 - Light and Vision System ✅ COMPLETE
+
+> 📄 **Documentation**: [phase11_lighting_design.md](./build_docs/phase11_lighting_design.md)
 
 **Goals**: Dynamic lighting system with visibility-based gameplay, environmental atmosphere, and light-dependent triggers.
 
@@ -1036,6 +1054,9 @@ Before adding big systems, make the core loop solid.
 ---
 
 ## Phase 12 - CMS API Integration ✅ COMPLETE
+
+> 📄 **Documentation**: [cms_gaps.md](./build_docs/cms_gaps.md)
+> 📄 **Documentation**: [CMS_DEVELOPMENT_GUIDE.md](./build_docs/CMS_DEVELOPMENT_GUIDE.md)
 
 **Goals**: Provide complete REST API endpoints for the Daemonswright CMS to create, read, update, and manage game content without direct file system access.
 
@@ -1323,6 +1344,8 @@ Before adding big systems, make the core loop solid.
 
 ## Phase 13 - Test Engine & CI/CD ✅ COMPLETE
 
+> 📄 **Documentation**: [phase13_abilities_testing_plan.md](./build_docs/phase13_abilities_testing_plan.md)
+
 **Goals**: Build robust testing infrastructure and continuous integration pipeline before auditing ability behaviors.
 
 **Status**: ✅ All immediate actions complete
@@ -1347,6 +1370,8 @@ Before adding big systems, make the core loop solid.
 ---
 
 ## Phase 14 - Entity Abilities ✅ COMPLETE
+
+> 📄 **Documentation**: [phase14_entity_abilities_DESIGN.md](./build_docs/phase14_entity_abilities_DESIGN.md) | [phase14_entity_abilities_1_COMPLETE.md](./build_docs/phase14_entity_abilities_1_COMPLETE.md) | [phase14_entity_abilities_1_REFACTOR.md](./build_docs/phase14_entity_abilities_1_REFACTOR.md) | [phase14_entity_abilities_world_entity_changes.md](./build_docs/phase14_entity_abilities_world_entity_changes.md)
 
 **Goals**: Extend the ability system from players to all entities (NPCs, magic items, environmental objects).
 
@@ -1612,6 +1637,8 @@ Stub client tweaks
 - [ ] Document security practices in SECURITY.md
 
 ## Phase 17 - Areas Engine Update ✅ COMPLETE
+
+> 📄 **Documentation**: [phase17_environment_implementation.md](./build_docs/phase17_environment_implementation.md)
 
 **Goals**: Expand environmental simulation with dynamic weather, temperature, flora/fauna ecosystems, biome coherence, and terrain features like roads and paths.
 

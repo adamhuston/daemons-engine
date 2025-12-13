@@ -3,10 +3,13 @@
  *
  * Displays a summary of the loaded world_data folder content,
  * showing counts of each content type (NPCs, Items, Abilities, etc.)
+ * 
+ * Stats blocks are clickable navigation components that take users
+ * to the appropriate editor view for that content type.
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { Card, Row, Col, Statistic, Typography, Space, Spin } from 'antd';
+import { Card, Row, Col, Statistic, Typography, Space, Tooltip } from 'antd';
 import {
   UserOutlined,
   GiftOutlined,
@@ -17,10 +20,20 @@ import {
   FlagOutlined,
   BugOutlined,
   EnvironmentOutlined,
+  RightOutlined,
 } from '@ant-design/icons';
+import '../../../shared/types'; // Import for Window type augmentation
 import './WorldSummary.css';
 
 const { Title, Text } = Typography;
+
+// Define which view each content type navigates to
+type EditorView = 'yaml' | 'room-builder' | 'entity-editor' | 'quest-designer' | 'dialogue-editor';
+
+interface NavigationTarget {
+  view: EditorView;
+  category?: string; // For entity-editor, specifies which category to select
+}
 
 interface ContentCount {
   key: string;
@@ -28,30 +41,31 @@ interface ContentCount {
   icon: React.ReactNode;
   folder: string;
   count: number;
+  navigation: NavigationTarget;
 }
 
 interface WorldSummaryProps {
   worldDataPath: string;
+  onNavigate?: (view: EditorView, category?: string) => void;
 }
 
-// Content types to count
-const CONTENT_TYPES = [
-  { key: 'rooms', label: 'Rooms', icon: <HomeOutlined />, folder: 'rooms' },
-  { key: 'npcs', label: 'NPCs', icon: <UserOutlined />, folder: 'npcs' },
-  { key: 'items', label: 'Items', icon: <GiftOutlined />, folder: 'items' },
-  { key: 'abilities', label: 'Abilities', icon: <ThunderboltOutlined />, folder: 'abilities' },
-  { key: 'classes', label: 'Classes', icon: <TeamOutlined />, folder: 'classes' },
-  { key: 'quests', label: 'Quests', icon: <FlagOutlined />, folder: 'quests' },
-  { key: 'dialogues', label: 'Dialogues', icon: <CommentOutlined />, folder: 'dialogues' },
-  { key: 'flora', label: 'Flora', icon: <span role="img" aria-label="flora">🌿</span>, folder: 'flora' },
-  { key: 'fauna', label: 'Fauna', icon: <BugOutlined />, folder: 'npcs/fauna' },
-  { key: 'areas', label: 'Areas', icon: <EnvironmentOutlined />, folder: 'areas' },
-  { key: 'triggers', label: 'Triggers', icon: <ThunderboltOutlined />, folder: 'triggers' },
+// Content types to count with their navigation targets
+const CONTENT_TYPES: Omit<ContentCount, 'count'>[] = [
+  { key: 'rooms', label: 'Rooms', icon: <HomeOutlined />, folder: 'rooms', navigation: { view: 'room-builder' } },
+  { key: 'npcs', label: 'NPCs', icon: <UserOutlined />, folder: 'npcs', navigation: { view: 'entity-editor', category: 'npcs' } },
+  { key: 'items', label: 'Items', icon: <GiftOutlined />, folder: 'items', navigation: { view: 'entity-editor', category: 'items' } },
+  { key: 'abilities', label: 'Abilities', icon: <ThunderboltOutlined />, folder: 'abilities', navigation: { view: 'entity-editor', category: 'abilities' } },
+  { key: 'classes', label: 'Classes', icon: <TeamOutlined />, folder: 'classes', navigation: { view: 'entity-editor', category: 'classes' } },
+  { key: 'quests', label: 'Quests', icon: <FlagOutlined />, folder: 'quests', navigation: { view: 'quest-designer' } },
+  { key: 'dialogues', label: 'Dialogues', icon: <CommentOutlined />, folder: 'dialogues', navigation: { view: 'dialogue-editor' } },
+  { key: 'flora', label: 'Flora', icon: <span role="img" aria-label="flora">🌿</span>, folder: 'flora', navigation: { view: 'entity-editor', category: 'flora' } },
+  { key: 'fauna', label: 'Fauna', icon: <BugOutlined />, folder: 'npcs/fauna', navigation: { view: 'entity-editor', category: 'fauna' } },
+  { key: 'areas', label: 'Areas', icon: <EnvironmentOutlined />, folder: 'areas', navigation: { view: 'room-builder' } },
+  { key: 'triggers', label: 'Triggers', icon: <ThunderboltOutlined />, folder: 'triggers', navigation: { view: 'entity-editor', category: 'triggers' } },
 ];
 
-export function WorldSummary({ worldDataPath }: WorldSummaryProps) {
+export function WorldSummary({ worldDataPath, onNavigate }: WorldSummaryProps) {
   const [contentCounts, setContentCounts] = useState<ContentCount[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Extract the folder name from the path for display
   const folderName = useMemo(() => {
@@ -63,11 +77,9 @@ export function WorldSummary({ worldDataPath }: WorldSummaryProps) {
   useEffect(() => {
     async function countContent() {
       if (!window.daemonswright?.fs) {
-        setLoading(false);
         return;
       }
 
-      setLoading(true);
       const counts: ContentCount[] = [];
 
       for (const contentType of CONTENT_TYPES) {
@@ -101,11 +113,10 @@ export function WorldSummary({ worldDataPath }: WorldSummaryProps) {
         counts.push({
           ...contentType,
           count,
-        });
+        } as ContentCount);
       }
 
       setContentCounts(counts);
-      setLoading(false);
     }
 
     countContent();
@@ -123,15 +134,6 @@ export function WorldSummary({ worldDataPath }: WorldSummaryProps) {
     [contentCounts]
   );
 
-  if (loading) {
-    return (
-      <div className="world-summary loading">
-        <Spin size="large" />
-        <Text type="secondary">Loading world data...</Text>
-      </div>
-    );
-  }
-
   return (
     <div className="world-summary">
       <div className="world-summary-header">
@@ -147,13 +149,24 @@ export function WorldSummary({ worldDataPath }: WorldSummaryProps) {
         <Row gutter={[16, 16]} className="world-summary-grid">
           {nonEmptyCounts.map((content) => (
             <Col xs={12} sm={8} md={6} lg={4} key={content.key}>
-              <Card className="world-summary-card" hoverable>
-                <Statistic
-                  title={content.label}
-                  value={content.count}
-                  prefix={content.icon}
-                />
-              </Card>
+              <Tooltip title={`Open ${content.label} in editor`}>
+                <Card 
+                  className="world-summary-card" 
+                  hoverable
+                  onClick={() => onNavigate?.(content.navigation.view, content.navigation.category)}
+                >
+                  <Statistic
+                    title={
+                      <span className="card-title-with-arrow">
+                        {content.label}
+                        <RightOutlined className="navigate-arrow" />
+                      </span>
+                    }
+                    value={content.count}
+                    prefix={content.icon}
+                  />
+                </Card>
+              </Tooltip>
             </Col>
           ))}
         </Row>

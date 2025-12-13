@@ -21,4 +21,8 @@ rooms:
     x: -1
     'y': -1
     z: 0
+  room_unstable_cavern:
+    x: 0
+    'y': 0
+    z: 0
 layer_names: {}

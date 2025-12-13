@@ -5,6 +5,8 @@
  * Features the DWCMS logo and options to create/open worlds.
  */
 
+/// <reference path="../../assets.d.ts" />
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Space, Tooltip, Typography, Divider, List } from 'antd';
 import {
