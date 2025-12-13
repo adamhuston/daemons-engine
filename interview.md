@@ -14,7 +14,7 @@
 
 ***Claude:* So what exactly is Daemons Engine?**
 
-> *Adam Huston:* It's a headless, real-time MUD engine written in Python. You get WebSocket communication, a FastAPI backend, modular game systems—combat, quests, weather, factions, the works. A YAML-based content system that makes it easy to build worlds without touching SQL. An easily moddable codebase that works out of the box. The client can be anything: a terminal, a mobile app, a React frontend. The engine doesn't care.
+> *Adam Huston:* It's a headless, real-time MUD engine written in Python. You get WebSocket communication, a FastAPI backend, modular game systems, combat, quests, weather, factions, the works. A YAML-based content system that makes it easy to build worlds without touching SQL. An easily moddable codebase that works out of the box. The client can be anything: a terminal, a mobile app, a React frontend. The engine doesn't care.
 
 ***C:* A MUD engine in 2025. Why?**
 
@@ -32,7 +32,7 @@
 
 > *AH:* Primarily it's about accessibility. Python is readable. It handles garbage collection automatically. The standard library and third-party ecosystem mean we don't reinvent the wheel for basic things like randomness and timekeeping. Far more people know Python than C, so more people can contribute.
 >
-> Python being an interpreted language also gives us rapid iteration and testing frameworks. With Uvicorn and pytest we can deploy changes in a dev environment and test immediately. And of course, no more Telnet. Clients connect via WebSockets with auth: say goodbye raw text and hello to JSON.
+> Python being an interpreted language also gives us rapid iteration and testing frameworks. With Uvicorn and pytest we can deploy changes in a dev environment and test immediately. And of course, no more Telnet. Clients connect via WebSockets with auth: say goodbye to raw text and hello to JSON.
 >
 > That said, DikuMUD derivatives benefit from decades of testing in deployment, and it's true that for comparable tasks C is technically more efficient than Python. That said, MUDs aren't CPU-bound: they're I/O-bound. For handling concurrent connections and scheduled events, Python's native async/await is ideal.
 
