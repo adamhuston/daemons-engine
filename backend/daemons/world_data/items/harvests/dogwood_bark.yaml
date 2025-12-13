@@ -1,0 +1,21 @@
+# Dogwood Bark - Harvested from dogwood trees
+id: item_dogwood_bark
+name: Dogwood Bark
+description: Reddish-brown bark from a dogwood tree. Traditionally used to treat fevers.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - bark
+  - dogwood
+  - medicinal
+  - material

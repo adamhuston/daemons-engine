@@ -1,0 +1,22 @@
+# Spore Sample - Harvested from glowing mushrooms
+id: item_spore_sample
+name: Spore Sample
+description: A vial of bioluminescent spores. They glow faintly in the dark.
+item_type: material
+item_subtype: reagent
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: rare
+value: 15
+flags: {}
+keywords:
+  - spore
+  - glowing
+  - fungus
+  - magical
+  - reagent

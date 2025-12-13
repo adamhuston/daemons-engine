@@ -1,0 +1,22 @@
+# Frost Petals - Harvested from frost flowers
+id: item_frost_petals
+name: Frost Petals
+description: Delicate crystalline petals that shimmer with cold. Magical in nature.
+item_type: material
+item_subtype: reagent
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: rare
+value: 12
+flags: {}
+keywords:
+  - petal
+  - frost
+  - ice
+  - magical
+  - reagent

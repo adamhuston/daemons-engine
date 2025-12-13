@@ -1,0 +1,21 @@
+# Alder Wood - Harvested from alder trees
+id: item_alder_wood
+name: Alder Wood
+description: Light, soft wood from an alder tree. Prized for woodworking and smoking fish.
+item_type: material
+item_subtype: wood
+equipment_slot: null
+stat_modifiers: {}
+weight: 1.0
+max_stack_size: 10
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - wood
+  - alder
+  - lumber
+  - material

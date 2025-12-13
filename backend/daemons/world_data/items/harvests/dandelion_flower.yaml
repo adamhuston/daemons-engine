@@ -1,0 +1,21 @@
+# Dandelion Flower - Harvested from dandelions
+id: item_dandelion_flower
+name: Dandelion Flower
+description: A bright yellow flower that turns into a puffball of seeds. Used in wines and salads.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - flower
+  - dandelion
+  - yellow
+  - edible

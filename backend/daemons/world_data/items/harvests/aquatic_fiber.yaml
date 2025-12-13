@@ -1,0 +1,21 @@
+# Aquatic Fiber - Harvested from water hyacinth
+id: item_aquatic_fiber
+name: Aquatic Fiber
+description: Strong, flexible fibers extracted from aquatic plants. Useful for weaving and cordage.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 4
+flags: {}
+keywords:
+  - fiber
+  - aquatic
+  - weaving
+  - material

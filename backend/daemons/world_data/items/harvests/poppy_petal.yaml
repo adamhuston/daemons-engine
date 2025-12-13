@@ -1,0 +1,21 @@
+# Poppy Petal - Harvested from poppies
+id: item_poppy_petal
+name: Poppy Petal
+description: Delicate, papery petals in vivid red or orange. Symbolic of sleep and remembrance.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.02
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - petal
+  - poppy
+  - red
+  - flower

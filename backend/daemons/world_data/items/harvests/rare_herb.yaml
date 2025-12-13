@@ -1,0 +1,26 @@
+# Rare Herb - Harvested from healing herb plants (rare drop)
+id: item_rare_herb
+name: Rare Herb
+description: An exceptionally potent medicinal herb with remarkable healing properties.
+item_type: consumable
+item_subtype: herb
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Healing
+  duration: 0.0
+  magnitude: 15
+rarity: rare
+value: 20
+flags: {}
+keywords:
+  - herb
+  - rare
+  - healing
+  - medicinal

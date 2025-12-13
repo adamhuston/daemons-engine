@@ -1,0 +1,21 @@
+# Oak Wood - Harvested from oak trees
+id: item_oak_wood
+name: Oak Wood
+description: Strong, durable hardwood with attractive grain. Excellent for construction and furniture.
+item_type: material
+item_subtype: wood
+equipment_slot: null
+stat_modifiers: {}
+weight: 1.5
+max_stack_size: 10
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 5
+flags: {}
+keywords:
+  - wood
+  - oak
+  - lumber
+  - hardwood

@@ -1,0 +1,21 @@
+# Ice Plant Leaf - Harvested from ice plants
+id: item_ice_plant_leaf
+name: Ice Plant Leaf
+description: Thick, succulent leaves covered in crystalline structures. Cool to the touch.
+item_type: material
+item_subtype: leaf
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 4
+flags: {}
+keywords:
+  - leaf
+  - ice
+  - succulent
+  - cold

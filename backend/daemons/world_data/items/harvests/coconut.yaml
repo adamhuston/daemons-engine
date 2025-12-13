@@ -1,0 +1,27 @@
+# Coconut - Harvested from palm trees
+id: item_coconut
+name: Coconut
+description: A large, hard-shelled fruit with sweet water and rich meat inside.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.8
+max_stack_size: 10
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Nourishment
+  duration: 0.0
+  magnitude: 8
+rarity: uncommon
+value: 5
+flags: {}
+keywords:
+  - coconut
+  - fruit
+  - palm
+  - food
+  - tropical

@@ -1,0 +1,21 @@
+# Cottonwood Fluff - Harvested from cottonwood trees
+id: item_cottonwood_fluff
+name: Cottonwood Fluff
+description: Cottony seeds that float on the wind. Useful as tinder or stuffing.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - fluff
+  - cottonwood
+  - fiber
+  - tinder

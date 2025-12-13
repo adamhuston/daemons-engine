@@ -1,0 +1,21 @@
+# Thistle Down - Harvested from thistles
+id: item_thistle_down
+name: Thistle Down
+description: Soft, silky fibers attached to thistle seeds. Floats on the breeze.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.02
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - down
+  - thistle
+  - fiber
+  - fluffy

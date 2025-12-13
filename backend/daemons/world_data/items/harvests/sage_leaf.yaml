@@ -1,0 +1,21 @@
+# Sage Leaf - Harvested from sagebrush
+id: item_sage_leaf
+name: Sage Leaf
+description: Silvery-green aromatic leaves with a pungent scent. Used in cooking and ceremony.
+item_type: material
+item_subtype: herb
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - leaf
+  - sage
+  - aromatic
+  - herb

@@ -1,0 +1,21 @@
+# Hickory Wood - Harvested from bitternut hickory trees
+id: item_hickory_wood
+name: Hickory Wood
+description: Extremely hard, shock-resistant wood. Prized for tool handles and smoking meat.
+item_type: material
+item_subtype: wood
+equipment_slot: null
+stat_modifiers: {}
+weight: 1.2
+max_stack_size: 10
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 5
+flags: {}
+keywords:
+  - wood
+  - hickory
+  - lumber
+  - hardwood

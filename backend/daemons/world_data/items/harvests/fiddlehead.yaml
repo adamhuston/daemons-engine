@@ -1,0 +1,26 @@
+# Fiddlehead - Harvested from ferns
+id: item_fiddlehead
+name: Fiddlehead
+description: A tightly coiled young fern frond. A delicacy when steamed or sautéed.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Nourishment
+  duration: 0.0
+  magnitude: 4
+rarity: uncommon
+value: 4
+flags: {}
+keywords:
+  - fiddlehead
+  - fern
+  - food
+  - vegetable

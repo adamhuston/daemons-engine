@@ -1,0 +1,21 @@
+# Walnut Wood - Harvested from black walnut trees
+id: item_walnut_wood
+name: Walnut Wood
+description: Dark, richly grained hardwood. Prized for fine furniture and gunstocks.
+item_type: material
+item_subtype: wood
+equipment_slot: null
+stat_modifiers: {}
+weight: 1.2
+max_stack_size: 10
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 8
+flags: {}
+keywords:
+  - wood
+  - walnut
+  - lumber
+  - hardwood

@@ -1,0 +1,21 @@
+# Fireweed Flower - Harvested from fireweed
+id: item_fireweed_flower
+name: Fireweed Flower
+description: Bright pink flowers that bloom after forest fires. Symbol of renewal.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - flower
+  - fireweed
+  - pink
+  - reagent

@@ -1,0 +1,21 @@
+# Fir Resin - Harvested from white fir trees
+id: item_fir_resin
+name: Fir Resin
+description: Clear, sticky resin from a fir tree. Used as a waterproof sealant and medicine.
+item_type: material
+item_subtype: resin
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 5
+flags: {}
+keywords:
+  - resin
+  - fir
+  - sap
+  - sealant

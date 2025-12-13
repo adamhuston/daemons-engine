@@ -1,0 +1,21 @@
+# Beech Wood - Harvested from beech trees
+id: item_beech_wood
+name: Beech Wood
+description: Hard, dense wood with a fine grain. Excellent for furniture and tool handles.
+item_type: material
+item_subtype: wood
+equipment_slot: null
+stat_modifiers: {}
+weight: 1.2
+max_stack_size: 10
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 4
+flags: {}
+keywords:
+  - wood
+  - beech
+  - lumber
+  - material

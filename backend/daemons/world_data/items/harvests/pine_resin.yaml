@@ -1,0 +1,21 @@
+# Pine Resin - Harvested from pine trees
+id: item_pine_resin
+name: Pine Resin
+description: Sticky, aromatic resin from a pine tree. Used for waterproofing and adhesives.
+item_type: material
+item_subtype: resin
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 4
+flags: {}
+keywords:
+  - resin
+  - pine
+  - sap
+  - pitch

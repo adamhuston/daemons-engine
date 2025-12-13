@@ -1,0 +1,21 @@
+# Water Hyacinth Flower - Harvested from water hyacinths
+id: item_water_hyacinth_flower
+name: Water Hyacinth Flower
+description: A beautiful lavender flower from an aquatic plant. Floats on water.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - flower
+  - hyacinth
+  - water
+  - aquatic

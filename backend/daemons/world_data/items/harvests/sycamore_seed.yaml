@@ -1,0 +1,20 @@
+# Sycamore Seed - Harvested from sycamore trees
+id: item_sycamore_seed
+name: Sycamore Seed
+description: Fuzzy seed balls that hang from sycamore branches. Known as buttonballs.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - seed
+  - sycamore
+  - buttonball

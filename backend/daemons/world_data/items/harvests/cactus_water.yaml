@@ -1,0 +1,26 @@
+# Cactus Water - Harvested from desert cacti and saguaros
+id: item_cactus_water
+name: Cactus Water
+description: Clear, slightly viscous water extracted from a cactus. A lifesaver in the desert.
+item_type: consumable
+item_subtype: drink
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Hydration
+  duration: 0.0
+  magnitude: 8
+rarity: uncommon
+value: 5
+flags: {}
+keywords:
+  - water
+  - cactus
+  - drink
+  - desert

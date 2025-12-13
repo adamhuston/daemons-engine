@@ -1,0 +1,26 @@
+# Black Cherry - Harvested from black cherry trees
+id: item_black_cherry
+name: Black Cherry
+description: Dark, ripe cherries with a sweet-tart flavor. Delicious but slightly bitter.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 3
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - cherry
+  - fruit
+  - food
+  - berry

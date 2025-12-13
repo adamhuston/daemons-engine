@@ -1,0 +1,21 @@
+# Winterberry - Harvested from winterberry bushes
+id: item_winterberry
+name: Winterberry
+description: Bright red berries that persist through winter. Toxic to humans but decorative.
+item_type: material
+item_subtype: berry
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - berry
+  - winterberry
+  - red
+  - decorative

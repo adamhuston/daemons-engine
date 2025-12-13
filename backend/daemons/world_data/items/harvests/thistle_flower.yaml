@@ -1,0 +1,21 @@
+# Thistle Flower - Harvested from thistles
+id: item_thistle_flower
+name: Thistle Flower
+description: A spiky purple flower head. Beautiful but prickly.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - flower
+  - thistle
+  - purple
+  - spiky

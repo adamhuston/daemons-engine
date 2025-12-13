@@ -1,0 +1,21 @@
+# Violet Flower - Harvested from violets
+id: item_violet_flower
+name: Violet Flower
+description: Small, deep purple flowers with a sweet scent. Edible and decorative.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.02
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - flower
+  - violet
+  - purple
+  - edible

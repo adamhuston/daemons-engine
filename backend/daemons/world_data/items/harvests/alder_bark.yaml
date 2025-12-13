@@ -1,0 +1,20 @@
+# Alder Bark - Harvested from alder trees
+id: item_alder_bark
+name: Alder Bark
+description: Dark, rough bark stripped from an alder tree. Used in tanning and herbal remedies.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - bark
+  - alder
+  - material

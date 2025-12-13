@@ -1,0 +1,21 @@
+# Pine Needle - Harvested from pine trees
+id: item_pine_needle
+name: Pine Needle
+description: Long, aromatic needles from a pine tree. Used in teas and as bedding.
+item_type: material
+item_subtype: herb
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - needle
+  - pine
+  - aromatic
+  - herb

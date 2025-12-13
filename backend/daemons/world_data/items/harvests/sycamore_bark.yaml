@@ -1,0 +1,20 @@
+# Sycamore Bark - Harvested from sycamore trees
+id: item_sycamore_bark
+name: Sycamore Bark
+description: Mottled bark that peels in patches, revealing smooth inner bark.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - bark
+  - sycamore
+  - material

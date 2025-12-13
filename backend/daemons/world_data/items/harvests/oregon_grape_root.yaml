@@ -1,0 +1,22 @@
+# Oregon Grape Root - Harvested from Oregon grape bushes
+id: item_oregon_grape_root
+name: Oregon Grape Root
+description: Bright yellow root with antimicrobial properties. Used in herbal medicine.
+item_type: material
+item_subtype: herb
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.15
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 5
+flags: {}
+keywords:
+  - root
+  - oregon
+  - grape
+  - herb
+  - medicinal

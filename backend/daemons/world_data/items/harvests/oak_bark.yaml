@@ -1,0 +1,21 @@
+# Oak Bark - Harvested from oak trees
+id: item_oak_bark
+name: Oak Bark
+description: Thick, furrowed bark from an oak tree. Rich in tannins for leatherworking.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.4
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - bark
+  - oak
+  - tannin
+  - material

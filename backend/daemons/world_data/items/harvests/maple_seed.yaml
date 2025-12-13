@@ -1,0 +1,21 @@
+# Maple Seed - Harvested from red maple trees
+id: item_maple_seed
+name: Maple Seed
+description: A winged seed that spins as it falls. Also known as a samara or helicopter.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - seed
+  - maple
+  - samara
+  - helicopter

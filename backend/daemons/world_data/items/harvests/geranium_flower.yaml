@@ -1,0 +1,21 @@
+# Geranium Flower - Harvested from geraniums
+id: item_geranium_flower
+name: Geranium Flower
+description: A colorful five-petaled flower with a distinctive scent. Used in perfumes.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - flower
+  - geranium
+  - fragrant
+  - reagent

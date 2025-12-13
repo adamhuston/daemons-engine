@@ -1,0 +1,21 @@
+# Grass Blade - Harvested from Kentucky bluegrass
+id: item_grass_blade
+name: Grass Blade
+description: Fresh green grass blades. Useful for weaving or as animal fodder.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - grass
+  - blade
+  - fodder
+  - material

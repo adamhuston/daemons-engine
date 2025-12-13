@@ -1,0 +1,26 @@
+# Cattail Root - Harvested from cattails
+id: item_cattail_root
+name: Cattail Root
+description: A starchy root from a cattail plant. Edible when cooked.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Nourishment
+  duration: 0.0
+  magnitude: 4
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - root
+  - cattail
+  - food
+  - starch

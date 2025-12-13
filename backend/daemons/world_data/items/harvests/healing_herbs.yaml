@@ -1,0 +1,26 @@
+# Healing Herbs - Harvested from healing herb plants
+id: item_healing_herbs
+name: Healing Herbs
+description: A bundle of medicinal herbs known for their restorative properties.
+item_type: consumable
+item_subtype: herb
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Healing
+  duration: 0.0
+  magnitude: 5
+rarity: common
+value: 5
+flags: {}
+keywords:
+  - herb
+  - healing
+  - medicinal
+  - restorative

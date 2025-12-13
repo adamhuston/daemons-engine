@@ -1,0 +1,26 @@
+# Joshua Fruit - Harvested from Joshua trees
+id: item_joshua_fruit
+name: Joshua Fruit
+description: A fleshy, green fruit from a Joshua tree. Edible but rather bland.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 3
+rarity: uncommon
+value: 3
+flags: {}
+keywords:
+  - fruit
+  - joshua
+  - desert
+  - food

@@ -1,0 +1,21 @@
+# Bluegrass Seed - Harvested from Kentucky bluegrass
+id: item_bluegrass_seed
+name: Bluegrass Seed
+description: Fine grass seeds that can be used for planting lawns or as animal feed.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - seed
+  - grass
+  - bluegrass
+  - planting

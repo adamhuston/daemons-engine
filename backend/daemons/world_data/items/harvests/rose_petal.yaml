@@ -1,0 +1,21 @@
+# Rose Petal - Harvested from wild roses
+id: item_rose_petal
+name: Rose Petal
+description: Soft, fragrant petals from a wild rose. Used in perfumes and potpourri.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.02
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - petal
+  - rose
+  - fragrant
+  - flower

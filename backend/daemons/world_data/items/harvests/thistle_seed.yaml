@@ -1,0 +1,19 @@
+# Thistle Seed - Harvested from thistles
+id: item_thistle_seed
+name: Thistle Seed
+description: Small seeds attached to fluffy down. A favorite food of goldfinches.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.02
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - seed
+  - thistle

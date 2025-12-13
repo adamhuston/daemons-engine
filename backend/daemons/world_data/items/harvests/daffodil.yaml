@@ -1,0 +1,21 @@
+# Daffodil - Harvested from daffodil flowers
+id: item_daffodil
+name: Daffodil
+description: A bright yellow trumpet-shaped flower. Symbol of spring and renewal.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - flower
+  - daffodil
+  - yellow
+  - spring

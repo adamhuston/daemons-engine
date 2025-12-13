@@ -1,0 +1,26 @@
+# Juniper Berry - Harvested from juniper bushes
+id: item_juniper_berry
+name: Juniper Berry
+description: Small blue-black berries with a piney, aromatic flavor. Used in cooking and medicine.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 2
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - berry
+  - juniper
+  - aromatic
+  - food

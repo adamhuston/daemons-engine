@@ -1,0 +1,22 @@
+# Iris Root - Harvested from irises
+id: item_iris_root
+name: Iris Root
+description: A fragrant rhizome known as orris root. Valued in perfumery and medicine.
+item_type: material
+item_subtype: herb
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.15
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 6
+flags: {}
+keywords:
+  - root
+  - iris
+  - orris
+  - fragrant
+  - reagent

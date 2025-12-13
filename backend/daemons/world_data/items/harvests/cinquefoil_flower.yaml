@@ -1,0 +1,21 @@
+# Cinquefoil Flower - Harvested from cinquefoil plants
+id: item_cinquefoil_flower
+name: Cinquefoil Flower
+description: A small yellow flower with five petals. Used in folk remedies and potions.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - flower
+  - cinquefoil
+  - yellow
+  - reagent

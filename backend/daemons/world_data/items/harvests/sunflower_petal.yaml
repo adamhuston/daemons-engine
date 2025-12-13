@@ -1,0 +1,21 @@
+# Sunflower Petal - Harvested from giant sunflowers
+id: item_sunflower_petal
+name: Sunflower Petal
+description: Bright yellow petals from a sunflower. Cheerful and used in dyes.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.02
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - petal
+  - sunflower
+  - yellow
+  - dye

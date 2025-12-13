@@ -1,0 +1,21 @@
+# Joshua Fiber - Harvested from Joshua trees
+id: item_joshua_fiber
+name: Joshua Fiber
+description: Tough, stringy fibers from a Joshua tree. Used for cordage and weaving.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 3
+flags: {}
+keywords:
+  - fiber
+  - joshua
+  - cordage
+  - desert

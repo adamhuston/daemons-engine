@@ -1,0 +1,20 @@
+# Shooting Star Seed - Harvested from shooting star plants
+id: item_shooting_star_seed
+name: Shooting Star Seed
+description: Tiny seeds from the shooting star wildflower. Difficult to germinate.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.02
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 2
+flags: {}
+keywords:
+  - seed
+  - shooting
+  - star

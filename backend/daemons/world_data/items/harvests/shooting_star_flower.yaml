@@ -1,0 +1,21 @@
+# Shooting Star Flower - Harvested from shooting star plants
+id: item_shooting_star_flower
+name: Shooting Star Flower
+description: A unique flower with swept-back petals, resembling a falling star.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 4
+flags: {}
+keywords:
+  - flower
+  - shooting
+  - star
+  - wildflower

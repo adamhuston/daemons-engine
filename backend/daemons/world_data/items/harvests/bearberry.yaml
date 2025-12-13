@@ -1,0 +1,26 @@
+# Bearberry - Harvested from bearberry shrubs
+id: item_bearberry
+name: Bearberry
+description: Small, red berries with a mealy texture. A favorite food of bears.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 2
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - berry
+  - bearberry
+  - food
+  - fruit

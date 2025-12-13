@@ -1,0 +1,20 @@
+# Magnolia Seed - Harvested from magnolia trees
+id: item_magnolia_seed
+name: Magnolia Seed
+description: Bright red seeds from a magnolia cone. Attractive to birds.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - seed
+  - magnolia
+  - red

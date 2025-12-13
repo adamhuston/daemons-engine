@@ -1,0 +1,21 @@
+# Venus Fly Trap Leaf - Harvested from venus fly traps
+id: item_venus_trap_leaf
+name: Venus Fly Trap Leaf
+description: A hinged leaf with trigger hairs, capable of trapping insects. Fascinating.
+item_type: material
+item_subtype: leaf
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 6
+flags: {}
+keywords:
+  - leaf
+  - venus
+  - trap
+  - carnivore

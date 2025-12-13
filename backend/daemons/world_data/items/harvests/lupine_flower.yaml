@@ -1,0 +1,21 @@
+# Lupine Flower - Harvested from lupines
+id: item_lupine_flower
+name: Lupine Flower
+description: A tall spike of pea-like flowers in shades of blue and purple.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - flower
+  - lupine
+  - blue
+  - purple

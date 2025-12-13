@@ -1,0 +1,21 @@
+# Cattail Fluff - Harvested from cattails
+id: item_cattail_fluff
+name: Cattail Fluff
+description: Soft, downy fibers from a cattail seed head. Used for insulation and tinder.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - fluff
+  - cattail
+  - fiber
+  - tinder

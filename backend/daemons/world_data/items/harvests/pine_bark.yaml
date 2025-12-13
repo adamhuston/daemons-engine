@@ -1,0 +1,21 @@
+# Pine Bark - Harvested from ponderosa pine trees
+id: item_pine_bark
+name: Pine Bark
+description: Thick, scaly bark from a pine tree with a vanilla-like scent.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - bark
+  - pine
+  - aromatic
+  - material

@@ -1,0 +1,20 @@
+# Lupine Seed - Harvested from lupines
+id: item_lupine_seed
+name: Lupine Seed
+description: Flat, bean-like seeds from a lupine. Require processing before consumption.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - seed
+  - lupine
+  - bean

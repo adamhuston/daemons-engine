@@ -1,0 +1,20 @@
+# Sedge Root - Harvested from sedges
+id: item_sedge_root
+name: Sedge Root
+description: Fibrous roots from sedge plants. Some varieties are edible.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - root
+  - sedge
+  - fiber

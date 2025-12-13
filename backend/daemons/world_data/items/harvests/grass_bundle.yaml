@@ -1,0 +1,21 @@
+# Grass Bundle - Harvested from buffalo grass
+id: item_grass_bundle
+name: Grass Bundle
+description: A bundle of dried prairie grass. Useful for thatching, bedding, or fire starting.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - grass
+  - bundle
+  - thatch
+  - tinder

@@ -1,0 +1,26 @@
+# Sunflower Seed - Harvested from giant sunflowers
+id: item_sunflower_seed
+name: Sunflower Seed
+description: Nutritious, oil-rich seeds from a sunflower head. A tasty snack.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 2
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - seed
+  - sunflower
+  - food
+  - snack

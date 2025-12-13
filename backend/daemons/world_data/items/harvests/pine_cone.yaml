@@ -1,0 +1,21 @@
+# Pine Cone - Harvested from pine trees
+id: item_pine_cone
+name: Pine Cone
+description: A woody cone containing pine seeds. Good for fire starting or decoration.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - cone
+  - pine
+  - seed
+  - tinder

@@ -1,0 +1,21 @@
+# Willow Bark - Harvested from willow trees
+id: item_willow_bark
+name: Willow Bark
+description: Flexible bark from a willow tree. Contains salicin, a natural pain reliever.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 4
+flags: {}
+keywords:
+  - bark
+  - willow
+  - medicinal
+  - material

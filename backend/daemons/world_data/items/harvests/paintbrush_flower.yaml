@@ -1,0 +1,21 @@
+# Paintbrush Flower - Harvested from Indian paintbrush
+id: item_paintbrush_flower
+name: Paintbrush Flower
+description: Brilliant red-orange bracts that look like a brush dipped in paint.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - flower
+  - paintbrush
+  - red
+  - orange

@@ -1,0 +1,21 @@
+# Water Lily Flower - Harvested from water lilies
+id: item_water_lily_flower
+name: Water Lily Flower
+description: A pristine white or pink flower floating on the water. Serene and beautiful.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 4
+flags: {}
+keywords:
+  - flower
+  - lily
+  - water
+  - aquatic

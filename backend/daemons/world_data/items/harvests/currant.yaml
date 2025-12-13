@@ -1,0 +1,26 @@
+# Currant - Harvested from currant bushes
+id: item_currant
+name: Currant
+description: Small, tart berries in clusters. Perfect for jams and baking.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 2
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - berry
+  - currant
+  - fruit
+  - food

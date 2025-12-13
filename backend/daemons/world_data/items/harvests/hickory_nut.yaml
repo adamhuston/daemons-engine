@@ -1,0 +1,25 @@
+# Hickory Nut - Harvested from bitternut hickory trees
+id: item_hickory_nut
+name: Hickory Nut
+description: A hard-shelled nut with rich, flavorful meat. Nutritious but difficult to crack.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Nourishment
+  duration: 0.0
+  magnitude: 4
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - nut
+  - hickory
+  - food

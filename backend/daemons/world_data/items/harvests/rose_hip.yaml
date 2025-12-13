@@ -1,0 +1,27 @@
+# Rose Hip - Harvested from wild roses
+id: item_rose_hip
+name: Rose Hip
+description: The red fruit of a rose, rich in vitamin C. Used in teas and jellies.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Vitamin Boost
+  duration: 0.0
+  magnitude: 3
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - hip
+  - rose
+  - fruit
+  - food
+  - tea

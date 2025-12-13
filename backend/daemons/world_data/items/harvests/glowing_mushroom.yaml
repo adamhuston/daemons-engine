@@ -1,0 +1,22 @@
+# Glowing Mushroom - Harvested from glowing mushroom clusters
+id: item_glowing_mushroom
+name: Glowing Mushroom
+description: A bioluminescent fungus that emits a soft blue-green glow. Fascinating and slightly magical.
+item_type: material
+item_subtype: fungus
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 8
+flags: {}
+keywords:
+  - mushroom
+  - glowing
+  - fungus
+  - magical
+  - reagent

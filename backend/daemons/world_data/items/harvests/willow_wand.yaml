@@ -1,0 +1,21 @@
+# Willow Wand - Harvested from willow trees
+id: item_willow_wand
+name: Willow Wand
+description: A slender, flexible branch from a willow. Traditional material for wands and baskets.
+item_type: material
+item_subtype: wood
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - wand
+  - willow
+  - branch
+  - weaving

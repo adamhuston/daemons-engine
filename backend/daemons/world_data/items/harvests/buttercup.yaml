@@ -1,0 +1,21 @@
+# Buttercup - Harvested from buttercup flowers
+id: item_buttercup
+name: Buttercup
+description: A cheerful yellow flower with glossy petals. Mildly toxic but useful in alchemy.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - flower
+  - buttercup
+  - yellow
+  - reagent

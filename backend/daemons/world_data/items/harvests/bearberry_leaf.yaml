@@ -1,0 +1,21 @@
+# Bearberry Leaf - Harvested from bearberry shrubs
+id: item_bearberry_leaf
+name: Bearberry Leaf
+description: Leathery, evergreen leaves with medicinal properties. Used in herbal teas.
+item_type: material
+item_subtype: herb
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - leaf
+  - bearberry
+  - herb
+  - medicinal

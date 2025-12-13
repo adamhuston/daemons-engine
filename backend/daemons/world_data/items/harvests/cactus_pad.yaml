@@ -1,0 +1,26 @@
+# Cactus Pad - Harvested from prickly pear cacti
+id: item_cactus_pad
+name: Cactus Pad
+description: A flat, fleshy pad from a prickly pear. Edible once the spines are removed.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Nourishment
+  duration: 0.0
+  magnitude: 4
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - cactus
+  - pad
+  - nopal
+  - food

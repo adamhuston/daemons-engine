@@ -1,0 +1,26 @@
+# Cactus Fruit - Harvested from desert cacti
+id: item_cactus_fruit
+name: Cactus Fruit
+description: A sweet, juicy fruit from a desert cactus. Refreshing in the heat.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Refreshment
+  duration: 0.0
+  magnitude: 5
+rarity: uncommon
+value: 4
+flags: {}
+keywords:
+  - fruit
+  - cactus
+  - desert
+  - food

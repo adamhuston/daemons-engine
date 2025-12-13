@@ -1,0 +1,21 @@
+# Elm Bark - Harvested from American elm trees
+id: item_elm_bark
+name: Elm Bark
+description: Gray, furrowed bark from an elm tree. The inner bark is soothing and mucilaginous.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - bark
+  - elm
+  - medicinal
+  - material

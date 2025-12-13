@@ -1,0 +1,25 @@
+# Walnut - Harvested from black walnut trees
+id: item_walnut
+name: Walnut
+description: A hard-shelled nut with rich, flavorful meat. Stains everything it touches.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.15
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Nourishment
+  duration: 0.0
+  magnitude: 4
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - nut
+  - walnut
+  - food

@@ -1,0 +1,21 @@
+# Acorn - Harvested from oak trees
+id: item_acorn
+name: Acorn
+description: A small, brown nut with a distinctive cap. A staple food for woodland creatures.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - acorn
+  - nut
+  - seed
+  - oak

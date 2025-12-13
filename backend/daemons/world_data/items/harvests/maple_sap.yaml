@@ -1,0 +1,26 @@
+# Maple Sap - Harvested from red maple trees
+id: item_maple_sap
+name: Maple Sap
+description: Sweet, watery sap from a maple tree. Can be boiled down into syrup.
+item_type: consumable
+item_subtype: drink
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Sweet Refreshment
+  duration: 0.0
+  magnitude: 3
+rarity: uncommon
+value: 4
+flags: {}
+keywords:
+  - sap
+  - maple
+  - sweet
+  - drink

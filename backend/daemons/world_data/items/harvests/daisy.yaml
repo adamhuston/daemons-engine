@@ -1,0 +1,20 @@
+# Daisy - Harvested from daisy flowers
+id: item_daisy
+name: Daisy
+description: A simple white flower with a yellow center. Associated with innocence and purity.
+item_type: material
+item_subtype: flower
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - flower
+  - daisy
+  - white

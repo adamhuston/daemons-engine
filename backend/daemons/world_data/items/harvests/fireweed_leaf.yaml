@@ -1,0 +1,26 @@
+# Fireweed Leaf - Harvested from fireweed
+id: item_fireweed_leaf
+name: Fireweed Leaf
+description: Lance-shaped leaves from fireweed. Young leaves are edible and nutritious.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 2
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - leaf
+  - fireweed
+  - greens
+  - food

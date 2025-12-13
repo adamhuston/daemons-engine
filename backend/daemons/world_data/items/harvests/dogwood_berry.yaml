@@ -1,0 +1,20 @@
+# Dogwood Berry - Harvested from dogwood trees
+id: item_dogwood_berry
+name: Dogwood Berry
+description: Small red berries from a dogwood tree. Bitter and best left for the birds.
+item_type: material
+item_subtype: berry
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - berry
+  - dogwood
+  - red

@@ -1,0 +1,21 @@
+# Cottonwood Bark - Harvested from cottonwood trees
+id: item_cottonwood_bark
+name: Cottonwood Bark
+description: Furrowed gray bark from a cottonwood tree. Contains salicin, a natural pain reliever.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - bark
+  - cottonwood
+  - medicinal
+  - material

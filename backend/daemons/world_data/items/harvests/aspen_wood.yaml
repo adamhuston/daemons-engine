@@ -1,0 +1,21 @@
+# Aspen Wood - Harvested from quaking aspen
+id: item_aspen_wood
+name: Aspen Wood
+description: Lightweight, pale wood that doesn't splinter easily. Good for crafting.
+item_type: material
+item_subtype: wood
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.8
+max_stack_size: 10
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - wood
+  - aspen
+  - lumber
+  - material

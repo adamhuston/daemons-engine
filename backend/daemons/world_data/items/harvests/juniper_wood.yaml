@@ -1,0 +1,21 @@
+# Juniper Wood - Harvested from juniper bushes
+id: item_juniper_wood
+name: Juniper Wood
+description: Aromatic, rot-resistant wood with a reddish heartwood. Excellent for carving.
+item_type: material
+item_subtype: wood
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.8
+max_stack_size: 10
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 4
+flags: {}
+keywords:
+  - wood
+  - juniper
+  - aromatic
+  - material

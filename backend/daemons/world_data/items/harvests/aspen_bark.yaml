@@ -1,0 +1,20 @@
+# Aspen Bark - Harvested from quaking aspen
+id: item_aspen_bark
+name: Aspen Bark
+description: Smooth, pale bark with a slightly bitter taste. Known for its medicinal properties.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - bark
+  - aspen
+  - material

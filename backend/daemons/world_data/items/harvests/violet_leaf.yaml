@@ -1,0 +1,26 @@
+# Violet Leaf - Harvested from violets
+id: item_violet_leaf
+name: Violet Leaf
+description: Heart-shaped leaves that are edible and rich in vitamins.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.02
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 1
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - leaf
+  - violet
+  - greens
+  - food

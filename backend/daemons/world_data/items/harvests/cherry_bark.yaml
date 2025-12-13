@@ -1,0 +1,21 @@
+# Cherry Bark - Harvested from black cherry trees
+id: item_cherry_bark
+name: Cherry Bark
+description: Aromatic bark from a cherry tree. Used in herbal medicine for coughs.
+item_type: material
+item_subtype: bark
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 3
+flags: {}
+keywords:
+  - bark
+  - cherry
+  - medicinal
+  - material

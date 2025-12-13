@@ -1,0 +1,21 @@
+# Spruce Needle - Harvested from black spruce trees
+id: item_spruce_needle
+name: Spruce Needle
+description: Short, stiff needles from a spruce tree. Aromatic and medicinal.
+item_type: material
+item_subtype: herb
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - needle
+  - spruce
+  - aromatic
+  - herb

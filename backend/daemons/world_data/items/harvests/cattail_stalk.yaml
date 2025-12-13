@@ -1,0 +1,21 @@
+# Cattail Stalk - Harvested from cattails
+id: item_cattail_stalk
+name: Cattail Stalk
+description: A sturdy stalk from a cattail plant. Useful for weaving and construction.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.2
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - stalk
+  - cattail
+  - weaving
+  - material

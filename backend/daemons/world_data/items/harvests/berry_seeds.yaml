@@ -1,0 +1,20 @@
+# Berry Seeds - Harvested from wild berry bushes
+id: item_berry_seeds
+name: Berry Seeds
+description: Tiny seeds collected from wild berries. Can be planted to grow new berry bushes.
+item_type: material
+item_subtype: seed
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - seed
+  - berry
+  - planting

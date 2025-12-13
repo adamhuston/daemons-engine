@@ -1,0 +1,26 @@
+# Poppy Seed - Harvested from poppies
+id: item_poppy_seed
+name: Poppy Seed
+description: Tiny blue-gray seeds from a poppy. Used in baking and cooking.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.05
+max_stack_size: 99
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 1
+rarity: common
+value: 1
+flags: {}
+keywords:
+  - seed
+  - poppy
+  - food
+  - baking

@@ -1,0 +1,21 @@
+# Elm Wood - Harvested from American elm trees
+id: item_elm_wood
+name: Elm Wood
+description: Strong, interlocking grain wood. Resistant to splitting and good for furniture.
+item_type: material
+item_subtype: wood
+equipment_slot: null
+stat_modifiers: {}
+weight: 1.0
+max_stack_size: 10
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 4
+flags: {}
+keywords:
+  - wood
+  - elm
+  - lumber
+  - material

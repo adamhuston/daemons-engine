@@ -1,0 +1,22 @@
+# Palm Frond - Harvested from palm trees
+id: item_palm_frond
+name: Palm Frond
+description: A large, feathery leaf from a palm tree. Used for thatching and weaving.
+item_type: material
+item_subtype: leaf
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.3
+max_stack_size: 20
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - frond
+  - palm
+  - leaf
+  - tropical
+  - thatch

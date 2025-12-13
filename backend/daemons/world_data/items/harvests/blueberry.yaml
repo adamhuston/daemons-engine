@@ -1,0 +1,26 @@
+# Blueberry - Harvested from blueberry bushes
+id: item_blueberry
+name: Blueberry
+description: Plump, sweet berries with a dusty blue coating. A delicious and nutritious snack.
+item_type: consumable
+item_subtype: food
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: true
+consume_effect:
+  effect_type: hot
+  name: Minor Nourishment
+  duration: 0.0
+  magnitude: 3
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - berry
+  - blueberry
+  - fruit
+  - food

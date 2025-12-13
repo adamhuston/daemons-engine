@@ -1,0 +1,21 @@
+# Reed Fiber - Harvested from swamp reeds
+id: item_reed_fiber
+name: Reed Fiber
+description: Long, flexible fibers from reed stalks. Perfect for basket weaving.
+item_type: material
+item_subtype: fiber
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 50
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: common
+value: 2
+flags: {}
+keywords:
+  - fiber
+  - reed
+  - weaving
+  - material

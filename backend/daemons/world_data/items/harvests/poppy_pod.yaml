@@ -1,0 +1,21 @@
+# Poppy Pod - Harvested from poppies
+id: item_poppy_pod
+name: Poppy Pod
+description: A dried seed pod from a poppy flower. Contains potent alchemical properties.
+item_type: material
+item_subtype: reagent
+equipment_slot: null
+stat_modifiers: {}
+weight: 0.1
+max_stack_size: 30
+has_durability: false
+is_container: false
+is_consumable: false
+rarity: uncommon
+value: 8
+flags: {}
+keywords:
+  - pod
+  - poppy
+  - reagent
+  - alchemy
