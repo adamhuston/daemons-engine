@@ -1,5 +1,7 @@
 # Build Documentation
 
+You might notice that these articles are somewhat dry and lengthy: they are not built with human consumption in mind. Here's why!
+
 ## Purpose
 
 This directory contains **phase design documents** that guide our agentic AI development process. Each document serves as a comprehensive specification that AI coding assistants (like GitHub Copilot, Claude, or ChatGPT) can consume to understand requirements, architecture decisions, and implementation details for a specific feature phase.

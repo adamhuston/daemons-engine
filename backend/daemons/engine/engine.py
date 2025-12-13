@@ -2439,7 +2439,7 @@ class WorldEngine:
         content_type = args.strip().lower() if args and args.strip() else "all"
 
         # Valid content types
-        valid_types = ["all", "items", "npcs", "rooms", "areas", "spawns", "instances"]
+        valid_types = ["all", "items", "npcs", "rooms", "areas", "spawns", "instances", "flora", "fauna"]
 
         if content_type not in valid_types:
             return [
@@ -2489,6 +2489,10 @@ class WorldEngine:
                     result = await reloader.reload_item_instances()
                 elif content_type == "spawns":
                     result = await reloader.reload_npc_spawns()
+                elif content_type == "flora":
+                    result = await reloader.reload_flora_instances()
+                elif content_type == "fauna":
+                    result = await reloader.reload_fauna_instances()
                 else:
                     return [
                         self._msg_to_player(player_id, f"Unknown content type: {content_type}")
@@ -8146,7 +8150,83 @@ class WorldEngine:
 
             await session.commit()
 
-            events = [self._msg_to_player(player_id, result.message)]
+            events: list[Event] = []
+
+            # Add harvested items to player inventory
+            if result.success and result.items_gained:
+                import uuid
+
+                from .inventory import (
+                    InventoryFullError,
+                    add_item_to_inventory,
+                )
+
+                items_added = []
+                for template_id, quantity in result.items_gained:
+                    item_template = world.item_templates.get(template_id)
+                    if not item_template:
+                        logger.warning(
+                            f"Harvest item template not found: {template_id}"
+                        )
+                        continue
+
+                    # Create item instance(s) for the harvested amount
+                    for _ in range(quantity):
+                        new_item_id = str(uuid.uuid4())
+                        new_item = WorldItem(
+                            id=new_item_id,
+                            template_id=template_id,
+                            name=item_template.name,
+                            keywords=list(item_template.keywords),
+                            room_id=None,
+                            player_id=player_id,
+                            container_id=None,
+                            quantity=1,
+                            current_durability=item_template.durability,
+                            equipped_slot=None,
+                            instance_data={},
+                            _description=item_template.description,
+                        )
+                        world.items[new_item_id] = new_item
+
+                        try:
+                            add_item_to_inventory(world, player_id, new_item_id)
+                            items_added.append(item_template.name)
+                        except InventoryFullError:
+                            # Remove the item we just created
+                            del world.items[new_item_id]
+                            events.append(
+                                self._msg_to_player(
+                                    player_id,
+                                    f"Your inventory is full! Some items were lost.",
+                                )
+                            )
+                            break
+
+                # Build a more accurate message based on what was actually added
+                if items_added:
+                    # Count items by name for display
+                    from collections import Counter
+
+                    item_counts = Counter(items_added)
+                    item_strs = [
+                        f"{count}x {name}" if count > 1 else name
+                        for name, count in item_counts.items()
+                    ]
+                    harvest_msg = f"You harvest from the {matched_template.name}. You obtain: {', '.join(item_strs)}."
+                    if result.flora_depleted:
+                        harvest_msg += f" The {matched_template.name} has been exhausted."
+                    events.append(self._msg_to_player(player_id, harvest_msg))
+                else:
+                    events.append(
+                        self._msg_to_player(
+                            player_id,
+                            f"You harvest from the {matched_template.name}. You find nothing useful.",
+                        )
+                    )
+            else:
+                # No items gained or harvest failed
+                events.append(self._msg_to_player(player_id, result.message))
 
             # Broadcast to room
             if result.success:

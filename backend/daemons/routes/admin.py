@@ -3827,6 +3827,8 @@ class ReloadContentType(str, Enum):
     NPCS = "npcs"
     NPC_TEMPLATES = "npc_templates"
     NPC_SPAWNS = "npc_spawns"
+    FLORA_INSTANCES = "flora_instances"
+    FAUNA_INSTANCES = "fauna_instances"
     ALL = "all"
 
 
@@ -4715,8 +4717,302 @@ class ContentReloader:
 
         return result
 
+    async def reload_flora_instances(self) -> ReloadResult:
+        """
+        Seed flora instances for rooms that have none, based on biome compatibility.
+
+        This mirrors the initial seeding logic from load_yaml.py but works at runtime.
+        Only seeds flora in rooms that don't already have any flora.
+        """
+        import random
+        import time
+        import yaml
+
+        from daemons.models import FloraInstance as FloraInstanceModel
+
+        result = ReloadResult(
+            success=True,
+            content_type="flora_instances",
+            items_loaded=0,
+            items_updated=0,
+            items_failed=0,
+        )
+
+        # Load biome definitions
+        biomes_dir = self.world_data_dir / "biomes"
+        biome_defs = {}
+        if biomes_dir.exists():
+            for yaml_file in biomes_dir.glob("**/*.yaml"):
+                if yaml_file.name.startswith("_"):
+                    continue
+                try:
+                    with open(yaml_file, encoding="utf-8") as f:
+                        biome_data = yaml.safe_load(f)
+                    if biome_data and "biome_id" in biome_data:
+                        biome_defs[biome_data["biome_id"]] = biome_data
+                except Exception as e:
+                    result.warnings.append(f"Failed to load biome {yaml_file}: {e}")
+
+        # Load flora templates
+        flora_dir = self.world_data_dir / "flora"
+        flora_templates = {}
+        if flora_dir.exists():
+            for yaml_file in flora_dir.glob("**/*.yaml"):
+                if yaml_file.name.startswith("_"):
+                    continue
+                try:
+                    with open(yaml_file, encoding="utf-8") as f:
+                        flora_data = yaml.safe_load(f)
+                    if flora_data and "id" in flora_data:
+                        flora_templates[flora_data["id"]] = flora_data
+                except Exception as e:
+                    result.warnings.append(f"Failed to load flora template {yaml_file}: {e}")
+
+        if not flora_templates:
+            result.warnings.append("No flora templates found")
+            return result
+
+        # Iterate rooms and seed flora where missing
+        for room_id, room in self.world.rooms.items():
+            # Skip if room already has flora
+            if room.flora:
+                continue
+
+            # Get area for biome info
+            area = self.world.areas.get(room.area_id) if room.area_id else None
+            if not area:
+                continue
+
+            # Get biome and compatibility tags
+            biome = biome_defs.get(area.biome, {})
+            biome_flora_tags = set(biome.get("flora_tags", []))
+            biome_tags = set(biome.get("tags", []))
+
+            if not biome_flora_tags:
+                biome_flora_tags = biome_tags | ({area.biome} if area.biome else set())
+
+            if not biome_flora_tags:
+                continue
+
+            # Find compatible flora templates
+            compatible = []
+            for template_id, template in flora_templates.items():
+                template_tags = set(template.get("biome_tags", []))
+                if not template_tags or template_tags & biome_flora_tags:
+                    rarity = template.get("rarity", "common")
+                    weight = {"common": 1.0, "uncommon": 0.5, "rare": 0.2, "very_rare": 0.05}.get(rarity, 1.0)
+                    compatible.append((template_id, template, weight))
+
+            if not compatible:
+                continue
+
+            # Spawn 1-3 flora types per room
+            num_to_spawn = random.randint(1, min(3, len(compatible)))
+            templates_to_spawn = random.choices(
+                compatible,
+                weights=[c[2] for c in compatible],
+                k=num_to_spawn
+            )
+
+            for template_id, template, _ in templates_to_spawn:
+                cluster_size = template.get("cluster_size", [1, 3])
+                quantity = random.randint(cluster_size[0], cluster_size[1])
+
+                try:
+                    flora_instance = FloraInstanceModel(
+                        template_id=template_id,
+                        room_id=room_id,
+                        quantity=quantity,
+                        spawned_at=time.time(),
+                        is_permanent=True,
+                        is_depleted=False,
+                    )
+                    self.session.add(flora_instance)
+                    await self.session.flush()
+
+                    # Update in-memory world
+                    self.world.flora_instances[flora_instance.id] = (template_id, quantity)
+                    room.flora.add(flora_instance.id)
+
+                    result.items_loaded += 1
+                except Exception as e:
+                    result.errors.append(f"Failed to spawn flora {template_id} in {room_id}: {e}")
+                    result.items_failed += 1
+
+        if result.items_loaded > 0:
+            await self.session.commit()
+
+        if result.items_failed > 0:
+            result.success = False
+
+        return result
+
+    async def reload_fauna_instances(self) -> ReloadResult:
+        """
+        Seed fauna (NPC) instances for rooms that have none, based on biome compatibility.
+
+        This mirrors the initial seeding logic from load_yaml.py but works at runtime.
+        Only seeds fauna in rooms that don't already have any fauna NPCs.
+        """
+        import random
+        import uuid
+        import yaml
+
+        from daemons.models import NpcInstance as NpcInstanceModel
+        from daemons.engine.world import WorldNpc, EntityType
+
+        result = ReloadResult(
+            success=True,
+            content_type="fauna_instances",
+            items_loaded=0,
+            items_updated=0,
+            items_failed=0,
+        )
+
+        # Load biome definitions
+        biomes_dir = self.world_data_dir / "biomes"
+        biome_defs = {}
+        if biomes_dir.exists():
+            for yaml_file in biomes_dir.glob("**/*.yaml"):
+                if yaml_file.name.startswith("_"):
+                    continue
+                try:
+                    with open(yaml_file, encoding="utf-8") as f:
+                        biome_data = yaml.safe_load(f)
+                    if biome_data and "biome_id" in biome_data:
+                        biome_defs[biome_data["biome_id"]] = biome_data
+                except Exception as e:
+                    result.warnings.append(f"Failed to load biome {yaml_file}: {e}")
+
+        # Load fauna templates (NPCs with is_fauna: true)
+        npcs_dir = self.world_data_dir / "npcs"
+        fauna_templates = {}
+        if npcs_dir.exists():
+            for yaml_file in npcs_dir.glob("**/*.yaml"):
+                if yaml_file.name.startswith("_"):
+                    continue
+                try:
+                    with open(yaml_file, encoding="utf-8") as f:
+                        npc_data = yaml.safe_load(f)
+                    if npc_data and npc_data.get("is_fauna"):
+                        fauna_templates[npc_data["id"]] = npc_data
+                except Exception as e:
+                    result.warnings.append(f"Failed to load NPC template {yaml_file}: {e}")
+
+        if not fauna_templates:
+            result.warnings.append("No fauna templates found (NPCs with is_fauna: true)")
+            return result
+
+        # Iterate rooms and seed fauna where missing
+        for room_id, room in self.world.rooms.items():
+            # Check if room already has fauna
+            has_fauna = any(
+                self.world.npcs.get(npc_id) and
+                self.world.npcs[npc_id].template_id in fauna_templates
+                for npc_id in room.entities
+                if npc_id in self.world.npcs
+            )
+            if has_fauna:
+                continue
+
+            # Get area for biome info
+            area = self.world.areas.get(room.area_id) if room.area_id else None
+            if not area:
+                continue
+
+            # Get biome and compatibility tags
+            biome = biome_defs.get(area.biome, {})
+            biome_fauna_tags = set(biome.get("fauna_tags", []))
+            biome_tags = set(biome.get("tags", []))
+
+            if not biome_fauna_tags:
+                biome_fauna_tags = biome_tags | ({area.biome} if area.biome else set())
+
+            if not biome_fauna_tags:
+                continue
+
+            # Find compatible fauna templates
+            compatible = []
+            for template_id, template in fauna_templates.items():
+                fauna_data = template.get("fauna_data", {})
+                template_tags = set(fauna_data.get("biome_tags", []))
+                if not template_tags or template_tags & biome_fauna_tags:
+                    level = template.get("level", 1)
+                    weight = 1.0 / (level * 0.5 + 0.5)
+                    compatible.append((template_id, template, weight))
+
+            if not compatible:
+                continue
+
+            # 50% chance to spawn fauna in room
+            if random.random() >= 0.5:
+                continue
+
+            # Spawn 1-2 fauna types per room
+            num_to_spawn = random.randint(1, min(2, len(compatible)))
+            templates_to_spawn = random.choices(
+                compatible,
+                weights=[c[2] for c in compatible],
+                k=num_to_spawn
+            )
+
+            for template_id, template, _ in templates_to_spawn:
+                max_health = template.get("max_health", 50)
+                instance_id = str(uuid.uuid4())
+
+                try:
+                    # Create database record
+                    npc_instance = NpcInstanceModel(
+                        id=instance_id,
+                        template_id=template_id,
+                        room_id=room_id,
+                        spawn_room_id=room_id,
+                        current_health=max_health,
+                        is_alive=True,
+                        respawn_time=300,  # 5 minute respawn
+                        instance_data={},
+                    )
+                    self.session.add(npc_instance)
+
+                    # Create in-memory WorldNpc
+                    npc_template = self.world.npc_templates.get(template_id)
+                    if npc_template:
+                        world_npc = WorldNpc(
+                            id=instance_id,
+                            entity_type=EntityType.NPC,
+                            template_id=template_id,
+                            name=npc_template.name,
+                            room_id=room_id,
+                            spawn_room_id=room_id,
+                            current_health=max_health,
+                            max_health=npc_template.max_health,
+                            is_alive=True,
+                            respawn_time=300,
+                            instance_data={},
+                            level=npc_template.level,
+                            armor_class=npc_template.armor_class,
+                            strength=npc_template.strength,
+                            dexterity=npc_template.dexterity,
+                            intelligence=npc_template.intelligence,
+                        )
+                        self.world.npcs[instance_id] = world_npc
+                        room.entities.add(instance_id)
+
+                    result.items_loaded += 1
+                except Exception as e:
+                    result.errors.append(f"Failed to spawn fauna {template_id} in {room_id}: {e}")
+                    result.items_failed += 1
+
+        if result.items_loaded > 0:
+            await self.session.commit()
+
+        if result.items_failed > 0:
+            result.success = False
+
+        return result
+
     async def reload_all(self, force: bool = False) -> dict:
-        """Reload all content types including instances."""
+        """Reload all content types including instances, flora, and fauna."""
         results = {
             "areas": await self.reload_areas(),
             "rooms": await self.reload_rooms(force=force),
@@ -4724,6 +5020,8 @@ class ContentReloader:
             "npc_templates": await self.reload_npc_templates(),
             "item_instances": await self.reload_item_instances(),
             "npc_spawns": await self.reload_npc_spawns(),
+            "flora_instances": await self.reload_flora_instances(),
+            "fauna_instances": await self.reload_fauna_instances(),
         }
 
         overall_success = all(r.success for r in results.values())
