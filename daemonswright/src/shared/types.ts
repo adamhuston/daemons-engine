@@ -93,6 +93,14 @@ export type ContentType =
   | 'rooms'
   | 'triggers';
 
+// Door state for exits (matches backend DoorState dataclass)
+export interface DoorState {
+  is_open: boolean; // Whether the door is open (passable)
+  is_locked: boolean; // Whether the door requires unlocking
+  key_item_id?: string; // Item template ID that can unlock this door
+  door_name?: string; // Custom display name (e.g., "iron gate", "wooden door")
+}
+
 // Room builder types
 export interface RoomNode {
   id: string;
@@ -103,6 +111,7 @@ export interface RoomNode {
   area_id?: string;
   z_level: number;
   exits: Record<string, string>;
+  doors?: Record<string, DoorState>; // Door states keyed by exit direction
   position: { x: number; y: number };
   filePath?: string; // Original file path where the room was loaded from
 }
@@ -114,6 +123,7 @@ export interface RoomConnection {
   sourceHandle: string; // direction (north, south, etc.)
   targetHandle: string;
   bidirectional?: boolean; // true if both rooms have exits to each other
+  door?: DoorState; // Door state on the source exit (if any)
 }
 
 // NPC Spawn types - represents an NPC placed in a room

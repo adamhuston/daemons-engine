@@ -111,6 +111,7 @@ function App() {
     removeConnection,
     removeExit,
     createArea,
+    updateDoor,
   } = useRoomBuilder(worldDataPath);
 
   // Room contents (NPCs and items) - only load when in room builder view
@@ -366,12 +367,15 @@ function App() {
                     onRemoveExit={async (roomId, direction) => {
                       await removeExit(roomId, direction);
                     }}
+                    onUpdateDoor={updateDoor}
                     isDirty={roomIsDirty}
                     onDirtyChange={setRoomIsDirty}
                     roomTypeOptions={roomOptions.room_type || []}
                     onAddRoomType={async (newType) => {
                       return await addOption('room', 'room_type', newType);
                     }}
+                    // All rooms for cross-area connections
+                    allRooms={rooms}
                     // NPC content
                     npcSpawns={npcSpawns}
                     npcTemplates={npcTemplates}

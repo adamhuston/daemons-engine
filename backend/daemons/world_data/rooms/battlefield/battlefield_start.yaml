@@ -1,0 +1,8 @@
+id: battlefield_start
+area_id: area_battlefield
+name: Battlefield - Start
+description: The starting point of Battlefield.
+room_type: outdoor
+z_level: 0
+exits:
+  west: battlefield_room_1765678986544

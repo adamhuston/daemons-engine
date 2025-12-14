@@ -24,6 +24,8 @@ import {
   InputNumber,
   Space,
   Popconfirm,
+  Switch,
+  Tooltip,
 } from 'antd';
 import {
   SaveOutlined,
@@ -34,8 +36,10 @@ import {
   CompassOutlined,
   EditOutlined,
   SearchOutlined,
+  LockOutlined,
+  UnlockOutlined,
 } from '@ant-design/icons';
-import type { RoomNode, NpcSpawn, ItemInstance } from '../../../shared/types';
+import type { RoomNode, NpcSpawn, ItemInstance, DoorState } from '../../../shared/types';
 import { AddableSelect } from '../AddableSelect';
 
 const { TextArea } = Input;
@@ -117,11 +121,14 @@ interface RoomPropertiesPanelProps {
   onExitClick: (exitDirection: string, targetRoomId: string) => void;
   onAddExit: (roomId: string, direction: string, targetRoomId: string) => void;
   onRemoveExit: (roomId: string, direction: string) => void;
+  onUpdateDoor?: (roomId: string, direction: string, doorState: DoorState | null) => Promise<boolean>;
   isLoading?: boolean;
   isDirty?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
   roomTypeOptions?: string[];
   onAddRoomType?: (newType: string) => Promise<boolean>;
+  // All rooms in the world for cross-area connections
+  allRooms?: RoomNode[];
   // NPC management
   npcSpawns?: NpcSpawn[];
   npcTemplates?: NpcTemplate[];
@@ -145,11 +152,13 @@ export function RoomPropertiesPanel({
   onExitClick,
   onAddExit,
   onRemoveExit,
+  onUpdateDoor,
   isLoading = false,
   isDirty = false,
   onDirtyChange,
   roomTypeOptions = [],
   onAddRoomType,
+  allRooms = [],
   // NPC props
   npcSpawns = [],
   npcTemplates = [],
@@ -172,10 +181,19 @@ export function RoomPropertiesPanel({
   // Modal states
   const [addNpcModalOpen, setAddNpcModalOpen] = useState(false);
   const [addItemModalOpen, setAddItemModalOpen] = useState(false);
+  const [addExitModalOpen, setAddExitModalOpen] = useState(false);
   const [npcSearchQuery, setNpcSearchQuery] = useState('');
   const [itemSearchQuery, setItemSearchQuery] = useState('');
+  const [exitSearchQuery, setExitSearchQuery] = useState('');
   const [selectedNpcTemplate, setSelectedNpcTemplate] = useState<string | null>(null);
   const [selectedItemTemplate, setSelectedItemTemplate] = useState<string | null>(null);
+  const [selectedExitDirection, setSelectedExitDirection] = useState<string>('north');
+  const [selectedTargetRoom, setSelectedTargetRoom] = useState<string | null>(null);
+  
+  // Door editing modal state
+  const [doorModalOpen, setDoorModalOpen] = useState(false);
+  const [editingDoorDirection, setEditingDoorDirection] = useState<string | null>(null);
+  const [doorForm] = Form.useForm();
   
   // Add NPC/Item forms
   const [addNpcForm] = Form.useForm();
@@ -273,6 +291,44 @@ export function RoomPropertiesPanel({
     }
   }, [selectedRoom, selectedItemTemplate, onAddItemInstance, addItemForm]);
 
+  // Handle opening door edit modal
+  const handleEditDoor = useCallback((direction: string, currentDoor: DoorState | null) => {
+    setEditingDoorDirection(direction);
+    doorForm.setFieldsValue({
+      has_door: currentDoor !== null,
+      is_open: currentDoor?.is_open ?? true,
+      is_locked: currentDoor?.is_locked ?? false,
+      key_item_id: currentDoor?.key_item_id ?? '',
+      door_name: currentDoor?.door_name ?? '',
+    });
+    setDoorModalOpen(true);
+  }, [doorForm]);
+
+  // Handle saving door changes
+  const handleSaveDoor = useCallback(async () => {
+    if (!selectedRoom || !editingDoorDirection || !onUpdateDoor) return;
+
+    const values = doorForm.getFieldsValue();
+    
+    if (!values.has_door) {
+      // Remove the door
+      await onUpdateDoor(selectedRoom.id, editingDoorDirection, null);
+    } else {
+      // Create or update the door
+      const doorState: DoorState = {
+        is_open: values.is_open,
+        is_locked: values.is_locked,
+        key_item_id: values.key_item_id || undefined,
+        door_name: values.door_name || undefined,
+      };
+      await onUpdateDoor(selectedRoom.id, editingDoorDirection, doorState);
+    }
+
+    setDoorModalOpen(false);
+    setEditingDoorDirection(null);
+    doorForm.resetFields();
+  }, [selectedRoom, editingDoorDirection, onUpdateDoor, doorForm]);
+
   // Filter templates by search query
   const filteredNpcTemplates = npcTemplates.filter(
     (t) =>
@@ -286,6 +342,47 @@ export function RoomPropertiesPanel({
       t.id.toLowerCase().includes(itemSearchQuery.toLowerCase())
   );
 
+  // Filter rooms for exit selection (exclude current room)
+  // Group by area for easier navigation
+  const filteredRooms = allRooms.filter(
+    (r) =>
+      r.id !== selectedRoom?.id && // Exclude current room
+      (r.name.toLowerCase().includes(exitSearchQuery.toLowerCase()) ||
+       r.id.toLowerCase().includes(exitSearchQuery.toLowerCase()) ||
+       (r.area_id && r.area_id.toLowerCase().includes(exitSearchQuery.toLowerCase())))
+  );
+
+  // Group filtered rooms by area for display
+  const roomsByArea = filteredRooms.reduce<Record<string, typeof filteredRooms>>((acc, room) => {
+    const areaId = room.area_id || 'Unknown Area';
+    if (!acc[areaId]) {
+      acc[areaId] = [];
+    }
+    acc[areaId].push(room);
+    return acc;
+  }, {});
+
+  // Available exit directions (excluding ones already used)
+  const usedDirections = selectedRoom ? Object.keys(selectedRoom.exits || {}) : [];
+  const availableDirections = ['north', 'south', 'east', 'west', 'up', 'down'].filter(
+    (dir) => !usedDirections.includes(dir)
+  );
+
+  // Handle adding exit
+  const handleAddExit = useCallback(() => {
+    if (!selectedRoom || !selectedTargetRoom || !selectedExitDirection) return;
+    
+    onAddExit(selectedRoom.id, selectedExitDirection, selectedTargetRoom);
+    setAddExitModalOpen(false);
+    setSelectedTargetRoom(null);
+    setExitSearchQuery('');
+    // Reset to first available direction for next time
+    const newAvailable = ['north', 'south', 'east', 'west', 'up', 'down'].filter(
+      (dir) => !Object.keys(selectedRoom.exits || {}).includes(dir) && dir !== selectedExitDirection
+    );
+    setSelectedExitDirection(newAvailable[0] || 'north');
+  }, [selectedRoom, selectedTargetRoom, selectedExitDirection, onAddExit]);
+
   // If no room is selected, show empty state
   if (!selectedRoom) {
     return (
@@ -298,10 +395,11 @@ export function RoomPropertiesPanel({
     );
   }
 
-  // Get exits as an array for display
+  // Get exits as an array for display, including door state
   const exits = Object.entries(selectedRoom.exits || {}).map(([direction, target]) => ({
     direction,
     target,
+    door: selectedRoom.doors?.[direction] || null,
   }));
 
   // Count badges for tabs
@@ -644,6 +742,15 @@ export function RoomPropertiesPanel({
                           <List.Item
                             className="exit-item"
                             actions={[
+                              <Tooltip key="door" title="Configure door">
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={exit.door ? (exit.door.is_locked ? <LockOutlined /> : <UnlockOutlined />) : <PlusOutlined />}
+                                  onClick={() => handleEditDoor(exit.direction, exit.door)}
+                                  style={{ color: exit.door ? (exit.door.is_locked ? '#faad14' : '#52c41a') : undefined }}
+                                />
+                              </Tooltip>,
                               <Popconfirm
                                 key="delete"
                                 title="Remove this exit?"
@@ -663,12 +770,20 @@ export function RoomPropertiesPanel({
                             <div
                               className="exit-info"
                               onClick={() => onExitClick(exit.direction, exit.target)}
-                              style={{ cursor: 'pointer' }}
+                              style={{ cursor: 'pointer', flex: 1 }}
                             >
-                              <Tag color={exit.direction === 'up' || exit.direction === 'down' ? 'gold' : 'green'}>
-                                {exit.direction}
-                              </Tag>
-                              <Text ellipsis style={{ maxWidth: 120 }}>
+                              <Space size={4}>
+                                <Tag color={exit.direction === 'up' || exit.direction === 'down' ? 'gold' : 'green'}>
+                                  {exit.direction}
+                                </Tag>
+                                {exit.door && (
+                                  <Tag color={exit.door.is_locked ? 'orange' : (exit.door.is_open ? 'default' : 'blue')}>
+                                    {exit.door.door_name || 'door'}
+                                    {exit.door.is_locked ? ' 🔒' : (!exit.door.is_open ? ' [closed]' : '')}
+                                  </Tag>
+                                )}
+                              </Space>
+                              <Text ellipsis style={{ maxWidth: 100, marginLeft: 4 }}>
                                 → {exit.target}
                               </Text>
                             </div>
@@ -688,16 +803,25 @@ export function RoomPropertiesPanel({
                     <Button
                       icon={<PlusOutlined />}
                       onClick={() => {
-                        // TODO: Open add exit modal
-                        console.log('Add exit');
+                        // Set initial direction to first available
+                        if (availableDirections.length > 0) {
+                          setSelectedExitDirection(availableDirections[0]);
+                        }
+                        setAddExitModalOpen(true);
                       }}
                       block
+                      disabled={availableDirections.length === 0}
                     >
                       Add Exit
                     </Button>
+                    {availableDirections.length === 0 && (
+                      <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+                        All exit directions are in use
+                      </Text>
+                    )}
 
                     <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
-                      Tip: Drag from room edge to create exits visually
+                      Tip: Drag from room edge to create exits visually, or use Add Exit for cross-area connections
                     </Text>
                   </div>
                 ),
@@ -872,6 +996,208 @@ export function RoomPropertiesPanel({
                 />
               </Form.Item>
             </Form>
+          </Modal>
+
+          {/* Add Exit Modal */}
+          <Modal
+            title="Add Exit to Another Room"
+            open={addExitModalOpen}
+            onCancel={() => {
+              setAddExitModalOpen(false);
+              setSelectedTargetRoom(null);
+              setExitSearchQuery('');
+            }}
+            onOk={handleAddExit}
+            okText="Create Exit"
+            okButtonProps={{ disabled: !selectedTargetRoom || !selectedExitDirection }}
+            width={500}
+          >
+            <Form layout="vertical" size="small">
+              <Form.Item label="Exit Direction" required>
+                <Select
+                  value={selectedExitDirection}
+                  onChange={setSelectedExitDirection}
+                  options={availableDirections.map((dir) => ({
+                    value: dir,
+                    label: dir.charAt(0).toUpperCase() + dir.slice(1),
+                  }))}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            </Form>
+
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>Target Room</Text>
+            <Input
+              placeholder="Search rooms by name, ID, or area..."
+              prefix={<SearchOutlined />}
+              value={exitSearchQuery}
+              onChange={(e) => setExitSearchQuery(e.target.value)}
+              style={{ marginBottom: 12 }}
+            />
+
+            <div
+              style={{
+                maxHeight: 300,
+                overflowY: 'auto',
+                border: '1px solid #d9d9d9',
+                borderRadius: 4,
+                marginBottom: 16,
+              }}
+            >
+              {Object.keys(roomsByArea).length > 0 ? (
+                Object.entries(roomsByArea).map(([areaId, areaRooms]) => (
+                  <div key={areaId}>
+                    <div
+                      style={{
+                        padding: '8px 12px',
+                        background: '#fafafa',
+                        borderBottom: '1px solid #d9d9d9',
+                        fontWeight: 600,
+                        fontSize: 12,
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 1,
+                      }}
+                    >
+                      <CompassOutlined style={{ marginRight: 6 }} />
+                      {areaId}
+                      {areaId !== selectedRoom?.area_id && (
+                        <Tag color="blue" style={{ marginLeft: 8, fontSize: 10 }}>
+                          Cross-Area
+                        </Tag>
+                      )}
+                    </div>
+                    <List
+                      size="small"
+                      dataSource={areaRooms}
+                      renderItem={(room) => (
+                        <List.Item
+                          onClick={() => setSelectedTargetRoom(room.id)}
+                          style={{
+                            cursor: 'pointer',
+                            backgroundColor:
+                              selectedTargetRoom === room.id ? '#e6f7ff' : 'transparent',
+                            padding: '8px 12px 8px 24px',
+                          }}
+                        >
+                          <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                            <Text strong>{room.name}</Text>
+                            <Text type="secondary" style={{ fontSize: 11 }}>
+                              {room.id} • z:{room.z_level}
+                            </Text>
+                          </Space>
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                ))
+              ) : (
+                <Empty
+                  description={exitSearchQuery ? 'No rooms match your search' : 'No other rooms available'}
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  style={{ margin: 16 }}
+                />
+              )}
+            </div>
+
+            {selectedTargetRoom && (
+              <div style={{ padding: '8px 12px', background: '#f6ffed', borderRadius: 4, marginBottom: 8 }}>
+                <Text>
+                  <strong>Preview:</strong> Exit {selectedExitDirection} → {selectedTargetRoom}
+                </Text>
+              </div>
+            )}
+
+            <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+              <strong>Tip:</strong> Use this to connect rooms across different areas (e.g., dungeon entrance from forest).
+              The exit will be one-way; you'll need to create a return exit from the target room.
+            </Text>
+          </Modal>
+
+          {/* Door Edit Modal */}
+          <Modal
+            title={`Configure Door - ${editingDoorDirection || ''} exit`}
+            open={doorModalOpen}
+            onCancel={() => {
+              setDoorModalOpen(false);
+              setEditingDoorDirection(null);
+              doorForm.resetFields();
+            }}
+            onOk={handleSaveDoor}
+            okText="Save"
+            okButtonProps={{ disabled: !onUpdateDoor }}
+          >
+            <Form form={doorForm} layout="vertical" size="small">
+              <Form.Item
+                name="has_door"
+                valuePropName="checked"
+                label="Has Door"
+              >
+                <Switch
+                  checkedChildren="Yes"
+                  unCheckedChildren="No"
+                />
+              </Form.Item>
+
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.has_door !== cur.has_door}>
+                {({ getFieldValue }) =>
+                  getFieldValue('has_door') && (
+                    <>
+                      <Form.Item
+                        name="door_name"
+                        label="Door Name"
+                        tooltip="Custom name like 'iron gate', 'wooden door', etc."
+                      >
+                        <Input placeholder="e.g., iron gate, wooden door" />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="is_open"
+                        valuePropName="checked"
+                        label="Open"
+                        tooltip="An open door allows passage. A closed door blocks movement."
+                      >
+                        <Switch
+                          checkedChildren="Open"
+                          unCheckedChildren="Closed"
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="is_locked"
+                        valuePropName="checked"
+                        label="Locked"
+                        tooltip="A locked door must be unlocked (with a key or trigger) before it can be opened."
+                      >
+                        <Switch
+                          checkedChildren="Locked"
+                          unCheckedChildren="Unlocked"
+                        />
+                      </Form.Item>
+
+                      <Form.Item noStyle shouldUpdate={(prev, cur) => prev.is_locked !== cur.is_locked}>
+                        {({ getFieldValue: getVal }) =>
+                          getVal('is_locked') && (
+                            <Form.Item
+                              name="key_item_id"
+                              label="Key Item ID"
+                              tooltip="The item template ID that can unlock this door (e.g., 'item_rusty_key')"
+                            >
+                              <Input placeholder="e.g., item_rusty_key" />
+                            </Form.Item>
+                          )
+                        }
+                      </Form.Item>
+                    </>
+                  )
+                }
+              </Form.Item>
+            </Form>
+
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 12 }}>
+              <strong>Tip:</strong> Doors are visible exits that can be opened/closed/locked.
+              Use hidden exits for secret passages that need to be discovered.
+            </Text>
           </Modal>
         </>
       )}

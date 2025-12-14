@@ -333,9 +333,10 @@ function RoomNode({ data, selected, xPos, yPos }: NodeProps<RoomNodeData>) {
   );
 
   // Only show tooltip for active (interactive) nodes
+  // Use "top" placement to avoid blocking east exit handle
   if (isActive && data.description) {
     return (
-      <Tooltip title={data.description} placement="right">
+      <Tooltip title={data.description} placement="top">
         {nodeContent}
       </Tooltip>
     );

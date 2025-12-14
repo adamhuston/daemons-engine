@@ -1,0 +1,13 @@
+id: battlefield_room_1765678986544
+name: The base of the watchtower
+description: ''
+room_type: chamber
+area_id: area_battlefield
+z_level: 0
+exits:
+  east: battlefield_start
+doors:
+  east:
+    is_open: true
+    is_locked: true
+    door_name: iron gate

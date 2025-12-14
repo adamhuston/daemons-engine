@@ -1,0 +1,22 @@
+id: area_battlefield
+name: Battlefield
+description: Battlefield area.
+time_scale: 1
+starting_day: 1
+starting_hour: 6
+starting_minute: 0
+biome: outdoor
+climate: temperate
+ambient_lighting: natural
+weather_profile: standard
+danger_level: 1
+magic_intensity: normal
+default_respawn_time: 300
+recommended_level: 1
+theme: exploration
+area_flags:
+  safe_zone: false
+  pvp_enabled: false
+  magic_enhanced: false
+entry_points:
+  - battlefield_start

@@ -8,7 +8,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import yaml from 'js-yaml';
-import type { RoomNode, RoomConnection } from '../../shared/types';
+import type { RoomNode, RoomConnection, DoorState } from '../../shared/types';
 import { useLayout, type RoomPosition, type AreaLayout } from './useLayout';
 
 // Grid size constant - must match RoomBuilder component
@@ -22,6 +22,7 @@ interface RoomYaml {
   room_type?: string;
   z_level?: number;
   exits?: Record<string, string>;
+  doors?: Record<string, DoorState>; // Door states keyed by exit direction
 }
 
 interface UseRoomBuilderResult {
@@ -39,6 +40,8 @@ interface UseRoomBuilderResult {
   removeConnection: (connectionId: string) => Promise<boolean>;
   removeExit: (roomId: string, direction: string) => Promise<boolean>;
   createArea: (areaId: string, displayName: string) => Promise<boolean>;
+  // Door management
+  updateDoor: (roomId: string, direction: string, doorState: DoorState | null) => Promise<boolean>;
 }
 
 // Direction to offset mapping for positioning exits
@@ -159,6 +162,7 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
               area_id: parsed.area_id,
               z_level: zLevel,
               exits: parsed.exits || {},
+              doors: parsed.doors, // Load door states from YAML
               position: { x: 0, y: 0 }, // Will be calculated
               filePath, // Store the original file path
             });
@@ -881,6 +885,88 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
     }
   }, [rooms, getRoomFilePath]);
 
+  // Update or remove a door on an exit
+  const updateDoor = useCallback(async (
+    roomId: string,
+    direction: string,
+    doorState: DoorState | null
+  ): Promise<boolean> => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (!room) {
+      console.error('Room not found:', roomId);
+      return false;
+    }
+
+    // Verify the exit exists
+    if (!room.exits || !room.exits[direction]) {
+      console.error('Exit not found for direction:', direction);
+      return false;
+    }
+
+    const filePath = getRoomFilePath(room);
+    if (!filePath) {
+      console.error('Could not get file path for room:', roomId);
+      return false;
+    }
+
+    try {
+      // Read current file content
+      const content = await window.daemonswright.fs.readFile(filePath);
+      const parsed = yaml.load(content) as RoomYaml;
+
+      // Update doors
+      if (doorState === null) {
+        // Remove the door
+        if (parsed.doors) {
+          delete parsed.doors[direction];
+          // Remove doors object if empty
+          if (Object.keys(parsed.doors).length === 0) {
+            delete parsed.doors;
+          }
+        }
+      } else {
+        // Add or update the door
+        if (!parsed.doors) {
+          parsed.doors = {};
+        }
+        parsed.doors[direction] = doorState;
+      }
+
+      // Write back to file
+      const newContent = yaml.dump(parsed, {
+        indent: 2,
+        lineWidth: 120,
+        noRefs: true,
+      });
+
+      await window.daemonswright.fs.writeFile(filePath, newContent);
+
+      // Update local state
+      setRooms((prev) =>
+        prev.map((r) => {
+          if (r.id === roomId) {
+            const newDoors = { ...(r.doors || {}) };
+            if (doorState === null) {
+              delete newDoors[direction];
+            } else {
+              newDoors[direction] = doorState;
+            }
+            return {
+              ...r,
+              doors: Object.keys(newDoors).length > 0 ? newDoors : undefined,
+            };
+          }
+          return r;
+        })
+      );
+
+      return true;
+    } catch (err) {
+      console.error('Failed to update door:', err);
+      return false;
+    }
+  }, [rooms, getRoomFilePath]);
+
   // Compute unique z-levels from rooms
   const zLevels = useMemo(() => {
     const levels = new Set(rooms.map((r) => r.z_level));
@@ -902,6 +988,7 @@ export function useRoomBuilder(worldDataPath: string | null): UseRoomBuilderResu
     removeConnection,
     removeExit,
     createArea,
+    updateDoor,
   };
 }
 
