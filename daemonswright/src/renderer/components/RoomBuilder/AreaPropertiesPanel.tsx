@@ -126,7 +126,9 @@ interface AreaFormData {
 
 interface AreaPropertiesPanelProps {
   selectedArea: Area | null;
+  selectedAreaId?: string | null; // The area ID from the dropdown (may not have full Area data yet)
   onSave: (areaId: string, updates: Partial<Area>) => Promise<void>;
+  onCreate?: (areaData: Partial<Area>) => Promise<boolean>; // Create new area when only ID exists
   onDelete?: (areaId: string) => Promise<void>;
   isLoading?: boolean;
   isDirty?: boolean;
@@ -144,7 +146,9 @@ interface AreaPropertiesPanelProps {
 
 export function AreaPropertiesPanel({
   selectedArea,
+  selectedAreaId,
   onSave,
+  onCreate,
   onDelete,
   isLoading = false,
   isDirty = false,
@@ -161,6 +165,9 @@ export function AreaPropertiesPanel({
   const [entryPoints, setEntryPoints] = useState<string[]>([]);
   const [timePhases, setTimePhases] = useState<TimePhase[]>([]);
   const [editingPhaseIndex, setEditingPhaseIndex] = useState<number | null>(null);
+
+  // Determine which area ID we're working with
+  const effectiveAreaId = selectedArea?.id || selectedAreaId;
 
   // Update form when selected area changes
   useEffect(() => {
@@ -181,35 +188,71 @@ export function AreaPropertiesPanel({
         starting_hour: selectedArea.starting_hour ?? 0,
         starting_minute: selectedArea.starting_minute ?? 0,
       });
-      setEntryPoints(selectedArea.entry_points || []);
-      setTimePhases(selectedArea.time_phases || DEFAULT_TIME_PHASES);
+      setEntryPoints(Array.isArray(selectedArea.entry_points) ? selectedArea.entry_points : []);
+      // Ensure time_phases is always an array
+      const phases = selectedArea.time_phases;
+      setTimePhases(Array.isArray(phases) ? phases : DEFAULT_TIME_PHASES);
       // Reset dirty state when switching areas
       onDirtyChange?.(false);
+    } else if (selectedAreaId) {
+      // We have an area ID but no full data - set defaults for creating
+      const displayName = selectedAreaId.replace('area_', '').replace(/_/g, ' ');
+      form.setFieldsValue({
+        name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
+        description: '',
+        biome: 'mystical',
+        climate: 'temperate',
+        ambient_lighting: 'dim',
+        weather_profile: '',
+        danger_level: 1,
+        magic_intensity: 'moderate',
+        ambient_sound: '',
+        default_respawn_time: 300,
+        time_scale: 1.0,
+        starting_day: 1,
+        starting_hour: 0,
+        starting_minute: 0,
+      });
+      setEntryPoints([]);
+      setTimePhases(DEFAULT_TIME_PHASES);
+      onDirtyChange?.(true); // Mark as dirty since this is new
     }
-  }, [selectedArea, form, onDirtyChange]);
+  }, [selectedArea, selectedAreaId, form, onDirtyChange]);
 
   // Track form changes to update dirty state
   const handleValuesChange = useCallback(() => {
     onDirtyChange?.(true);
   }, [onDirtyChange]);
 
-  // Handle form save
+  // Handle form save (for existing areas)
   const handleSave = useCallback(async () => {
-    if (!selectedArea) return;
+    if (!effectiveAreaId) return;
 
     try {
       setSaving(true);
       const values = form.getFieldsValue();
-      await onSave(selectedArea.id, {
-        ...values,
-        entry_points: entryPoints,
-        time_phases: timePhases,
-      });
+      
+      if (selectedArea) {
+        // Update existing area
+        await onSave(selectedArea.id, {
+          ...values,
+          entry_points: entryPoints,
+          time_phases: timePhases,
+        });
+      } else if (onCreate && selectedAreaId) {
+        // Create new area from ID
+        await onCreate({
+          id: selectedAreaId,
+          ...values,
+          entry_points: entryPoints,
+          time_phases: timePhases,
+        });
+      }
       onDirtyChange?.(false);
     } finally {
       setSaving(false);
     }
-  }, [selectedArea, form, onSave, onDirtyChange, entryPoints, timePhases]);
+  }, [effectiveAreaId, selectedArea, selectedAreaId, form, onSave, onCreate, onDirtyChange, entryPoints, timePhases]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -238,8 +281,8 @@ export function AreaPropertiesPanel({
     });
   }, [onDirtyChange]);
 
-  // If no area is selected, show empty state
-  if (!selectedArea) {
+  // If no area is selected (neither full Area nor areaId), show empty state
+  if (!effectiveAreaId) {
     return (
       <div className="area-properties-panel empty" style={{ padding: 24, textAlign: 'center' }}>
         <Empty
@@ -251,7 +294,12 @@ export function AreaPropertiesPanel({
   }
 
   // Get biome color for display
-  const biomeColor = BIOME_OPTIONS.find(b => b.value === selectedArea.biome)?.color || '#595959';
+  const currentBiome = selectedArea?.biome || form.getFieldValue('biome') || 'mystical';
+  const biomeColor = BIOME_OPTIONS.find(b => b.value === currentBiome)?.color || '#595959';
+  
+  // Display name
+  const displayName = selectedArea?.name || effectiveAreaId.replace('area_', '').replace(/_/g, ' ');
+  const isNewArea = !selectedArea && !!selectedAreaId;
 
   const tabItems = [
     {
@@ -508,7 +556,7 @@ export function AreaPropertiesPanel({
           </div>
 
           <Collapse size="small" accordion>
-            {timePhases.map((phase, index) => (
+            {(Array.isArray(timePhases) ? timePhases : DEFAULT_TIME_PHASES).map((phase, index) => (
               <Panel
                 key={phase.name}
                 header={
@@ -517,7 +565,7 @@ export function AreaPropertiesPanel({
                       {phase.name}
                     </Text>
                     {phase.lighting && (
-                      <Tag size="small">{phase.lighting}</Tag>
+                      <Tag style={{ fontSize: 11 }}>{phase.lighting}</Tag>
                     )}
                   </Space>
                 }
@@ -588,13 +636,18 @@ export function AreaPropertiesPanel({
           }}
         />
         <div style={{ flex: 1 }}>
-          <Title level={5} style={{ margin: 0 }}>
-            {selectedArea.name}
+          <Title level={5} style={{ margin: 0, textTransform: 'capitalize' }}>
+            {displayName}
           </Title>
           <Text type="secondary" style={{ fontSize: 11 }}>
-            {selectedArea.id}
+            {effectiveAreaId}
           </Text>
         </div>
+        {isNewArea && (
+          <Tag color="blue" style={{ margin: 0 }}>
+            New
+          </Tag>
+        )}
         {isDirty && (
           <Tag color="orange" style={{ margin: 0 }}>
             Unsaved

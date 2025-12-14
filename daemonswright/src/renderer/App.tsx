@@ -451,11 +451,19 @@ function App() {
                     ) : (
                       <AreaPropertiesPanel
                         selectedArea={selectedArea}
+                        selectedAreaId={selectedAreaId}
                         onSave={async (areaId, updates) => {
                           const success = await updateArea(areaId, updates);
                           if (success) {
                             setAreaIsDirty(false);
                           }
+                        }}
+                        onCreate={async (areaData) => {
+                          const success = await createAreaData(areaData);
+                          if (success) {
+                            setAreaIsDirty(false);
+                          }
+                          return success;
                         }}
                         onDelete={async (areaId) => {
                           const success = await deleteArea(areaId);
