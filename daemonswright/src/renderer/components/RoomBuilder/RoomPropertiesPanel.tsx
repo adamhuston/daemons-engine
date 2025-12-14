@@ -1039,9 +1039,10 @@ export function RoomPropertiesPanel({
               style={{
                 maxHeight: 300,
                 overflowY: 'auto',
-                border: '1px solid #d9d9d9',
+                border: '1px solid var(--color-border, #424242)',
                 borderRadius: 4,
                 marginBottom: 16,
+                background: 'var(--color-bg-primary, #141414)',
               }}
             >
               {Object.keys(roomsByArea).length > 0 ? (
@@ -1050,13 +1051,14 @@ export function RoomPropertiesPanel({
                     <div
                       style={{
                         padding: '8px 12px',
-                        background: '#fafafa',
-                        borderBottom: '1px solid #d9d9d9',
+                        background: 'var(--color-bg-secondary, #1f1f1f)',
+                        borderBottom: '1px solid var(--color-border, #424242)',
                         fontWeight: 600,
                         fontSize: 12,
                         position: 'sticky',
                         top: 0,
                         zIndex: 1,
+                        color: 'var(--color-text, #e0e0e0)',
                       }}
                     >
                       <CompassOutlined style={{ marginRight: 6 }} />
@@ -1076,7 +1078,7 @@ export function RoomPropertiesPanel({
                           style={{
                             cursor: 'pointer',
                             backgroundColor:
-                              selectedTargetRoom === room.id ? '#e6f7ff' : 'transparent',
+                              selectedTargetRoom === room.id ? 'var(--color-bg-selected, #177ddc33)' : 'transparent',
                             padding: '8px 12px 8px 24px',
                           }}
                         >
@@ -1101,7 +1103,7 @@ export function RoomPropertiesPanel({
             </div>
 
             {selectedTargetRoom && (
-              <div style={{ padding: '8px 12px', background: '#f6ffed', borderRadius: 4, marginBottom: 8 }}>
+              <div style={{ padding: '8px 12px', background: 'var(--color-bg-success, #162312)', borderRadius: 4, marginBottom: 8 }}>
                 <Text>
                   <strong>Preview:</strong> Exit {selectedExitDirection} → {selectedTargetRoom}
                 </Text>

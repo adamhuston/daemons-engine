@@ -1,12 +1,20 @@
 version: 1
 grid_size: 150
 rooms:
+  battlefield_room_1765678986544:
+    x: -1
+    'y': 0
+    z: 0
   battlefield_start:
     x: 0
     'y': 0
     z: 0
-  battlefield_room_1765678986544:
-    x: -1
+  battlefield_room_1765682196543:
+    x: 1
+    'y': 0
+    z: 0
+  battlefield_room_1765682232115:
+    x: 2
     'y': 0
     z: 0
 layer_names: {}

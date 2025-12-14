@@ -77,6 +77,8 @@ interface RoomBuilderProps {
   onConnectionUpdate?: (oldConnectionId: string, newSource: string, newTarget: string, direction: string) => Promise<boolean>;
   onRemoveExit: (roomId: string, direction: string) => Promise<boolean>;
   onAreaCreate: (areaId: string, displayName: string) => Promise<boolean>;
+  // Callback when area selection changes
+  onAreaSelect?: (areaId: string | null) => void;
   // Schema options for room types
   roomTypeOptions?: string[];
   onAddRoomType?: (newType: string) => Promise<boolean>;
@@ -105,6 +107,7 @@ export function RoomBuilder({
   onConnectionUpdate,
   onRemoveExit,
   onAreaCreate,
+  onAreaSelect,
   roomTypeOptions = [],
   onAddRoomType,
   roomContentCounts = {},
@@ -764,12 +767,18 @@ export function RoomBuilder({
     setCreateModalOpen(true);
   }, [selectedArea, activeLayer, createForm]);
 
+  // Handle area selection change and notify parent
+  const handleAreaChange = useCallback((areaId: string | null) => {
+    setSelectedArea(areaId);
+    onAreaSelect?.(areaId);
+  }, [onAreaSelect]);
+
   return (
     <div className="room-builder">
       <div className="room-builder-toolbar">
         <Select
           value={selectedArea}
-          onChange={setSelectedArea}
+          onChange={handleAreaChange}
           style={{ width: 240 }}
           placeholder="Select Area"
           options={[

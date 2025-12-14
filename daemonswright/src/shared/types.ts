@@ -101,6 +101,35 @@ export interface DoorState {
   door_name?: string; // Custom display name (e.g., "iron gate", "wooden door")
 }
 
+// Time phase definitions for areas
+export interface TimePhase {
+  name: string; // e.g., 'night', 'morning', 'day', 'evening'
+  ambient_text?: string; // Flavor text shown during this phase
+  lighting?: string; // Override lighting for this phase
+}
+
+// Area types (matching Daemons engine Area model)
+export interface Area {
+  id: string;
+  name: string;
+  description?: string;
+  time_scale?: number; // Day/night cycle speed multiplier
+  biome?: string; // e.g., 'mystical', 'forest', 'cave', 'desert'
+  climate?: string; // e.g., 'temperate', 'arctic', 'tropical'
+  ambient_lighting?: string; // e.g., 'dim', 'bright', 'pitch_black', 'normal'
+  weather_profile?: string; // Weather system configuration
+  danger_level?: number; // 1-10 scale
+  magic_intensity?: string; // e.g., 'none', 'low', 'moderate', 'high', 'extreme'
+  ambient_sound?: string; // Background audio identifier
+  default_respawn_time?: number; // Seconds for NPC/item respawn
+  time_phases?: TimePhase[]; // Custom time phase configurations
+  entry_points?: string[]; // Room IDs where players can spawn
+  starting_day?: number; // Initial game day
+  starting_hour?: number; // Initial hour (0-23)
+  starting_minute?: number; // Initial minute (0-59)
+  filePath?: string; // Original file path where the area was loaded from
+}
+
 // Room builder types
 export interface RoomNode {
   id: string;

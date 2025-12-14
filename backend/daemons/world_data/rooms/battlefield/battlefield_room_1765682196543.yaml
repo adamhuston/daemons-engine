@@ -1,0 +1,9 @@
+id: battlefield_room_1765682196543
+name: Battlefield
+description: ''
+room_type: outdoor
+area_id: area_battlefield
+z_level: 0
+exits:
+  west: battlefield_start
+  east: battlefield_room_1765682232115

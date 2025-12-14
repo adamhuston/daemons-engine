@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Layout, Drawer } from 'antd';
+import { Layout, Drawer, Segmented } from 'antd';
 import { FileTree } from './components/FileTree';
 import { AppLoader, InlineLoader, StartScreen } from './components/Loader';
 import { ErrorPanel } from './components/ErrorPanel';
@@ -13,6 +13,9 @@ const RoomBuilder = React.lazy(() =>
 );
 const RoomPropertiesPanel = React.lazy(() =>
   import('./components/RoomBuilder/RoomPropertiesPanel').then((mod) => ({ default: mod.RoomPropertiesPanel }))
+);
+const AreaPropertiesPanel = React.lazy(() =>
+  import('./components/RoomBuilder/AreaPropertiesPanel').then((mod) => ({ default: mod.AreaPropertiesPanel }))
 );
 const ContentPalette = React.lazy(() =>
   import('./components/RoomBuilder/ContentPalette').then((mod) => ({ default: mod.ContentPalette }))
@@ -37,6 +40,7 @@ import { useRoomBuilder } from './hooks/useRoomBuilder';
 import { useRoomContents } from './hooks/useRoomContents';
 import { useSchemaOptions } from './hooks/useSchemaOptions';
 import { useReferenceValidation } from './hooks/useReferenceValidation';
+import { useAreas } from './hooks/useAreas';
 import type { RoomNode } from '../shared/types';
 import './styles/App.css';
 
@@ -131,6 +135,15 @@ function App() {
   // Schema options for dynamic field values
   const { roomOptions, areaOptions, addOption } = useSchemaOptions(worldDataPath);
 
+  // Areas management
+  const {
+    areas,
+    getArea,
+    updateArea,
+    createArea: createAreaData,
+    deleteArea,
+  } = useAreas(worldDataPath);
+
   // Compute content counts per room for badges
   const roomContentCounts = useMemo(() => {
     const counts: Record<string, { npcCount: number; itemCount: number }> = {};
@@ -164,6 +177,22 @@ function App() {
 
   // Room property change tracking
   const [roomIsDirty, setRoomIsDirty] = useState(false);
+
+  // Selected area for properties panel
+  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
+  const selectedArea = selectedAreaId ? getArea(selectedAreaId) || null : null;
+
+  // Area property change tracking
+  const [areaIsDirty, setAreaIsDirty] = useState(false);
+
+  // Properties panel mode: 'room' or 'area'
+  const [propertiesPanelMode, setPropertiesPanelMode] = useState<'room' | 'area'>('room');
+
+  // Rooms in the selected area (for entry point selection)
+  const areaRooms = useMemo(() => {
+    if (!selectedAreaId) return [];
+    return rooms.filter((r) => r.area_id === selectedAreaId);
+  }, [rooms, selectedAreaId]);
 
   // Load last folder and recent folders on mount
   useEffect(() => {
@@ -305,6 +334,8 @@ function App() {
                     onRoomSelect={(roomId) => {
                       setSelectedRoomId(roomId);
                       setRoomIsDirty(false);
+                      // Switch to room panel when a room is selected
+                      setPropertiesPanelMode('room');
                     }}
                     onRoomMove={updateRoomPosition}
                     onRoomCreate={async (roomData, position, sourceRoomId) => {
@@ -325,6 +356,10 @@ function App() {
                     onConnectionDelete={removeConnection}
                     onRemoveExit={removeExit}
                     onAreaCreate={createArea}
+                    onAreaSelect={(areaId) => {
+                      setSelectedAreaId(areaId);
+                      setAreaIsDirty(false);
+                    }}
                     roomTypeOptions={roomOptions.room_type || []}
                     onAddRoomType={async (newType) => {
                       return await addOption('room', 'room_type', newType);
@@ -340,56 +375,105 @@ function App() {
                 </Suspense>
               </Content>
               <Sider
-                width={300}
-                style={{ background: 'var(--color-bg-secondary)' }}
+                width={320}
+                style={{ 
+                  background: 'var(--color-bg-secondary)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
               >
-                <Suspense fallback={<EditorFallback />}>
-                  <RoomPropertiesPanel
-                    selectedRoom={selectedRoom}
-                    onSave={async (roomId, updates) => {
-                      const success = await updateRoomProperties(roomId, updates);
-                      if (success) {
-                        setRoomIsDirty(false);
-                      }
-                    }}
-                    onDelete={async (roomId) => {
-                      const success = await deleteRoom(roomId);
-                      if (success) {
-                        setSelectedRoomId(null);
-                      }
-                    }}
-                    onExitClick={(direction, targetId) => {
-                      setSelectedRoomId(targetId);
-                    }}
-                    onAddExit={(roomId, direction, targetId) => {
-                      addConnection(roomId, targetId, direction);
-                    }}
-                    onRemoveExit={async (roomId, direction) => {
-                      await removeExit(roomId, direction);
-                    }}
-                    onUpdateDoor={updateDoor}
-                    isDirty={roomIsDirty}
-                    onDirtyChange={setRoomIsDirty}
-                    roomTypeOptions={roomOptions.room_type || []}
-                    onAddRoomType={async (newType) => {
-                      return await addOption('room', 'room_type', newType);
-                    }}
-                    // All rooms for cross-area connections
-                    allRooms={rooms}
-                    // NPC content
-                    npcSpawns={npcSpawns}
-                    npcTemplates={npcTemplates}
-                    onAddNpcSpawn={addNpcSpawn}
-                    onUpdateNpcSpawn={updateNpcSpawn}
-                    onRemoveNpcSpawn={removeNpcSpawn}
-                    // Item content
-                    itemInstances={itemInstances}
-                    itemTemplates={itemTemplates}
-                    onAddItemInstance={addItemInstance}
-                    onUpdateItemInstance={updateItemInstance}
-                    onRemoveItemInstance={removeItemInstance}
+                {/* Panel Mode Toggle */}
+                <div style={{ 
+                  padding: '8px 12px', 
+                  borderBottom: '1px solid var(--color-border, #434343)',
+                }}>
+                  <Segmented
+                    block
+                    value={propertiesPanelMode}
+                    onChange={(val) => setPropertiesPanelMode(val as 'room' | 'area')}
+                    options={[
+                      { label: 'Room', value: 'room' },
+                      { label: 'Area', value: 'area' },
+                    ]}
+                    size="small"
                   />
-                </Suspense>
+                </div>
+
+                {/* Properties Panel Content */}
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <Suspense fallback={<EditorFallback />}>
+                    {propertiesPanelMode === 'room' ? (
+                      <RoomPropertiesPanel
+                        selectedRoom={selectedRoom}
+                        onSave={async (roomId, updates) => {
+                          const success = await updateRoomProperties(roomId, updates);
+                          if (success) {
+                            setRoomIsDirty(false);
+                          }
+                        }}
+                        onDelete={async (roomId) => {
+                          const success = await deleteRoom(roomId);
+                          if (success) {
+                            setSelectedRoomId(null);
+                          }
+                        }}
+                        onExitClick={(direction, targetId) => {
+                          setSelectedRoomId(targetId);
+                        }}
+                        onAddExit={(roomId, direction, targetId) => {
+                          addConnection(roomId, targetId, direction);
+                        }}
+                        onRemoveExit={async (roomId, direction) => {
+                          await removeExit(roomId, direction);
+                        }}
+                        onUpdateDoor={updateDoor}
+                        isDirty={roomIsDirty}
+                        onDirtyChange={setRoomIsDirty}
+                        roomTypeOptions={roomOptions.room_type || []}
+                        onAddRoomType={async (newType) => {
+                          return await addOption('room', 'room_type', newType);
+                        }}
+                        // All rooms for cross-area connections
+                        allRooms={rooms}
+                        // NPC content
+                        npcSpawns={npcSpawns}
+                        npcTemplates={npcTemplates}
+                        onAddNpcSpawn={addNpcSpawn}
+                        onUpdateNpcSpawn={updateNpcSpawn}
+                        onRemoveNpcSpawn={removeNpcSpawn}
+                        // Item content
+                        itemInstances={itemInstances}
+                        itemTemplates={itemTemplates}
+                        onAddItemInstance={addItemInstance}
+                        onUpdateItemInstance={updateItemInstance}
+                        onRemoveItemInstance={removeItemInstance}
+                      />
+                    ) : (
+                      <AreaPropertiesPanel
+                        selectedArea={selectedArea}
+                        onSave={async (areaId, updates) => {
+                          const success = await updateArea(areaId, updates);
+                          if (success) {
+                            setAreaIsDirty(false);
+                          }
+                        }}
+                        onDelete={async (areaId) => {
+                          const success = await deleteArea(areaId);
+                          if (success) {
+                            setSelectedAreaId(null);
+                          }
+                        }}
+                        isDirty={areaIsDirty}
+                        onDirtyChange={setAreaIsDirty}
+                        areaRooms={areaRooms}
+                        biomeOptions={areaOptions.biome || []}
+                        onAddBiome={async (newBiome) => {
+                          return await addOption('area', 'biome', newBiome);
+                        }}
+                      />
+                    )}
+                  </Suspense>
+                </div>
               </Sider>
             </Layout>
           ) : currentView === 'entity-editor' ? (

@@ -2,18 +2,19 @@ id: room_unstable_cavern
 area_id: area_dark_caves
 name: Unstable Cavern
 description: >-
-  This section of the cave looks dangerously unstable. Cracks spider across the ceiling and loose stones litter
-  the floor. The walls groan ominously with each step you take.
+  This section of the cave looks dangerously unstable. Cracks spider across the ceiling and loose stones litter the
+  floor. The walls groan ominously with each step you take.
 room_type: cave
 lighting_override: '15'
 exits:
   east: room_cave_tunnel_1
+  up: battlefield_room_1765678986544
 on_enter_effect: Pebbles rain down from above as you enter.
 on_exit_effect: You carefully back away from the unstable area.
 triggers:
   - id: falling_rocks_trap
     event: on_enter
-    cooldown: 30.0
+    cooldown: 30
     conditions: []
     actions:
       - type: message_player
@@ -26,10 +27,10 @@ triggers:
         amount: 8
         damage_type: bludgeoning
       - type: message_player
-        message: "(-8 HP from falling rocks)"
+        message: (-8 HP from falling rocks)
   - id: dust_settles
     event: on_enter
-    cooldown: 30.0
+    cooldown: 30
     conditions: []
     actions:
       - type: message_player

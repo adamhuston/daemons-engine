@@ -6,6 +6,7 @@ area_id: area_battlefield
 z_level: 0
 exits:
   east: battlefield_start
+  down: room_unstable_cavern
 doors:
   east:
     is_open: true
