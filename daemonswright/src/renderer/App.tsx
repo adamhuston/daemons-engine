@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Layout, Drawer, Segmented } from 'antd';
 import { FileTree } from './components/FileTree';
+import { ResizablePanel } from './components/ResizablePanel';
 import { AppLoader, InlineLoader, StartScreen } from './components/Loader';
 import { ErrorPanel } from './components/ErrorPanel';
 import React, { Suspense } from 'react';
@@ -60,7 +61,7 @@ function EditorFallback() {
 function App() {
   // Track initial app loading state
   const [appReady, setAppReady] = useState(false);
-  
+
   // Track last folder and recent folders for start screen
   const [lastFolder, setLastFolder] = useState<string | null>(null);
   const [recentFolders, setRecentFolders] = useState<string[]>([]);
@@ -81,10 +82,10 @@ function App() {
   const { schemas, validationErrors: schemaErrors, validateContent, isLoading: schemasLoading } = useSchema(worldDataPath);
 
   // Reference validation
-  const { 
-    validationErrors: referenceErrors, 
+  const {
+    validationErrors: referenceErrors,
     validateAll: validateReferences,
-    isValidating: isValidatingReferences 
+    isValidating: isValidatingReferences
   } = useReferenceValidation(worldDataPath);
 
   // Combined validation errors
@@ -147,7 +148,7 @@ function App() {
   // Compute content counts per room for badges
   const roomContentCounts = useMemo(() => {
     const counts: Record<string, { npcCount: number; itemCount: number }> = {};
-    
+
     // Count NPCs per room
     for (const spawn of npcSpawns) {
       if (spawn.room_id) {
@@ -157,7 +158,7 @@ function App() {
         counts[spawn.room_id].npcCount += spawn.quantity || 1;
       }
     }
-    
+
     // Count items per room
     for (const instance of itemInstances) {
       if (instance.room_id) {
@@ -167,7 +168,7 @@ function App() {
         counts[instance.room_id].itemCount += instance.quantity || 1;
       }
     }
-    
+
     return counts;
   }, [npcSpawns, itemInstances]);
 
@@ -262,7 +263,7 @@ function App() {
   // If no world is loaded, show the start screen
   if (!worldDataPath) {
     return (
-      <StartScreen 
+      <StartScreen
         onWorldSelect={openFolderByPath}
         lastFolder={lastFolder}
         recentFolders={recentFolders}
@@ -271,9 +272,9 @@ function App() {
   }
 
   return (
-    <AppLoader 
-      isLoading={!appReady} 
-      minDisplayTime={0} 
+    <AppLoader
+      isLoading={!appReady}
+      minDisplayTime={0}
       message="Loading world data..."
     >
       <Layout className="app-layout">
@@ -286,11 +287,14 @@ function App() {
         />
 
       <Layout className="main-layout">
-        <Sider
-          width={280}
+        <ResizablePanel
+          defaultWidth={280}
+          minWidth={180}
+          maxWidth={500}
+          resizeFrom="right"
           className="file-tree-sider"
-          collapsible
-          collapsedWidth={0}
+          style={{ background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--border-color)' }}
+          storageKey="file-tree-width"
         >
           <FileTree
             files={files}
@@ -298,7 +302,7 @@ function App() {
             onSelect={handleFileSelect}
             worldDataPath={worldDataPath}
           />
-        </Sider>
+        </ResizablePanel>
 
         <Content className="editor-content">
           {currentView === 'yaml' && selectedFile ? (
@@ -313,9 +317,13 @@ function App() {
             </Suspense>
           ) : currentView === 'room-builder' ? (
             <Layout style={{ height: '100%' }}>
-              <Sider
-                width={220}
-                style={{ background: 'var(--color-bg-secondary)' }}
+              <ResizablePanel
+                defaultWidth={220}
+                minWidth={160}
+                maxWidth={400}
+                resizeFrom="right"
+                style={{ background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--border-color)' }}
+                storageKey="content-palette-width"
               >
                 <Suspense fallback={<EditorFallback />}>
                   <ContentPalette
@@ -323,7 +331,7 @@ function App() {
                     itemTemplates={itemTemplates}
                   />
                 </Suspense>
-              </Sider>
+              </ResizablePanel>
               <Content style={{ flex: 1, minWidth: 0 }}>
                 <Suspense fallback={<EditorFallback />}>
                   <RoomBuilder
@@ -374,17 +382,22 @@ function App() {
                   />
                 </Suspense>
               </Content>
-              <Sider
-                width={320}
-                style={{ 
+              <ResizablePanel
+                defaultWidth={320}
+                minWidth={250}
+                maxWidth={550}
+                resizeFrom="left"
+                style={{
                   background: 'var(--color-bg-secondary)',
                   display: 'flex',
                   flexDirection: 'column',
+                  borderLeft: '1px solid var(--border-color)',
                 }}
+                storageKey="room-properties-width"
               >
                 {/* Panel Mode Toggle */}
-                <div style={{ 
-                  padding: '8px 12px', 
+                <div style={{
+                  padding: '8px 12px',
                   borderBottom: '1px solid var(--color-border, #434343)',
                 }}>
                   <Segmented
@@ -482,7 +495,7 @@ function App() {
                     )}
                   </Suspense>
                 </div>
-              </Sider>
+              </ResizablePanel>
             </Layout>
           ) : currentView === 'entity-editor' ? (
             <Suspense fallback={<EditorFallback />}>
@@ -506,8 +519,8 @@ function App() {
             </Suspense>
           ) : (
             <Suspense fallback={<EditorFallback />}>
-              <WorldSummary 
-                worldDataPath={worldDataPath} 
+              <WorldSummary
+                worldDataPath={worldDataPath}
                 onNavigate={handleWorldSummaryNavigate}
               />
             </Suspense>
@@ -534,8 +547,8 @@ function App() {
         onClose={() => setErrorPanelOpen(false)}
         className="error-panel-drawer"
       >
-        <ErrorPanel 
-          errors={allValidationErrors} 
+        <ErrorPanel
+          errors={allValidationErrors}
           onRefresh={validateReferences}
           loading={isValidatingReferences}
         />

@@ -27,9 +27,13 @@
 }
 
 /* File Tree Sider */
+/* File Tree Sider - now using ResizablePanel */
 .file-tree-sider {
   background: var(--color-bg-secondary) !important;
-  border-right: 1px solid var(--border-color);
+}
+
+.file-tree-sider .resizable-panel-content {
+  overflow: hidden;
 }
 
 .file-tree {

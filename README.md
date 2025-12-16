@@ -9,10 +9,11 @@
 A Python framework for building text-based multiplayer RPGs with real-time WebSocket communication. Includes a batteries-included headless engine server, a debugging client, example content and a CMS.
 
 > ⚠️ **Pre-Release Beta**  Breaking package updates may still occur regularly and unpredictably. There is no timeline yet for a stable Alpha release.
-
+>
 > 🤖 **Clanker Alert: Extensive use of LLM generated code**  This project is an exercise in testing the limits of agentic development processes. Ideologically opposed developers should skip it. As an experimental artifact, the existence of this project should not be mistaken for a positive or negative statement about agentic development. Although we can say there has been a rigorous cybersecurity review and the engine has over 800 tests, this software is provided "as-is" and "without warranty of any kind", per the MIT license.
-
-> **Latest Roadmap Release:**  Phase 17 - Environmental systems (Weather, Biomes, Flora, Fauna, Ecosystems)
+>
+> **Latest Release:**
+> *version = "0.18.1"* - documentation cleanup and Daemonswright CMS area editor progress
 
 
 

@@ -13,3 +13,4 @@ export { FormEditor } from './FormEditor';
 export { EntityEditor } from './EntityEditor';
 export { ErrorPanel } from './ErrorPanel';
 export { Loader, InlineLoader, AppLoader, StartScreen } from './Loader';
+export { ResizablePanel } from './ResizablePanel';
