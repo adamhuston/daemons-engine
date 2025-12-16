@@ -1579,10 +1579,19 @@ class WorldEngine:
         if not player:
             return [self._msg_to_player(player_id, "You have no form.")]
 
-        # First check if it's a room ID
+        # First check if it's a room ID (exact match)
+        target_room = None
         if target in self.world.rooms:
             target_room = self.world.rooms[target]
         else:
+            # Try case-insensitive room ID match or partial match
+            target_lower = target.lower()
+            for room_id, room in self.world.rooms.items():
+                if room_id.lower() == target_lower or room_id.lower().startswith(target_lower):
+                    target_room = room
+                    break
+
+        if not target_room:
             # Try to find a player with that name
             target_player = None
             for p in self.world.players.values():
@@ -1611,10 +1620,10 @@ class WorldEngine:
         # Move player
         old_room = self.world.rooms.get(player.room_id)
         if old_room:
-            old_room.players.discard(player.id)
+            old_room.entities.discard(player.id)
 
         player.room_id = target_room.id
-        target_room.players.add(player.id)
+        target_room.entities.add(player.id)
 
         # Show room description
         room_desc = self._format_room_description(target_room, player_id)
