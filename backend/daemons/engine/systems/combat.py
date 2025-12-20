@@ -707,16 +707,25 @@ class CombatSystem:
                 return
 
             # ========== ATTACK HIT - CALCULATE DAMAGE ==========
-            # Base weapon damage
-            damage = random.randint(weapon.damage_min, weapon.damage_max)
-
+            # Base weapon damage (rolled)
+            weapon_damage = random.randint(weapon.damage_min, weapon.damage_max)
+            
             # Add strength modifier to damage
             str_mod = attacker.get_ability_modifier(attacker.get_effective_strength())
-            damage = max(1, damage + str_mod)
-
-            # Critical hits use centralized mechanics
+            base_total = weapon_damage + str_mod
+            
+            # Track original values for breakdown message
+            original_weapon_damage = weapon_damage
+            original_str_mod = str_mod
+            
+            # Critical hits use centralized mechanics (before applying minimum)
             if is_crit:
-                damage = d20.calculate_critical_damage(damage, str_mod)
+                damage = d20.calculate_critical_damage(base_total, str_mod)
+            else:
+                damage = base_total
+            
+            # Apply minimum damage (after crit calculation)
+            damage = max(1, damage)
 
             # Apply damage
             target.current_health = max(0, target.current_health - damage)
@@ -739,17 +748,28 @@ class CombatSystem:
             events: list[Event] = []
             crit_text = " **CRITICAL HIT!**" if is_crit else ""
 
-            # Attacker message with attack roll info
+            # Attacker message with attack roll info and damage breakdown
             if attacker_id in world.players:
                 roll_info = (
                     f" (rolled {attack_roll}+{attack_bonus}={attack_total} vs AC {target_ac})"
                     if not is_crit
                     else " (natural 20!)"
                 )
+                
+                # Get weapon name for display
+                weapon_name = self._get_equipped_weapon_name(attacker_id)
+                
+                # Build damage breakdown
+                if is_crit:
+                    # For crits, show the original weapon roll being doubled
+                    breakdown = f"[{weapon_name}: {original_weapon_damage} × 2 + {original_str_mod} STR]"
+                else:
+                    breakdown = f"[{weapon_name}: {original_weapon_damage} + {original_str_mod} STR]"
+                
                 events.append(
                     self.ctx.msg_to_player(
                         attacker_id,
-                        f"You hit {target.name} for {damage} damage!{crit_text}{roll_info}",
+                        f"You hit {target.name} for {damage} damage {breakdown}!{crit_text}{roll_info}",
                     )
                 )
 
@@ -1135,10 +1155,12 @@ class CombatSystem:
             return "fists"
 
         if "weapon" in entity.equipped_items:
-            weapon_template_id = entity.equipped_items["weapon"]
-            weapon_template = world.item_templates.get(weapon_template_id)
-            if weapon_template:
-                return weapon_template.name
+            weapon_item_id = entity.equipped_items["weapon"]
+            weapon_item = world.items.get(weapon_item_id)
+            if weapon_item:
+                weapon_template = world.item_templates.get(weapon_item.template_id)
+                if weapon_template:
+                    return weapon_template.name
 
         return "fists"
 

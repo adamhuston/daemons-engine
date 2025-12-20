@@ -4850,7 +4850,7 @@ class WorldEngine:
         for name, (count, provides_light) in grouped.items():
             glow_suffix = " (glowing)" if provides_light else ""
             if count > 1:
-                parts.append(f"{count} {name}s{glow_suffix}")
+                parts.append(f"{count} {name}{glow_suffix}")
             else:
                 parts.append(f"a {name}{glow_suffix}")
 

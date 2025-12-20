@@ -949,7 +949,7 @@ class FloraSystem:
 
         # Get compatible templates
         if self.biome_system:
-            biome = self.biome_system.get_biome_for_area(area.id)
+            biome = self.biome_system.get_biome_for_area(area)
             if biome:
                 compatible = self.get_templates_for_biome(biome)
             else:
