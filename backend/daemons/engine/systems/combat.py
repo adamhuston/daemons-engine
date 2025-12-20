@@ -1017,21 +1017,8 @@ class CombatSystem:
         victim_name = victim.name
         killer_name = killer.name if killer else "unknown forces"
 
-        # Death message to room (anonymize if dark)
+        # Get room reference for later use
         room = world.rooms.get(victim.room_id)
-        if room:
-            if self._should_anonymize_room_broadcast(room.id):
-                events.append(
-                    self.ctx.msg_to_room(
-                        room.id, "💀 Someone has been slain!"
-                    )
-                )
-            else:
-                events.append(
-                    self.ctx.msg_to_room(
-                        room.id, f"💀 {victim_name} has been slain by {killer_name}!"
-                    )
-                )
 
         # If victim was an NPC, trigger respawn and loot
         if victim_id in world.npcs:
@@ -1142,6 +1129,21 @@ class CombatSystem:
                 import asyncio
 
                 asyncio.create_task(await_coro)
+
+        # Death message to room (anonymize if dark) - added LAST so it appears after damage/XP messages
+        if room:
+            if self._should_anonymize_room_broadcast(room.id):
+                events.append(
+                    self.ctx.msg_to_room(
+                        room.id, "💀 Someone has been slain!"
+                    )
+                )
+            else:
+                events.append(
+                    self.ctx.msg_to_room(
+                        room.id, f"💀 {victim_name} has been slain by {killer_name}!"
+                    )
+                )
 
         return events
 

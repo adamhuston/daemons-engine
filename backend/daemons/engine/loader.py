@@ -271,6 +271,14 @@ async def load_world(session: AsyncSession) -> World:
             provides_light=bool(t.provides_light),
             light_intensity=t.light_intensity,
             light_duration=t.light_duration,
+            # Phase 14: Ability system support (magic items)
+            class_id=t.class_id,
+            default_abilities=set(t.default_abilities) if t.default_abilities else set(),
+            ability_loadout=list(t.ability_loadout) if t.ability_loadout else [],
+            # Phase 14+: Combat stats (destructible items)
+            max_health=t.max_health,
+            base_armor_class=t.base_armor_class,
+            resistances=t.resistances or {},
         )
 
     # ----- Load item instances (Phase 3) -----

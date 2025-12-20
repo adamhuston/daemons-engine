@@ -7486,18 +7486,12 @@ class WorldEngine:
 
             # Phase 11: Add light source if item provides light
             if template.provides_light and template.light_intensity > 0:
-                import time
-
-                expires_at = None
-                if template.light_duration:
-                    expires_at = time.time() + template.light_duration
-
                 self.lighting_system.update_light_source(
                     room_id=player.room_id,
                     source_id=f"item_{found_item_id}",
                     source_type="item",
                     intensity=template.light_intensity,
-                    expires_at=expires_at,
+                    duration=template.light_duration,  # duration in seconds, not expires_at
                 )
 
                 if template.light_duration:

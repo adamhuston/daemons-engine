@@ -174,6 +174,7 @@ class TestFaunaEnums:
         assert FaunaType.FISH.value == "fish"
         assert FaunaType.INSECT.value == "insect"
         assert FaunaType.ARACHNID.value == "arachnid"
+        assert FaunaType.CRUSTACEAN.value == "crustacean"
 
     def test_time_of_day_values(self):
         """Test TimeOfDay enum values."""

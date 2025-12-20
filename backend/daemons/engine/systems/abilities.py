@@ -719,6 +719,40 @@ class AbilityExecutor:
                 error=error_msg,
             )
 
+    def _is_ability_from_item(self, caster: WorldEntity, ability_id: str) -> bool:
+        """
+        Check if an ability is granted by an equipped item (magic weapon/armor).
+        
+        Item-granted abilities bypass level requirements since the item itself
+        has the power, not the player's class progression.
+        
+        Args:
+            caster: The entity casting the ability
+            ability_id: The ability being checked
+            
+        Returns:
+            True if the ability comes from an equipped item, False otherwise
+        """
+        # Only check for players (NPCs don't equip items with abilities currently)
+        if not hasattr(caster, 'equipped_items'):
+            return False
+        
+        # Check each equipped item
+        for item_id in caster.equipped_items.values():
+            item = self.context.world.items.get(item_id)
+            if not item:
+                continue
+                
+            template = self.context.world.item_templates.get(item.template_id)
+            if not template:
+                continue
+            
+            # Check if this item grants the ability
+            if template.class_id and ability_id in template.default_abilities:
+                return True
+        
+        return False
+
     def _validate_ability_use(self, caster: WorldEntity, ability_id: str) -> str | None:
         """
         Validate that an entity can use an ability.
@@ -753,12 +787,15 @@ class AbilityExecutor:
         if not ability:
             return f"Unknown ability: {ability_id}"
 
-        # Check level
-        if caster.level < ability.required_level:
+        # Check level requirement (but skip for item-granted abilities)
+        # Item abilities don't require player level - the item itself has the power
+        is_item_ability = self._is_ability_from_item(caster, ability_id)
+        if not is_item_ability and caster.level < ability.required_level:
             return f"You must be level {ability.required_level} to use {ability_id}"
 
-        # Check resources
-        if ability.costs:
+        # Check resources (but skip for item-granted abilities)
+        # Item abilities use the item's power, not the player's resources
+        if not is_item_ability and ability.costs:
             for resource_id, cost in ability.costs.items():
                 pool = caster.get_resource_pool(resource_id)
                 if not pool or pool.current < cost:

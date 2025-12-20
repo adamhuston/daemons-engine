@@ -149,6 +149,18 @@ async def load_data():
                     damage_max=item_data.get("damage_max", 0),
                     attack_speed=item_data.get("attack_speed", 2.0),
                     damage_type=item_data.get("damage_type", "physical"),
+                    # Phase 11: Light source properties
+                    provides_light=item_data.get("provides_light", False),
+                    light_intensity=item_data.get("light_intensity", 0),
+                    light_duration=item_data.get("light_duration"),
+                    # Phase 14: Ability system support (magic items)
+                    class_id=item_data.get("class_id"),
+                    default_abilities=item_data.get("default_abilities", []),
+                    ability_loadout=item_data.get("ability_loadout", []),
+                    # Phase 14+: Combat stats (destructible items)
+                    max_health=item_data.get("max_health"),
+                    base_armor_class=item_data.get("base_armor_class", 10),
+                    resistances=item_data.get("resistances", {}),
                     # Flavor and metadata
                     flavor_text=item_data.get("flavor_text"),
                     rarity=item_data.get("rarity", "common"),
