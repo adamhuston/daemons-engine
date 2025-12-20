@@ -150,6 +150,19 @@ properties:
       enum: [north, south, east, west, up, down]
     description: "Specific directions blocked by dense flora"
 
+  # Light Emission (for bioluminescent flora)
+  provides_light:
+    type: boolean
+    default: false
+    description: "Whether flora emits light (e.g., glowing mushrooms)"
+
+  light_intensity:
+    type: integer
+    minimum: 0
+    maximum: 50
+    default: 0
+    description: "Light contribution when provides_light is true (0-50)"
+
   # Spawning Properties
   rarity:
     type: string

@@ -1784,6 +1784,9 @@ class WorldRoom:
     # ---------- Phase 17.4: Flora System ----------
     # Flora instance IDs in this room (loaded from flora_instances table)
     flora: set[int] = field(default_factory=set)
+    # Whether flora can grow/respawn in this room (default: True)
+    # Set to False for barren rooms like deep caves or magically dead zones
+    no_flora: bool = False
 
     # ---------- Phase 11: Lighting System ----------
     # Room-specific lighting override (replaces area ambient + time calculation)

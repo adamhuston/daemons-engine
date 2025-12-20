@@ -4,6 +4,7 @@ name: Deep Cavern
 description: You've reached the deepest part of the cave system. The absolute darkness here is oppressive and disorienting.
 room_type: cave
 lighting_override: '0'
+no_flora: true
 on_enter_effect: The temperature drops noticeably.
 on_exit_effect: null
 triggers:

@@ -116,6 +116,8 @@ async def load_world(session: AsyncSession) -> World:
             lighting_override=getattr(r, "lighting_override", None),
             # Phase 17.1: Temperature system
             temperature_override=getattr(r, "temperature_override", None),
+            # Phase 17.4: Flora system
+            no_flora=getattr(r, "no_flora", False),
         )
 
     # Update the global emoji cache with any new types discovered

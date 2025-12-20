@@ -151,6 +151,10 @@ class FloraTemplate:
     blocks_movement: bool = False
     blocks_directions: list[str] = field(default_factory=list)
 
+    # Light emission (for bioluminescent flora like glowing mushrooms)
+    provides_light: bool = False  # Whether flora emits light
+    light_intensity: int = 0  # Light contribution (0-50)
+
     # Spawning
     rarity: Rarity = Rarity.COMMON
     cluster_size: tuple[int, int] = (1, 3)  # (min, max) plants per cluster
@@ -384,6 +388,8 @@ class FloraSystem:
             cover_bonus=data.get("cover_bonus", 2),
             blocks_movement=data.get("blocks_movement", False),
             blocks_directions=data.get("blocks_directions", []),
+            provides_light=data.get("provides_light", False),
+            light_intensity=data.get("light_intensity", 0),
             rarity=Rarity(data.get("rarity", "common")),
             cluster_size=(cluster_size[0], cluster_size[1]),
         )
@@ -917,8 +923,14 @@ class FloraSystem:
         Spawn appropriate flora for a room based on biome.
 
         Uses area flora density and biome compatibility.
+        Skips rooms with no_flora=True.
         """
         spawned = []
+
+        # Check if room disallows flora
+        if getattr(room, "no_flora", False):
+            logger.debug(f"Room {room.id} has no_flora=True, skipping flora spawn")
+            return spawned
 
         # Determine max flora
         if max_flora is None:

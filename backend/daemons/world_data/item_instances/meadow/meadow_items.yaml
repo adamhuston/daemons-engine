@@ -9,3 +9,25 @@ items:
     instance_data:
       placed_by: "world_builder"
       purpose: "Testing ground item light emission"
+
+  # Legendary Sunfire Blade - Magical sword with fire damage and fireball ability
+  - id: meadow_sunfire_blade
+    template_id: item_sunfire_blade
+    room_id: room_meadow_center
+    quantity: 1
+    current_durability: 150
+    instance_data:
+      placed_by: "world_builder"
+      purpose: "Testing magical weapon equipment and item abilities"
+      lore: "Left here by a fallen champion who sought respite in the meadow's warmth"
+
+  # Epic Celestial Plate - Magical armor with mana shield and detect magic abilities
+  - id: meadow_celestial_plate
+    template_id: item_celestial_plate
+    room_id: room_meadow_center
+    quantity: 1
+    current_durability: 200
+    instance_data:
+      placed_by: "world_builder"
+      purpose: "Testing magical armor equipment and item abilities"
+      lore: "Abandoned by a guardian who transcended to a higher plane"

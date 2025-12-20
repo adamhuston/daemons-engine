@@ -1,0 +1,55 @@
+# Celestial Plate - Epic magical armor
+# A radiant chestplate infused with protective magic, grants mana shield
+
+id: item_celestial_plate
+name: Celestial Plate
+description: An ornate breastplate crafted from gleaming silver-white metal. Intricate patterns of stars and moons are inlaid with sapphires that pulse with arcane energy. A soft protective aura emanates from its surface.
+item_type: armor
+item_subtype: chestplate
+equipment_slot: chest
+
+stat_modifiers:
+  armor_class: 8
+  vitality: 3
+  intelligence: 2
+  max_health: 25
+
+weight: 12.0
+max_stack_size: 1
+
+has_durability: true
+max_durability: 200
+
+is_container: false
+is_consumable: false
+
+# Emits a soft protective glow when equipped
+provides_light: true
+light_intensity: 20
+light_duration: null  # Permanent glow
+
+# Phase 14: Magic item abilities
+# The armor grants the mana shield spell when equipped
+class_id: mage
+default_abilities:
+  - mana_shield
+  - detect_magic
+ability_loadout:
+  - mana_shield
+  - detect_magic
+
+flavor_text: "Worn by the Guardians of the Celestial Order, this armor has protected countless heroes from both physical and magical harm. The sapphires whisper ancient words of warding to those attuned to its power."
+rarity: epic
+value: 1800
+
+flags:
+  soulbound: true
+
+keywords:
+  - armor
+  - chestplate
+  - plate
+  - celestial
+  - epic
+  - magic
+  - protection

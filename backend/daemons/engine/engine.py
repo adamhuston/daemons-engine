@@ -180,6 +180,9 @@ class WorldEngine:
         )
         self.ctx.flora_system = self.flora_system
 
+        # Link flora system to lighting system for bioluminescent plants
+        self.lighting_system.flora_system = self.flora_system
+
         # Phase 17.5: Fauna system
         from daemons.engine.systems.fauna import FaunaSystem
 
@@ -3873,6 +3876,13 @@ class WorldEngine:
             return None
         return self.world.areas.get(room.area_id)
 
+    def _get_area_for_room(self, room_id: RoomId) -> WorldArea | None:
+        """Get the area for a given room."""
+        room = self.world.rooms.get(room_id)
+        if not room or not room.area_id:
+            return None
+        return self.world.areas.get(room.area_id)
+
     def cancel_player_respawn(self, player_id: PlayerId) -> None:
         """
         Cancel a scheduled player respawn (e.g., if they disconnect).
@@ -4813,28 +4823,36 @@ class WorldEngine:
 
         world = self.world
 
-        # Group flora by template name
-        grouped: dict[str, int] = {}
+        # Group flora by template name, tracking if it provides light
+        # Structure: {name: (count, provides_light)}
+        grouped: dict[str, tuple[int, bool]] = {}
         for flora_id in room.flora:
             if flora_id in world.flora_instances:
                 template_id, quantity = world.flora_instances[flora_id]
-                # Get template name from flora_system
+                # Get template from flora_system
                 if hasattr(self, "flora_system") and self.flora_system:
                     template = self.flora_system.get_template(template_id)
                     if template:
                         name = template.name
-                        grouped[name] = grouped.get(name, 0) + quantity
+                        # Check if flora provides light (like glowing mushrooms)
+                        provides_light = getattr(template, "provides_light", False)
+                        if name in grouped:
+                            old_count, old_glow = grouped[name]
+                            grouped[name] = (old_count + quantity, old_glow or provides_light)
+                        else:
+                            grouped[name] = (quantity, provides_light)
 
         if not grouped:
             return ""
 
         # Format as natural language
         parts = []
-        for name, count in grouped.items():
+        for name, (count, provides_light) in grouped.items():
+            glow_suffix = " (glowing)" if provides_light else ""
             if count > 1:
-                parts.append(f"{count} {name}s")
+                parts.append(f"{count} {name}s{glow_suffix}")
             else:
-                parts.append(f"a {name}")
+                parts.append(f"a {name}{glow_suffix}")
 
         if len(parts) == 1:
             return f"You see {parts[0]} here."
@@ -5301,7 +5319,8 @@ class WorldEngine:
                 item = world.items[item_id]
                 template = world.item_templates[item.template_id]
                 quantity_str = f" x{item.quantity}" if item.quantity > 1 else ""
-                items_here.append(f"  {template.name}{quantity_str}")
+                glowing_str = " (glowing)" if template.provides_light else ""
+                items_here.append(f"  {template.name}{quantity_str}{glowing_str}")
 
             lines.append("")
             lines.append("Items here:")
@@ -8102,14 +8121,14 @@ class WorldEngine:
             return [self._msg_to_player(player_id, "You are nowhere.")]
 
         # Get flora in room (need database session)
-        if not self.state_tracker or not self.state_tracker._session_factory:
+        if not self.state_tracker or not self.state_tracker.db_session_factory:
             return [
                 self._msg_to_player(player_id, "Cannot access flora (no database).")
             ]
 
         from sqlalchemy.ext.asyncio import AsyncSession
 
-        async with self.state_tracker._session_factory() as session:
+        async with self.state_tracker.db_session_factory() as session:
             flora_list = await self.flora_system.get_room_flora(room.id, session)
 
             if not flora_list:
@@ -8141,7 +8160,7 @@ class WorldEngine:
             if hasattr(self, "season_system") and self.season_system:
                 area = self._get_area_for_room(room.id)
                 if area:
-                    current_season = self.season_system.get_season(area.id)
+                    current_season = self.season_system.get_season(area)
 
             # Check if player can harvest
             equipped_tool = self._get_equipped_tool_type(player)
@@ -8191,7 +8210,7 @@ class WorldEngine:
                             player_id=player_id,
                             container_id=None,
                             quantity=1,
-                            current_durability=item_template.durability,
+                            current_durability=item_template.max_durability,
                             equipped_slot=None,
                             instance_data={},
                             _description=item_template.description,
@@ -8240,10 +8259,10 @@ class WorldEngine:
             # Broadcast to room
             if result.success:
                 events.append(
-                    self._room_broadcast(
+                    self._msg_to_room(
                         room.id,
                         f"{player.name} harvests from a {matched_template.name}.",
-                        exclude_player=player_id,
+                        exclude={player_id},
                     )
                 )
 
@@ -8251,11 +8270,8 @@ class WorldEngine:
 
     def _get_equipped_tool_type(self, player) -> str | None:
         """Get the item_type of the player's equipped tool (for harvest checks)."""
-        if not player.character_sheet:
-            return None
-
         # Check main hand for tool
-        main_hand = player.character_sheet.equipment.get("main_hand")
+        main_hand = player.equipped_items.get("weapon")
         if main_hand:
             item = self.world.items.get(main_hand)
             if item:

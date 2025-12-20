@@ -87,6 +87,11 @@ class Room(Base):
     # Example: forge room = 110, ice cave = 20
     temperature_override: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Phase 17.4: Flora system
+    # Whether flora cannot grow in this room (default False = flora can grow)
+    # Example: pitch-black caves, magically dead zones
+    no_flora: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0")
+
     # YAML content management
     # True = managed by YAML files, False = created/modified via API
     yaml_managed: Mapped[bool] = mapped_column(

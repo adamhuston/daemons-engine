@@ -1069,8 +1069,8 @@ async def _handle_character_selection(
     create_state = None  # None, "awaiting_name", "awaiting_class"
     pending_name = None
 
-    # Available classes
-    available_classes = ["warrior", "mage", "rogue", "cleric"]
+    # Available classes - loaded dynamically from world_data YAML files
+    available_classes = sorted(engine.class_system.class_templates.keys())
 
     while True:
         # Send current menu
