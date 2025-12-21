@@ -404,6 +404,8 @@ async def load_world(session: AsyncSession) -> World:
             # Phase 17.5: Fauna properties
             is_fauna=getattr(t, "is_fauna", False) or False,
             fauna_data=getattr(t, "fauna_data", {}) or {},
+            # Phase 10.3+: Faction affiliation
+            faction_id=getattr(t, "faction_id", None),
         )
 
     # ----- Load NPC instances (Phase 4) -----

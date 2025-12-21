@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from daemons.engine.systems.biome import BiomeSystem
+    from daemons.engine.systems.biome import BiomeSystem, SeasonSystem
     from daemons.engine.systems.fauna import FaunaSystem
     from daemons.engine.systems.flora import FloraSystem
     from daemons.engine.systems.temperature import TemperatureSystem
@@ -175,6 +175,7 @@ class SpawnConditionEvaluator:
         temperature_system: Optional["TemperatureSystem"] = None,
         weather_system: Optional["WeatherSystem"] = None,
         biome_system: Optional["BiomeSystem"] = None,
+        season_system: Optional["SeasonSystem"] = None,
         flora_system: Optional["FloraSystem"] = None,
         fauna_system: Optional["FaunaSystem"] = None,
     ):
@@ -183,6 +184,7 @@ class SpawnConditionEvaluator:
         self.temperature_system = temperature_system
         self.weather_system = weather_system
         self.biome_system = biome_system
+        self.season_system = season_system
         self.flora_system = flora_system
         self.fauna_system = fauna_system
 
@@ -370,10 +372,14 @@ class SpawnConditionEvaluator:
         if not conditions.season_is and not conditions.season_not:
             return failed
 
-        if not self.biome_system:
+        if not self.season_system:
             return failed  # Can't check, allow spawn
 
-        season = self.biome_system.get_season(area_id)
+        area = self.world.areas.get(area_id)
+        if not area:
+            return failed
+
+        season = self.season_system.get_season(area)
         if not season:
             return failed
 

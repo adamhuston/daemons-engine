@@ -1,0 +1,53 @@
+id: npc_test_sanctum_warrior
+name: Silver Sanctum Warrior
+description: >
+  A disciplined soldier clad in gleaming silver armor bearing the insignia
+  of the Silver Sanctum. Their eyes are alert and watchful, ready to defend
+  against any Shadow Syndicate threat.
+
+npc_type: hostile
+
+# Faction affiliation (Phase 1.1)
+faction_id: silver_sanctum
+
+# Base stats
+level: 5
+max_health: 80
+armor_class: 14
+strength: 16
+dexterity: 12
+intelligence: 10
+
+# Combat properties
+attack_damage_min: 8
+attack_damage_max: 15
+attack_speed: 3.0
+experience_reward: 50
+
+# AI behavior - will attack Shadow Syndicate NPCs on sight due to faction hostility
+behavior:
+  - wanders_nowhere       # Guards position
+  - aggressive            # Will also attack players with aggro_on_sight
+  - fearless              # Never flees
+
+# Loot table
+loot_table:
+  - template_id: item_ancient_coin
+    quantity: [2, 5]
+    chance: 0.7
+  - template_id: item_iron_sword
+    quantity: 1
+    chance: 0.15
+
+# Flavor
+idle_messages:
+  - "The Sanctum warrior scans the area for threats."
+  - "The warrior's silver armor glints in the light."
+  - "The soldier grips their weapon tightly, ever vigilant."
+
+keywords:
+  - warrior
+  - sanctum
+  - silver
+  - soldier
+  - guard

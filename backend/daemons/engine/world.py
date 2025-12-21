@@ -1497,6 +1497,9 @@ class NpcTemplate:
     is_fauna: bool = False  # True if this is a wildlife NPC
     fauna_data: dict = field(default_factory=dict)  # Fauna-specific properties
 
+    # Phase 10.3+: Faction affiliation
+    faction_id: str | None = None  # Faction membership for warfare
+
     # Resolved behavior config (populated at load time from behavior tags)
     resolved_behavior: dict = field(default_factory=dict)
 

@@ -251,6 +251,8 @@ async def load_data():
                     # Phase 17.5: Fauna properties
                     existing.is_fauna = npc_data.get("is_fauna", False)
                     existing.fauna_data = npc_data.get("fauna_data", {})
+                    # Phase 1: Faction warfare
+                    existing.faction_id = npc_data.get("faction_id")
                     print(f"Updating NPC template: {npc_data['name']}")
                 else:
                     print(f"Loading NPC template: {npc_data['name']}")
@@ -276,6 +278,8 @@ async def load_data():
                         # Phase 17.5: Fauna properties
                         is_fauna=npc_data.get("is_fauna", False),
                         fauna_data=npc_data.get("fauna_data", {}),
+                        # Phase 1: Faction warfare
+                        faction_id=npc_data.get("faction_id"),
                     )
                     session.add(template)
                 loaded += 1

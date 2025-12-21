@@ -563,6 +563,11 @@ class NpcTemplate(Base):
         JSON, default=dict
     )  # Fauna-specific properties (biome_tags, diet, etc.)
 
+    # Phase 10.3+: Faction affiliation
+    faction_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # Faction membership for warfare
+
 
 class NpcInstance(Base):
     """Dynamic NPC instance - a specific NPC in the world."""

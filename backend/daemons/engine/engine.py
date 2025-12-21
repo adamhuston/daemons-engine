@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from ..input_sanitization import sanitize_command
-from .behaviors import BehaviorContext, BehaviorResult, get_behavior_instances
+from .behaviors import BehaviorContext, BehaviorResult, get_behavior_instances, resolve_behaviors
 from .systems import (
     CombatSystem,
     CommandRouter,
@@ -1759,11 +1759,13 @@ class WorldEngine:
             # For now, just create the NPC synchronously
             import uuid
 
+            from .world import EntityType, WorldNpc
+
             npc_id = str(uuid.uuid4())
-            from .world import WorldNpc
 
             npc = WorldNpc(
                 id=npc_id,
+                entity_type=EntityType.NPC,
                 template_id=template.id,
                 name=template.name,
                 room_id=player.room_id,
@@ -1772,9 +1774,17 @@ class WorldEngine:
                 current_health=template.max_health,
                 level=template.level,
                 keywords=template.keywords.copy() if template.keywords else [],
-                behaviors=template.behaviors.copy() if template.behaviors else [],
             )
             self.world.npcs[npc_id] = npc
+            
+            # Add NPC to room
+            room = self.world.rooms.get(player.room_id)
+            if room:
+                room.entities.add(npc_id)
+            
+            # Start NPC behavior timers
+            self._schedule_npc_idle(npc_id)
+            self._schedule_npc_wander(npc_id)
 
             return [
                 self._msg_to_player(
@@ -3580,6 +3590,17 @@ class WorldEngine:
 
             # Run the on_idle_tick hook for all behaviors
             await self._run_behavior_hook(npc_id, "on_idle_tick")
+
+            # Check for hostile targets (faction enemies and aggro_on_sight players)
+            # Only if not already in combat
+            if not npc.target_id:
+                hostile_targets = self._npc_find_hostile_targets(npc_id)
+                if hostile_targets:
+                    # Pick the first hostile target and attack
+                    target_id = hostile_targets[0]
+                    events = self.combat_system.start_attack_entity(npc_id, target_id)
+                    if events:
+                        await self._dispatch_events(events)
 
             # Reschedule next idle check
             self._schedule_npc_idle(npc_id)
@@ -6375,6 +6396,82 @@ class WorldEngine:
     def _show_combat_status(self, player_id: PlayerId) -> list[Event]:
         """Show current combat status. Delegates to CombatSystem."""
         return self.combat_system.show_combat_status(player_id)
+
+    def _npc_find_hostile_targets(self, npc_id: str) -> list[str]:
+        """Find hostile targets for an NPC based on faction and aggro settings.
+        
+        Returns a list of entity IDs (NPCs and players) that this NPC should attack.
+        Prioritizes faction enemies, then aggro_on_sight players if enabled.
+        
+        Args:
+            npc_id: The NPC entity ID
+            
+        Returns:
+            List of entity IDs that are hostile targets
+        """
+        hostile_targets = []
+        
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
+            return hostile_targets
+            
+        template = self.world.npc_templates.get(npc.template_id)
+        if not template:
+            print(f"[FACTION] ERROR: No template found for {npc.name} (template_id: {npc.template_id})")
+            return hostile_targets
+        
+        # DEBUG: Check template attributes
+        print(f"[FACTION] Template for {npc.name}: has faction_id = {hasattr(template, 'faction_id')}, value = {getattr(template, 'faction_id', 'MISSING')}")
+            
+        room = self.world.rooms.get(npc.room_id)
+        if not room:
+            return hostile_targets
+            
+        # Get NPC's faction if any
+        npc_faction_id = template.faction_id
+        
+        # DEBUG: Log faction checking
+        if npc_faction_id:
+            print(f"[FACTION] {npc.name} ({npc_id[:8]}) has faction: {npc_faction_id}")
+        
+        # Check all NPCs in the room for faction hostility
+        if npc_faction_id:
+            for entity_id in room.entities:
+                if entity_id == npc_id:
+                    continue
+                    
+                other_npc = self.world.npcs.get(entity_id)
+                if not other_npc or not other_npc.is_alive():
+                    continue
+                    
+                other_template = self.world.npc_templates.get(other_npc.template_id)
+                if not other_template or not other_template.faction_id:
+                    continue
+                
+                # DEBUG: Log faction comparison
+                print(f"[FACTION] Checking {npc.name} ({npc_faction_id}) vs {other_npc.name} ({other_template.faction_id})")
+                    
+                # Check if factions are hostile
+                if self.faction_system.are_factions_hostile(
+                    npc_faction_id, other_template.faction_id
+                ):
+                    print(f"[FACTION] ✓ HOSTILE! {npc.name} will attack {other_npc.name}")
+                    hostile_targets.append(entity_id)
+                else:
+                    print(f"[FACTION] ✗ Not hostile: {npc_faction_id} vs {other_template.faction_id}")
+        
+        # Check if this NPC has aggro_on_sight for players
+        behavior_config = resolve_behaviors(template.behaviors)
+        if behavior_config.get("aggro_on_sight", False):
+            # Add all players in the room as hostile targets
+            for entity_id in room.entities:
+                if entity_id in self.world.players:
+                    player = self.world.players[entity_id]
+                    if player.is_alive():
+                        print(f"[FACTION] {npc.name} adding player {player.name} to targets (aggro_on_sight)")
+                        hostile_targets.append(entity_id)
+        
+        return hostile_targets
 
     async def _trigger_npc_player_enter(
         self, room_id: str, player_id: str, skip_npcs: set[str] | None = None

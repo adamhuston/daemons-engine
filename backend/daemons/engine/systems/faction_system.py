@@ -104,6 +104,9 @@ class FactionSystem:
         # Player reputation: (player_id, faction_id) -> FactionStanding
         self.player_standings: dict[tuple[str, str], FactionStanding] = {}
 
+        # Faction hostility matrix: {faction_id: set(enemy_faction_ids)}
+        self.faction_hostilities: dict[str, set[str]] = {}
+
     # ---------- Database Operations ----------
 
     async def load_factions_from_db(self) -> None:
@@ -196,7 +199,8 @@ class FactionSystem:
 
             # Process each faction
             for faction_def in faction_definitions:
-                faction_id = str(uuid.uuid4())
+                # Use ID from YAML if provided, otherwise generate UUID
+                faction_id = faction_def.get("id") or str(uuid.uuid4())
                 faction_name = faction_def.get("name", "Unknown")
                 description = faction_def.get("description", "")
                 color = faction_def.get("color", "#FFFFFF")
@@ -236,6 +240,12 @@ class FactionSystem:
                 # Add NPC members to database
                 for npc_id in npc_members:
                     await self._add_npc_member_in_db(faction_id, npc_id)
+
+            # Setup default hostilities for known factions
+            # Phase 1: Silver Sanctum vs Shadow Syndicate
+            if "silver_sanctum" in self.factions and "shadow_syndicate" in self.factions:
+                self.set_faction_hostility("silver_sanctum", "shadow_syndicate")
+                logger.info("Set hostility: Silver Sanctum <-> Shadow Syndicate")
 
             logger.info(f"Loaded {len(self.factions)} factions from YAML files")
         except Exception as e:
@@ -331,6 +341,56 @@ class FactionSystem:
         if player_joinable_only:
             factions = [f for f in factions if f.player_joinable]
         return sorted(factions, key=lambda f: f.name)
+
+    def set_faction_hostility(
+        self, faction_id_1: str, faction_id_2: str, bidirectional: bool = True
+    ) -> None:
+        """
+        Mark two factions as hostile to each other.
+
+        Args:
+            faction_id_1: First faction ID
+            faction_id_2: Second faction ID
+            bidirectional: If True, makes hostility mutual (default)
+        """
+        if faction_id_1 not in self.faction_hostilities:
+            self.faction_hostilities[faction_id_1] = set()
+        self.faction_hostilities[faction_id_1].add(faction_id_2)
+
+        if bidirectional:
+            if faction_id_2 not in self.faction_hostilities:
+                self.faction_hostilities[faction_id_2] = set()
+            self.faction_hostilities[faction_id_2].add(faction_id_1)
+
+    def are_factions_hostile(
+        self, faction_id_1: str | None, faction_id_2: str | None
+    ) -> bool:
+        """
+        Check if two factions are enemies.
+
+        Args:
+            faction_id_1: First faction ID (None = neutral)
+            faction_id_2: Second faction ID (None = neutral)
+
+        Returns:
+            True if factions are hostile, False otherwise
+        """
+        print(f"[FACTION-HOSTILITY] Checking: {faction_id_1} vs {faction_id_2}")
+        print(f"[FACTION-HOSTILITY] Full hostility matrix: {self.faction_hostilities}")
+        
+        if not faction_id_1 or not faction_id_2:
+            print(f"[FACTION-HOSTILITY] One is None, returning False")
+            return False  # Neutral NPCs not hostile
+        if faction_id_1 == faction_id_2:
+            print(f"[FACTION-HOSTILITY] Same faction, returning False")
+            return False  # Same faction
+
+        hostiles_for_f1 = self.faction_hostilities.get(faction_id_1, set())
+        is_hostile = faction_id_2 in hostiles_for_f1
+        print(f"[FACTION-HOSTILITY] Hostiles for {faction_id_1}: {hostiles_for_f1}")
+        print(f"[FACTION-HOSTILITY] Is {faction_id_2} in that set? {is_hostile}")
+        
+        return is_hostile
 
     def get_npc_faction(self, npc_template_id: str) -> str | None:
         """Get the faction ID for an NPC template (O(1) lookup)."""

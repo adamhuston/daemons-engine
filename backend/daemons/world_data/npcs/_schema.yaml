@@ -108,6 +108,15 @@ behavior: array or dictionary (default: [])
   #   flees_at_health_percent: 20
   #   calls_for_help: false
 
+# Faction Affiliation (Phase 10.3+)
+# ==================================
+faction_id: string | null (default: null)
+  # Faction this NPC belongs to (from factions/*.yaml)
+  # NPCs with matching faction_id are allies
+  # NPCs with different faction_ids may be enemies (see faction hostility matrix)
+  # If null, NPC is independent/neutral
+  # Example: "Silver Sanctum", "Shadow Syndicate"
+
 # Loot Table (Phase 4.5)
 # =====================
 loot_table: array (default: [])
