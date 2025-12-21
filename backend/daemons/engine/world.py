@@ -1555,6 +1555,13 @@ class WorldNpc(WorldEntity):
     # Last time hunger was updated (Unix timestamp)
     last_hunger_update: float | None = None
 
+    # Phase 2: Patrol System
+    patrol_route: list[RoomId] = field(default_factory=list)  # List of room IDs to patrol
+    patrol_index: int = 0  # Current waypoint index
+    patrol_mode: str = "loop"  # "loop", "bounce", or "once"
+    home_room_id: RoomId | None = None  # Spawn point for respawn/return
+    _patrol_direction: int = 1  # Internal: 1=forward, -1=backward (for bounce mode)
+
     def __post_init__(self):
         """Ensure entity_type is set correctly."""
         object.__setattr__(self, "entity_type", EntityType.NPC)
@@ -1680,6 +1687,9 @@ class WorldPlayer(WorldEntity):
 
     # Connection state - whether player is actively connected
     is_connected: bool = False
+
+    # Phase 10.3: Faction membership
+    faction_id: str | None = None  # Faction player belongs to (from factions/*.yaml)
 
     # Quest tracking (Phase X)
     quest_progress: dict[str, Any] = field(

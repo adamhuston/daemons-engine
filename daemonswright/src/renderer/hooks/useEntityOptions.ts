@@ -32,7 +32,8 @@ const ID_FIELD_MAP: Record<string, string> = {
   classes: 'class_id',
   areas: 'area_id',
   triggers: 'id',
-  factions: 'faction_id',
+  factions: 'id',  // Factions use 'id' not 'faction_id'
+  biomes: 'biome_id',
 };
 
 // Name field to use for display
@@ -47,6 +48,7 @@ const NAME_FIELD_MAP: Record<string, string> = {
   areas: 'name',
   triggers: 'description',
   factions: 'name',
+  biomes: 'name',
 };
 
 export function useEntityOptions(

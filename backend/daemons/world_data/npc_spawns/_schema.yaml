@@ -69,6 +69,43 @@ enabled: bool (optional, default: true)
   # Set to false to temporarily disable without deleting
   # Example: false
 
+# Patrol System (Phase 2)
+# -----------------------
+patrol_route: array[string] (optional, default: null)
+  # List of room IDs the NPC should patrol through
+  # NPC will move between these waypoints in sequence
+  # Minimum 2 rooms required for patrol to activate
+  # Example: ["room_gate", "room_forest_1", "room_forest_2"]
+
+patrol_mode: string (optional, default: "loop")
+  # How the NPC moves through the patrol route
+  # Options:
+  #   "loop" - Circular: waypoint 0 → 1 → 2 → 0 → ...
+  #   "bounce" - Back and forth: 0 → 1 → 2 → 1 → 0 → ...
+  #   "once" - One-time: 0 → 1 → 2, then stop
+  # Example: "bounce"
+
+patrol_interval: float (optional, default: 60.0)
+  # Seconds between patrol movements
+  # Range: 10.0 to 300.0
+  # Example: 45.0
+
+spawn_as_group: bool (optional, default: false)
+  # If true, spawns multiple NPCs with same patrol route
+  # Uses group_size to determine count
+  # Example: true
+
+group_size: int (optional, default: 1)
+  # Number of NPCs to spawn when spawn_as_group is true
+  # Range: 1 to 10
+  # Example: 3
+
+group_spacing: int (optional, default: 0)
+  # Waypoint offset between NPCs in patrol group
+  # Prevents clumping by starting NPCs at different waypoints
+  # Range: 0 to len(patrol_route) - 1
+  # Example: 1 (first NPC at waypoint 0, second at waypoint 1)
+
 # Database Mapping Notes
 # ======================
 # Each spawn entry creates one or more NpcInstance records
@@ -186,3 +223,47 @@ enabled: bool (optional, default: true)
 #     instance_data:
 #       name_override: "Elder Willow"
 #       dialogue_tree: "village_elder_main"
+
+# Pattern 6: Patrolling Guard (Phase 2)
+# NPC that walks a patrol route in a loop
+# spawns:
+#   - template_id: npc_town_guard
+#     room_id: room_city_gate
+#     respawn_time: 600
+#     patrol_route:
+#       - room_city_gate
+#       - room_market_square
+#       - room_north_wall
+#       - room_east_wall
+#     patrol_mode: loop
+#     patrol_interval: 45.0
+
+# Pattern 7: Patrol Group (Phase 2)
+# Multiple NPCs patrolling together with spacing
+# spawns:
+#   - template_id: npc_sanctum_warrior
+#     room_id: room_battlefield_gate
+#     respawn_time: 300
+#     patrol_route:
+#       - room_battlefield_gate
+#       - room_west_forest_1
+#       - room_west_forest_2
+#       - room_ruins_outer
+#     patrol_mode: loop
+#     patrol_interval: 60.0
+#     spawn_as_group: true
+#     group_size: 3
+#     group_spacing: 1
+
+# Pattern 8: Bouncing Patrol (Phase 2)
+# NPC that walks back and forth between endpoints
+# spawns:
+#   - template_id: npc_syndicate_rogue
+#     room_id: room_east_base
+#     respawn_time: 240
+#     patrol_route:
+#       - room_east_base
+#       - room_east_forest_1
+#       - room_east_forest_2
+#     patrol_mode: bounce
+#     patrol_interval: 30.0

@@ -1,6 +1,3 @@
-# Underground/Cavern Biome
-# Subterranean realm with no natural light
-
 biome_id: underground
 name: Underground Caverns
 description: >
@@ -9,155 +6,84 @@ description: >
   on darkvision, bioluminescence, or torchlight. Strange fungi and
   creatures adapted to eternal night make their home in the depths.
 
-biome_type: UNDERGROUND
+# Phase 17.4-17.5: Environmental Properties
+temperature_range: [50, 65]
+climate_types: [subterranean, stable]
 
-# Temperature configuration - stable underground temps
-temperature:
-  base_min: 50   # Cool and constant
-  base_max: 65   # Little variation
-  comfortable_min: 52
-  comfortable_max: 62
+weather_patterns:
+  calm: 0.50
+  dripping: 0.25
+  flooded: 0.05
+  cave_in: 0.03
+  wind_current: 0.12
+  spore_cloud: 0.05
 
-# Seasonal modifiers - minimal effect underground
-seasonal_effects:
+seasonal_weather_modifiers:
   spring:
-    temperature_modifier: 0
-    precipitation_modifier: 1.2  # Snowmelt seeps in
-    growth_rate: 1.0
-    spawn_rate: 1.0
-    light_hours: 0               # No natural light
+    precipitation_multiplier: 1.2
     description: "Surface melt sends water trickling through the stone."
-    
   summer:
-    temperature_modifier: 2
-    precipitation_modifier: 0.8
-    growth_rate: 1.0
-    spawn_rate: 1.0
-    light_hours: 0
+    precipitation_multiplier: 0.8
     description: "Surface heat barely penetrates. The deep remains cool."
-    
   autumn:
-    temperature_modifier: 0
-    precipitation_modifier: 1.0
-    growth_rate: 1.0
-    spawn_rate: 1.1  # Surface creatures may shelter
-    light_hours: 0
+    precipitation_multiplier: 1.0
     description: "As surface grows cold, some creatures retreat underground."
-    
   winter:
-    temperature_modifier: -2
-    precipitation_modifier: 0.5
-    growth_rate: 1.0
-    spawn_rate: 1.2  # Hibernating creatures gather
-    light_hours: 0
+    precipitation_multiplier: 0.5
     description: "The depths offer shelter from winter's bite."
 
-# Valid weather patterns - underground has its own "weather"
-valid_weather:
-  - CALM          # Stable
-  - DRIPPING      # Water seepage
-  - FLOODED       # Rising water levels
-  - CAVE_IN       # Unstable areas
-  - WIND_CURRENT  # Underground air currents
-  - SPORE_CLOUD   # Fungal releases
+seasonal_temperature_modifiers:
+  spring: 0
+  summer: 2
+  autumn: 0
+  winter: -2
 
-# Weather weights
-weather_weights:
-  CALM: 50
-  DRIPPING: 25
-  FLOODED: 5
-  CAVE_IN: 3
-  WIND_CURRENT: 12
-  SPORE_CLOUD: 5
+seasonal_descriptions:
+  spring: "Water seeps through stone as the surface world thaws above."
+  summer: "The depths remain cool and stable while the surface bakes."
+  autumn: "Surface creatures begin seeking shelter in the upper caves."
+  winter: "The underground becomes a refuge from the frozen world above."
 
-# Valid seasons (present but minimal effect)
-valid_seasons:
-  - SPRING
-  - SUMMER
-  - AUTUMN
-  - WINTER
+flora_tags:
+  - fungus
+  - moss
+  - lichen
+  - bioluminescent
+  - spore_plant
+  - cave_growth
 
-# Spawn modifiers
+fauna_tags:
+  - cave_dwelling
+  - blind
+  - darkvision
+  - bioluminescent
+  - aberration
+  - ooze
+  - vermin
+  - underdark
+  - predator
+
 spawn_modifiers:
-  herbivore: 0.4    # Limited food sources
-  predator: 0.8     # Efficient hunters thrive
-  omnivore: 0.9     # Adaptable creatures survive
-  bird: 0.1         # Almost none
-  insect: 1.2       # Cave insects
-  reptile: 0.5      # Some cold-blooded survive
-  amphibian: 0.8    # Near water sources
-  plant: 0.2        # Fungi replaces plants
-  fungus: 2.5       # Abundant fungi
-  undead: 1.5       # Darkness favors undead
-  elemental: 1.3    # Earth elementals
-  beast: 0.6
-  aberration: 1.8   # Strange things in the dark
-  ooze: 1.5         # Oozes thrive here
-  vermin: 1.8       # Rats, spiders, centipedes
+  spring:
+    fauna_spawn_multiplier: 1.0
+    flora_growth_rate: 1.0
+    water_seepage_active: true
+  summer:
+    fauna_spawn_multiplier: 1.0
+    flora_growth_rate: 1.0
+    surface_heat_minimal: true
+  autumn:
+    fauna_spawn_multiplier: 1.1
+    flora_growth_rate: 1.0
+    surface_migration_active: true
+  winter:
+    fauna_spawn_multiplier: 1.2
+    flora_growth_rate: 1.0
+    hibernation_refuge: true
+    surface_refugees: true
 
-# Spawn types
-spawn_types:
-  common:
-    - bat
-    - cave_spider
-    - rat
-    - cave_fish
-    - giant_centipede
-    - fungus
-  uncommon:
-    - darkmantle
-    - cave_bear
-    - ooze
-    - grick
-  rare:
-    - mind_flayer
-    - purple_worm
-    - drow
-    - beholder
-
-# Population limits
-population_limits:
-  herbivore_max: 2
-  predator_max: 3
-  fungus_max: 15
-  vermin_max: 10
-  total_creature_max: 8
-
-# Terrain features
-terrain_features:
-  - stalactites
-  - stalagmites
-  - underground_rivers
-  - chasms
-  - crystal_formations
-  - fungal_forests
-  - lava_tubes
-
-# Resources
-resources:
-  wood: none
-  herbs: rare       # Cave-adapted species
-  game: uncommon
-  water: common     # Underground streams
-  ore: abundant
-  gems: common
-  fungal_reagents: abundant
-
-# Hazards
-hazards:
-  - cave_in
-  - darkness
-  - flooding
-  - toxic_gas
-  - spore_clouds
-  - getting_lost
-  - underground_predators
-
-# Tags
-tags:
-  - underground
-  - cavern
-  - dark
-  - subterranean
-  - depths
-  - no_light
+# Gameplay Modifiers
+danger_modifier: 3
+magic_affinity: moderate
+movement_modifier: 0.8
+visibility_modifier: 0.1

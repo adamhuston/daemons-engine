@@ -1034,6 +1034,26 @@ class CombatSystem:
             # Get template for loot and XP
             template = world.npc_templates.get(npc.template_id)
 
+            # Phase 3: Track faction warfare kills
+            if template and template.faction_id and killer:
+                victim_faction = template.faction_id
+                
+                # Get killer's faction if it's an NPC
+                killer_faction = None
+                if killer_id in world.npcs:
+                    killer_npc = world.npcs[killer_id]
+                    killer_template = world.npc_templates.get(killer_npc.template_id)
+                    if killer_template:
+                        killer_faction = killer_template.faction_id
+                
+                # Track kills if both are faction NPCs
+                if killer_faction and victim_faction and killer_faction != victim_faction:
+                    if killer_faction not in self.ctx.faction_kill_counts:
+                        self.ctx.faction_kill_counts[killer_faction] = 0
+                    self.ctx.faction_kill_counts[killer_faction] += 1
+                    
+                    print(f"[FACTION] {killer_faction} killed {victim_faction} member. Total kills: {self.ctx.faction_kill_counts[killer_faction]}")
+
             # Drop loot to room floor
             if template and template.drop_table and room:
                 loot_events = self.roll_and_drop_loot(

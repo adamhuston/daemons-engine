@@ -53,7 +53,7 @@ export function useSchema(worldDataPath: string | null) {
     // Infer content type from file path
     const pathParts = filePath.split(/[/\\]/);
     const contentType = pathParts.find((part) =>
-      ['rooms', 'items', 'npcs', 'quests', 'abilities', 'classes', 'areas', 'dialogues', 'triggers', 'factions', 'npc_spawns', 'item_instances', 'quest_chains'].includes(part)
+      ['rooms', 'items', 'npcs', 'quests', 'abilities', 'classes', 'areas', 'dialogues', 'triggers', 'factions', 'biomes', 'flora', 'npc_spawns', 'item_instances', 'quest_chains'].includes(part)
     );
 
     if (!contentType) {

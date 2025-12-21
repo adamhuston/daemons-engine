@@ -111,6 +111,7 @@ behavior: array or dictionary (default: [])
 # Faction Affiliation (Phase 10.3+)
 # ==================================
 faction_id: string | null (default: null)
+  # ref: factions
   # Faction this NPC belongs to (from factions/*.yaml)
   # NPCs with matching faction_id are allies
   # NPCs with different faction_ids may be enemies (see faction hostility matrix)
@@ -251,23 +252,27 @@ keywords: array of strings (default: [])
 # Class & Abilities (Phase 14)
 # ============================
 class_id: string (optional, default: null)
+  # ref: classes
   # Character class for this NPC (from world_data/classes/*.yaml)
   # When set, the NPC gets a CharacterSheet with resources and abilities
   # Example: "warrior", "mage", "rogue"
 
 default_abilities: array of strings (optional, default: [])
+  # ref: abilities
   # Ability IDs this NPC knows (from world_data/abilities/*.yaml)
   # Must be valid ability IDs that exist in the ability templates
   # NPC will learn these abilities regardless of level requirements
   # Example: ["fireball", "arcane_bolt", "mana_shield"]
 
 ability_loadout: array of strings (optional, default: [])
+  # ref: abilities
   # Ability IDs in the NPC's "action bar" for AI to use
   # Should be a subset of default_abilities
   # AI behaviors use this to decide which abilities to cast
   # Example: ["fireball", "arcane_bolt"]
 
 ai_behavior: string (optional, default: null)
+  # Options: caster_ai, caster_tactical, brute_ai, berserker_ai, brute_simple
   # Combat AI behavior script for ability usage
   # Controls how the NPC decides when to use abilities vs basic attacks
   # Options:
@@ -275,6 +280,7 @@ ai_behavior: string (optional, default: null)
   #   "caster_tactical"  - Tactical caster: uses AoE when multiple enemies, adapts
   #   "brute_ai"         - Melee fighter: uses power attacks, manages rage/stamina
   #   "berserker_ai"     - Always aggressive: enrages below 50% HP
+  #   "brute_simple"     - Simple random ability usage
   # Example: "caster_ai"
 
 # Complete Example: NPC Mage with Abilities

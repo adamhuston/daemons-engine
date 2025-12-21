@@ -1,6 +1,8 @@
 id: battlefield_room_1765678986544
 name: The base of the watchtower
-description: ''
+description: >-
+  A shapeless ruined interior built out of large stone blocks and massive stone beams. This would seem to be the ground
+  floor of a ruined watchtower. There is a barely functional door to the east.
 room_type: chamber
 area_id: area_battlefield
 z_level: 0
@@ -12,3 +14,6 @@ doors:
     is_open: true
     is_locked: true
     door_name: iron gate
+lighting_override: null
+on_enter_effect: ''
+on_exit_effect: ''

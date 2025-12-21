@@ -1,5 +1,6 @@
 # backend/app/engine/loader.py
 import time
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -163,6 +164,8 @@ async def load_world(session: AsyncSession) -> World:
             vitality=p.vitality,
             max_energy=p.max_energy,
             current_energy=p.current_energy,
+            # Phase 10.3: Faction membership
+            faction_id=getattr(p, "faction_id", None),
             # Quest system (Phase X)
             quest_progress=quest_progress_data,
             completed_quests=set(completed_quests_data),
@@ -449,6 +452,11 @@ async def load_world(session: AsyncSession) -> World:
             respawn_time_override=n.respawn_time,  # NULL means use area default
             last_killed_at=n.last_killed_at,
             instance_data=n.instance_data or {},
+            # Phase 2: Patrol fields
+            patrol_route=getattr(n, "patrol_route", []) or [],
+            patrol_index=getattr(n, "patrol_index", 0) or 0,
+            patrol_mode=getattr(n, "patrol_mode", "loop") or "loop",
+            home_room_id=getattr(n, "home_room_id", None),
         )
 
     # ----- Link NPCs to rooms (unified entity tracking) -----
@@ -456,7 +464,8 @@ async def load_world(session: AsyncSession) -> World:
         if npc.is_alive() and npc.room_id in rooms:
             rooms[npc.room_id].entities.add(npc.id)
 
-    return World(
+    # Build World object
+    world = World(
         rooms=rooms,
         players=players,
         areas=areas,
@@ -468,6 +477,12 @@ async def load_world(session: AsyncSession) -> World:
         container_contents=container_contents,
         flora_instances=flora_cache,
     )
+
+    # ----- Load patrol spawns from YAML (Phase 2) -----
+    world_data_path = Path(__file__).parent.parent / "world_data"
+    await _load_patrol_spawns(session, world, world_data_path)
+
+    return world
 
 
 def create_npc_character_sheet(
@@ -694,6 +709,156 @@ def load_triggers_from_yaml(world: World, world_data_dir: str | None = None) -> 
 
     if spawns_loaded > 0:
         print(f"Loaded {spawns_loaded} dynamic NPC spawn definitions")
+
+
+async def _load_patrol_spawns(session: AsyncSession, world: World, world_data_dir: Path) -> None:
+    """
+    Load NPC spawn configurations with patrol routes and create NpcInstance records.
+    
+    Phase 2: Patrol System
+    Processes npc_spawns/*.yaml files to create NPCs with patrol routes.
+    """
+    import uuid
+    import yaml
+    
+    spawns_dir = world_data_dir / "npc_spawns"
+    if not spawns_dir.exists():
+        return
+    
+    instances_created = 0
+    
+    for yaml_file in spawns_dir.glob("**/*.yaml"):
+        if yaml_file.name.startswith("_"):
+            continue
+            
+        with open(yaml_file, encoding="utf-8") as f:
+            spawn_data = yaml.safe_load(f)
+        
+        if not spawn_data:
+            continue
+        
+        # Get spawns list (supporting both old and new formats)
+        spawns = spawn_data.get("spawns", [])
+        if not spawns:
+            continue
+        
+        for spawn_def in spawns:
+            # Skip dynamic spawns (handled by existing system)
+            if spawn_def.get("spawn_conditions"):
+                continue
+            
+            # Required fields
+            template_id = spawn_def.get("npc_template_id") or spawn_def.get("template_id")
+            room_id = spawn_def.get("spawn_room_id") or spawn_def.get("room_id")
+            
+            if not template_id or not room_id:
+                continue
+            
+            # Check if template and room exist
+            if template_id not in world.npc_templates:
+                print(f"Warning: NPC template '{template_id}' not found for spawn")
+                continue
+            
+            if room_id not in world.rooms:
+                print(f"Warning: Room '{room_id}' not found for spawn")
+                continue
+            
+            # Patrol configuration
+            patrol_route = spawn_def.get("patrol_route") or []
+            patrol_mode = spawn_def.get("patrol_mode", "loop")
+            patrol_interval = spawn_def.get("patrol_interval", 60.0)
+            
+            # Group spawning
+            spawn_as_group = spawn_def.get("spawn_as_group", False)
+            group_size = spawn_def.get("group_size", 1)
+            group_spacing = spawn_def.get("group_spacing", 0)
+            
+            # Other options
+            respawn_time = spawn_def.get("respawn_time")
+            spawn_on_start = spawn_def.get("spawn_on_server_start", True)
+            instance_data = spawn_def.get("instance_data", {})
+            
+            if not spawn_on_start:
+                continue  # Skip this spawn for now
+            
+            # Determine how many NPCs to spawn
+            count = group_size if spawn_as_group else 1
+            
+            # Create NPC instances
+            for i in range(count):
+                npc_id = str(uuid.uuid4())
+                
+                # Calculate starting patrol index with spacing
+                starting_index = 0
+                if patrol_route and group_spacing > 0:
+                    starting_index = (i * group_spacing) % len(patrol_route)
+                
+                # Get template for initial health
+                template = world.npc_templates[template_id]
+                
+                # Create database record
+                npc_instance = NpcInstance(
+                    id=npc_id,
+                    template_id=template_id,
+                    room_id=room_id,
+                    spawn_room_id=room_id,
+                    current_health=template.max_health,
+                    is_alive=True,
+                    respawn_time=respawn_time,
+                    last_killed_at=None,
+                    patrol_route=patrol_route,
+                    patrol_index=starting_index,
+                    patrol_mode=patrol_mode,
+                    home_room_id=room_id,
+                    instance_data=instance_data,
+                )
+                
+                session.add(npc_instance)
+                instances_created += 1
+                
+                # Add to world immediately for this session
+                from .world import WorldNpc, EntityType
+                
+                npc_name = instance_data.get("name_override", template.name)
+                
+                world_npc = WorldNpc(
+                    id=npc_id,
+                    entity_type=EntityType.NPC,
+                    name=npc_name,
+                    room_id=room_id,
+                    keywords=list(template.keywords),
+                    level=template.level,
+                    max_health=template.max_health,
+                    current_health=template.max_health,
+                    armor_class=template.armor_class,
+                    strength=template.strength,
+                    dexterity=template.dexterity,
+                    intelligence=template.intelligence,
+                    base_attack_damage_min=template.attack_damage_min,
+                    base_attack_damage_max=template.attack_damage_max,
+                    base_attack_speed=template.attack_speed,
+                    experience_reward=template.experience_reward,
+                    template_id=template_id,
+                    spawn_room_id=room_id,
+                    respawn_time_override=respawn_time,
+                    last_killed_at=None,
+                    instance_data=instance_data,
+                    # Patrol fields
+                    patrol_route=patrol_route,
+                    patrol_index=starting_index,
+                    patrol_mode=patrol_mode,
+                    home_room_id=room_id,
+                )
+                
+                world.npcs[npc_id] = world_npc
+                
+                # Add to room entities
+                if room_id in world.rooms:
+                    world.rooms[room_id].entities.add(npc_id)
+    
+    if instances_created > 0:
+        await session.commit()
+        print(f"Created {instances_created} NPC instances with patrol routes")
 
 
 def _parse_trigger(trigger_dict: dict):

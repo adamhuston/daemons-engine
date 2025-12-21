@@ -63,12 +63,14 @@ function parseSchemaFile(content: string, contentType: string): SchemaDefinition
       const defaultMatch = trimmed.match(/\(default:\s*(.+?)\)/);
       const hasDefault = !!defaultMatch;
 
-      // Look ahead for # Options: comment in the next few lines
+      // Look ahead for # Options: or # ref: comments in the next few lines
       let enumValues: string[] | undefined;
+      let refValue: string | undefined;
       for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
         const nextLine = lines[j].trim();
         // Stop if we hit a new field definition
         if (nextLine.match(/^\w+:\s*\w+/)) break;
+        
         // Look for Options: comment
         const optionsMatch = nextLine.match(/^#\s*Options?:\s*(.+)/i);
         if (optionsMatch) {
@@ -78,7 +80,12 @@ function parseSchemaFile(content: string, contentType: string): SchemaDefinition
             .split(',')
             .map(s => s.trim().replace(/^["']|["']$/g, ''))
             .filter(s => s.length > 0);
-          break;
+        }
+        
+        // Look for ref: comment (e.g., # ref: factions)
+        const refMatch = nextLine.match(/^#\s*ref:\s*(\w+)/i);
+        if (refMatch) {
+          refValue = refMatch[1];
         }
       }
 
@@ -86,6 +93,7 @@ function parseSchemaFile(content: string, contentType: string): SchemaDefinition
         type: normalizedType,
         required: !hasDefault,
         ...(enumValues && { enum: enumValues }),
+        ...(refValue && { ref: refValue }),
       };
     }
   }

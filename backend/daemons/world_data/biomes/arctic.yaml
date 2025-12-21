@@ -8,96 +8,113 @@ description: >
   in winter and never sets in summer. Only the hardiest creatures survive
   here, adapted to temperatures that would kill most beings.
 
-biome_type: ARCTIC
+# Environmental Ranges (Phase 17.4)
+# ==================================
+temperature_range: [-50, 45]
+  # Extreme cold in winter, brief warmth in summer
 
-# Temperature configuration
-temperature:
-  base_min: -50  # Extreme winter cold
-  base_max: 45   # Brief summer warmth
-  comfortable_min: 20
-  comfortable_max: 35
+climate_types:
+  - polar
+  - arctic
 
-# Seasonal modifiers
-seasonal_effects:
+# Weather Configuration (Phase 17.4)
+# ===================================
+weather_patterns:
+  clear: 0.20
+  cloudy: 0.25
+  overcast: 0.15
+  snow: 0.25
+  blizzard: 0.10
+  fog: 0.05
+
+seasonal_weather_modifiers:
   spring:
-    temperature_modifier: 15
-    precipitation_modifier: 0.8
-    growth_rate: 0.8
-    spawn_rate: 1.0
-    light_hours: 12
-    description: "The long darkness ends. Ice begins to crack and melt at the edges."
-    
+    clear: +0.10
+    snow: -0.10
+    description: "The long darkness ends. Ice begins to crack."
   summer:
-    temperature_modifier: 30
-    precipitation_modifier: 0.6
-    growth_rate: 2.0           # Rapid growth in short summer
-    spawn_rate: 1.5
-    light_hours: 20            # Midnight sun
-    description: "The midnight sun never sets. Life explodes across the tundra."
-    
-  autumn:
-    temperature_modifier: 0
-    precipitation_modifier: 1.0
-    growth_rate: 0.5
-    spawn_rate: 0.8
-    light_hours: 10
-    description: "Days shorten rapidly. Creatures prepare for the long dark."
-    
+    clear: +0.20
+    snow: -0.20
+    fog: +0.05
+    description: "Midnight sun brings nearly endless daylight."
+  fall:
+    snow: +0.10
+    blizzard: +0.05
+    description: "Days shorten rapidly. Winter approaches."
   winter:
-    temperature_modifier: -20
-    precipitation_modifier: 1.5  # Heavy snowfall
-    growth_rate: 0.0
-    spawn_rate: 0.3
-    light_hours: 4              # Polar night
-    description: "Endless night and bitter cold. Survival is the only goal."
+    blizzard: +0.10
+    overcast: +0.10
+    clear: -0.15
+    description: "Polar night and fierce storms dominate."
 
-# Valid weather patterns
-valid_weather:
-  - CLEAR
-  - CLOUDY
-  - OVERCAST
-  - LIGHT_SNOW
-  - SNOW
-  - HEAVY_SNOW
-  - BLIZZARD
-  - FOG
-  - AURORA
+# Seasonal Modifiers (Phase 17.4)
+# ================================
+seasonal_temperature_modifiers:
+  spring: +15
+  summer: +30
+  fall: 0
+  winter: -20
 
-# Weather weights
-weather_weights:
-  CLEAR: 20
-  CLOUDY: 25
-  OVERCAST: 15
-  LIGHT_SNOW: 15
-  SNOW: 10
-  HEAVY_SNOW: 5
-  BLIZZARD: 5
-  FOG: 3
-  AURORA: 2
+seasonal_descriptions:
+  spring: "The long darkness ends. Ice begins to crack and melt at the edges. Life stirs beneath the snow."
+  summer: "The midnight sun never sets. Wildflowers bloom across the tundra in a brief, intense growing season."
+  fall: "Days shorten rapidly. Animals prepare for the coming darkness with frantic feeding."
+  winter: "Endless night and bitter cold. Survival is measured in heartbeats. Only the hardiest endure."
 
-# Valid seasons
-valid_seasons:
-  - SPRING
-  - SUMMER
-  - AUTUMN
-  - WINTER
+# Flora/Fauna Compatibility (Phase 17.4-17.5)
+# ============================================
+flora_tags:
+  - moss
+  - lichen
+  - hardy_grass
+  - tundra_flower
+  - dwarf_shrub
+  - cold_resistant
 
-# Spawn modifiers
+fauna_tags:
+  - cold_adapted
+  - arctic
+  - migratory
+  - thick_fur
+  - aquatic
+  - predator
+  - hibernating
+
+# Spawn Modifiers (Phase 17.5-17.6)
+# ==================================
 spawn_modifiers:
-  herbivore: 0.5
-  predator: 0.6
-  omnivore: 0.5
-  bird: 0.4       # Migratory only
-  insect: 0.2     # Too cold
-  reptile: 0.0    # No reptiles survive
-  plant: 0.2      # Sparse vegetation
-  fungus: 0.3
-  undead: 1.5     # Cold preserves the dead
-  elemental: 1.4  # Ice elementals thrive
-  beast: 0.6
-  cold_adapted: 2.0  # Specialized creatures
+  spring:
+    fauna_spawn_multiplier: 1.0
+    flora_growth_rate: 0.8
+    ice_melting: true
+  summer:
+    fauna_spawn_multiplier: 1.5
+    flora_growth_rate: 2.0
+    midnight_sun_active: true
+    migratory_influx: true
+  fall:
+    fauna_spawn_multiplier: 0.8
+    flora_growth_rate: 0.5
+    migration_departure: true
+  winter:
+    fauna_spawn_multiplier: 0.3
+    flora_growth_rate: 0.0
+    hibernation_active: true
+    polar_night_active: true
 
-# Spawn types
+# Gameplay Modifiers
+# ==================
+danger_modifier: 3
+  # Extreme environment is highly dangerous
+
+magic_affinity: moderate
+  # Ice magic and aurora phenomena
+
+movement_modifier: 0.7
+  # Deep snow and ice significantly slow travel
+
+visibility_modifier: 1.2
+  # Open terrain and snow reflection improve visibility (when clear)
 spawn_types:
   common:
     - arctic_fox

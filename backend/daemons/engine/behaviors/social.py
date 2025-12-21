@@ -19,8 +19,36 @@ class Social(BehaviorScript):
         if not ctx.config.get("calls_for_help", True):
             return BehaviorResult.nothing()
 
-        # Find allies in the same room
-        allies = ctx.get_npcs_in_room()
+        # Find allies in the same room (faction-aware, includes NPCs and players)
+        npc_faction = ctx.template.faction_id
+        allies = []
+        
+        # Check NPCs
+        for npc_id in ctx.get_npcs_in_room():
+            other_npc = ctx.world.npcs.get(npc_id)
+            if not other_npc:
+                continue
+            
+            other_template = ctx.world.npc_templates.get(other_npc.template_id)
+            if not other_template:
+                continue
+            
+            # Only call same-faction NPCs for help
+            # If this NPC has no faction, call everyone (backward compatibility)
+            if npc_faction is None or other_template.faction_id == npc_faction:
+                allies.append(npc_id)
+        
+        # Check players
+        for player_id in ctx.get_players_in_room():
+            player = ctx.world.players.get(player_id)
+            if not player:
+                continue
+            
+            # Only call same-faction players for help
+            # If this NPC has no faction, call everyone (backward compatibility)
+            if npc_faction is None or player.faction_id == npc_faction:
+                allies.append(player_id)
+        
         if allies:
             return BehaviorResult(
                 handled=False,  # Don't prevent other responses
@@ -47,8 +75,36 @@ class CallsForHelp(BehaviorScript):
         if not ctx.config.get("calls_for_help", True):
             return BehaviorResult.nothing()
 
-        # Find allies in the same room
-        allies = ctx.get_npcs_in_room()
+        # Find allies in the same room (faction-aware, includes NPCs and players)
+        npc_faction = ctx.template.faction_id
+        allies = []
+        
+        # Check NPCs
+        for npc_id in ctx.get_npcs_in_room():
+            other_npc = ctx.world.npcs.get(npc_id)
+            if not other_npc:
+                continue
+            
+            other_template = ctx.world.npc_templates.get(other_npc.template_id)
+            if not other_template:
+                continue
+            
+            # Only call same-faction NPCs for help
+            # If this NPC has no faction, call everyone (backward compatibility)
+            if npc_faction is None or other_template.faction_id == npc_faction:
+                allies.append(npc_id)
+        
+        # Check players
+        for player_id in ctx.get_players_in_room():
+            player = ctx.world.players.get(player_id)
+            if not player:
+                continue
+            
+            # Only call same-faction players for help
+            # If this NPC has no faction, call everyone (backward compatibility)
+            if npc_faction is None or player.faction_id == npc_faction:
+                allies.append(player_id)
+        
         if allies:
             return BehaviorResult(
                 handled=False,  # Don't prevent other responses

@@ -1,17 +1,17 @@
 id: area_battlefield
 name: Battlefield
-description: Battlefield area.
+description: A war-torn battlefield surrounding a destroyed keep.
 time_scale: 1
 starting_day: 1
 starting_hour: 6
 starting_minute: 0
 biome: outdoor
-climate: temperate
+climate: subarctic
 ambient_lighting: natural
-weather_profile: standard
-danger_level: 1
-magic_intensity: normal
-default_respawn_time: 300
+weather_profile: snowy
+danger_level: 10
+magic_intensity: moderate
+default_respawn_time: 250
 recommended_level: 1
 theme: exploration
 area_flags:
@@ -20,3 +20,17 @@ area_flags:
   magic_enhanced: false
 entry_points:
   - battlefield_start
+ambient_sound: ''
+time_phases:
+  - name: night
+    ambient_text: The darkness of night surrounds you.
+    lighting: pitch_black
+  - name: morning
+    ambient_text: The first light of dawn breaks over the horizon.
+    lighting: dim
+  - name: day
+    ambient_text: The sun shines overhead.
+    lighting: normal
+  - name: evening
+    ambient_text: The sun begins to set, casting long shadows.
+    lighting: dim

@@ -4,6 +4,7 @@ Social commands - Groups, Tells, Follows, Yells, Clans, Factions
 
 from .clan import register_clan_commands
 from .faction import register_faction_commands
+from .fchan import register_faction_chat_commands
 from .follow import register_follow_commands
 from .group import register_group_commands
 from .tell import register_tell_commands
@@ -16,4 +17,5 @@ __all__ = [
     "register_yell_commands",
     "register_clan_commands",
     "register_faction_commands",
+    "register_faction_chat_commands",
 ]

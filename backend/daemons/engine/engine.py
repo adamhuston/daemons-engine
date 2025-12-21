@@ -850,6 +850,7 @@ class WorldEngine:
         from daemons.commands.social import (
             register_clan_commands,
             register_faction_commands,
+            register_faction_chat_commands,
             register_follow_commands,
             register_group_commands,
             register_tell_commands,
@@ -862,6 +863,7 @@ class WorldEngine:
         register_yell_commands(self.command_router)
         register_clan_commands(self.command_router)
         register_faction_commands(self.command_router)
+        register_faction_chat_commands(self.command_router)
 
         # Quit command - graceful disconnect
         self.command_router.register_handler(
@@ -3591,6 +3593,30 @@ class WorldEngine:
             # Run the on_idle_tick hook for all behaviors
             await self._run_behavior_hook(npc_id, "on_idle_tick")
 
+            # Phase 3: Check if NPC in combat has chased too far from home territory
+            if npc.target_id and npc.home_room_id:
+                max_chase_distance = 5  # Maximum rooms to chase from home
+                distance = self._calculate_room_distance(npc.room_id, npc.home_room_id, max_depth=max_chase_distance + 2)
+                
+                if distance is not None and distance > max_chase_distance:
+                    # Too far from home - disengage and return
+                    print(f"[TERRITORY] {npc.name} is {distance} rooms from home (max {max_chase_distance}), disengaging...")
+                    npc.target_id = None
+                    
+                    # Broadcast disengage message
+                    room = self.world.rooms.get(npc.room_id)
+                    if room:
+                        message = f"⚔️ {npc.name} gives up the chase and returns to patrol."
+                        for entity_id in room.entities:
+                            if entity_id in self.world.players:
+                                player = self.world.players[entity_id]
+                                if player.client:
+                                    player.client.send_message(message)
+                    
+                    # Return to patrol on next idle tick
+                    self._schedule_npc_idle(npc_id)
+                    return
+
             # Check for hostile targets (faction enemies and aggro_on_sight players)
             # Only if not already in combat
             if not npc.target_id:
@@ -3601,6 +3627,15 @@ class WorldEngine:
                     events = self.combat_system.start_attack_entity(npc_id, target_id)
                     if events:
                         await self._dispatch_events(events)
+                else:
+                    # No hostile targets - check if NPC needs to return to patrol
+                    if npc.patrol_route and len(npc.patrol_route) >= 2:
+                        # Check if NPC is off patrol route
+                        if npc.room_id not in npc.patrol_route:
+                            print(f"[PATROL] {npc.name} is off patrol route, returning...")
+                            return_events = await self._npc_return_to_patrol(npc_id)
+                            if return_events:
+                                await self._dispatch_events(return_events)
 
             # Reschedule next idle check
             self._schedule_npc_idle(npc_id)
@@ -6472,6 +6507,243 @@ class WorldEngine:
                         hostile_targets.append(entity_id)
         
         return hostile_targets
+
+    # ===== Phase 2: Patrol System Helpers =====
+
+    def _calculate_room_distance(
+        self, from_room_id: str, to_room_id: str, max_depth: int = 15
+    ) -> int | None:
+        """
+        Calculate distance in rooms between two locations.
+        
+        Args:
+            from_room_id: Starting room ID
+            to_room_id: Destination room ID
+            max_depth: Maximum distance to check
+            
+        Returns:
+            Number of rooms between locations, or None if unreachable
+        """
+        path = self._find_path_to_room(from_room_id, to_room_id, max_depth)
+        if path is None:
+            return None
+        return len(path) - 1  # Path includes both start and end
+
+    def _find_path_to_room(
+        self, from_room_id: str, to_room_id: str, max_depth: int = 10
+    ) -> list[str] | None:
+        """
+        Find shortest path between two rooms using BFS.
+        
+        Args:
+            from_room_id: Starting room ID
+            to_room_id: Destination room ID
+            max_depth: Maximum path length to search
+            
+        Returns:
+            List of room IDs from source to destination (inclusive), or None if no path
+        """
+        if from_room_id == to_room_id:
+            return [from_room_id]
+        
+        from collections import deque
+        
+        queue = deque([(from_room_id, [from_room_id])])
+        visited = {from_room_id}
+        
+        while queue:
+            current_room_id, path = queue.popleft()
+            
+            # Check depth limit
+            if len(path) > max_depth:
+                continue
+            
+            current_room = self.world.rooms.get(current_room_id)
+            if not current_room:
+                continue
+            
+            # Check all exits
+            for direction, next_room_id in current_room.exits.items():
+                if next_room_id == to_room_id:
+                    return path + [next_room_id]
+                
+                if next_room_id not in visited:
+                    visited.add(next_room_id)
+                    queue.append((next_room_id, path + [next_room_id]))
+        
+        return None
+
+    def _find_nearest_waypoint(
+        self, current_room_id: str, waypoints: list[str]
+    ) -> tuple[str, list[str]] | None:
+        """
+        Find the closest waypoint in a patrol route using BFS.
+        
+        Args:
+            current_room_id: Current room ID
+            waypoints: List of waypoint room IDs
+            
+        Returns:
+            Tuple of (nearest_waypoint_id, path_to_waypoint) or None if unreachable
+        """
+        if not waypoints:
+            return None
+        
+        # Check if already at a waypoint
+        if current_room_id in waypoints:
+            return (current_room_id, [current_room_id])
+        
+        # Find shortest path to any waypoint
+        best_waypoint = None
+        best_path = None
+        best_length = float('inf')
+        
+        for waypoint in waypoints:
+            path = self._find_path_to_room(current_room_id, waypoint, max_depth=15)
+            if path and len(path) < best_length:
+                best_length = len(path)
+                best_waypoint = waypoint
+                best_path = path
+        
+        if best_waypoint and best_path:
+            return (best_waypoint, best_path)
+        
+        return None
+
+    def _get_next_patrol_waypoint(self, npc: "WorldNpc") -> str | None:
+        """
+        Calculate the next waypoint in an NPC's patrol route.
+        
+        Args:
+            npc: The NPC with patrol configuration
+            
+        Returns:
+            Next room ID to move to, or None if no valid waypoint
+        """
+        if not npc.patrol_route or len(npc.patrol_route) < 2:
+            return None
+        
+        route_length = len(npc.patrol_route)
+        current_index = npc.patrol_index
+        mode = npc.patrol_mode
+        
+        if mode == "loop":
+            # Circular patrol: 0 → 1 → 2 → 0 → 1 → ...
+            next_index = (current_index + 1) % route_length
+            npc.patrol_index = next_index
+            return npc.patrol_route[next_index]
+            
+        elif mode == "bounce":
+            # Back-and-forth: 0 → 1 → 2 → 1 → 0 → 1 → ...
+            direction = getattr(npc, "_patrol_direction", 1)
+            
+            next_index = current_index + direction
+            
+            # Check if we've reached an endpoint
+            if next_index >= route_length:
+                next_index = route_length - 2
+                direction = -1
+            elif next_index < 0:
+                next_index = 1
+                direction = 1
+            
+            npc.patrol_index = next_index
+            npc._patrol_direction = direction
+            return npc.patrol_route[next_index]
+            
+        elif mode == "once":
+            # One-time patrol: 0 → 1 → 2 → stop
+            next_index = current_index + 1
+            if next_index >= route_length:
+                return None  # Patrol complete
+            
+            npc.patrol_index = next_index
+            return npc.patrol_route[next_index]
+        
+        # Unknown mode, default to loop
+        next_index = (current_index + 1) % route_length
+        npc.patrol_index = next_index
+        return npc.patrol_route[next_index]
+
+    async def _npc_return_to_patrol(self, npc_id: str) -> list["Event"]:
+        """
+        Return an NPC to its patrol route after combat or deviation.
+        
+        Args:
+            npc_id: NPC entity ID
+            
+        Returns:
+            List of events (movement messages, etc.)
+        """
+        events = []
+        
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
+            return events
+        
+        # Check if NPC has a patrol route
+        if not npc.patrol_route or len(npc.patrol_route) < 2:
+            return events
+        
+        current_room = npc.room_id
+        
+        # Check if NPC is already on patrol route
+        if current_room in npc.patrol_route:
+            # Update patrol index to current position
+            npc.patrol_index = npc.patrol_route.index(current_room)
+            print(f"[PATROL] {npc.name} already on patrol route at waypoint {npc.patrol_index}")
+            return events
+        
+        # Find nearest waypoint
+        result = self._find_nearest_waypoint(current_room, npc.patrol_route)
+        if not result:
+            print(f"[PATROL] {npc.name} cannot find path to any patrol waypoint")
+            # Fall back to home room
+            if npc.home_room_id:
+                print(f"[PATROL] {npc.name} will try to return to home room")
+                result = self._find_nearest_waypoint(current_room, [npc.home_room_id])
+        
+        if result:
+            nearest_waypoint, path = result
+            
+            # Move to next room in path (not all the way to waypoint at once)
+            if len(path) > 1:
+                next_room_id = path[1]  # path[0] is current room
+                
+                # Find which direction to go
+                current_room_obj = self.world.rooms.get(current_room)
+                if current_room_obj:
+                    for direction, dest_id in current_room_obj.exits.items():
+                        if dest_id == next_room_id:
+                            # Move the NPC
+                            npc.room_id = next_room_id
+                            
+                            # Update room entities
+                            if current_room in self.world.rooms:
+                                self.world.rooms[current_room].entities.discard(npc_id)
+                            if next_room_id in self.world.rooms:
+                                self.world.rooms[next_room_id].entities.add(npc_id)
+                            
+                            # Broadcast movement
+                            events.append(
+                                self._msg_to_room(
+                                    current_room,
+                                    f"{npc.name} heads {direction}, returning to patrol.",
+                                    exclude=set(),
+                                )
+                            )
+                            events.append(
+                                self._msg_to_room(
+                                    next_room_id,
+                                    f"{npc.name} arrives from patrol.",
+                                    exclude=set(),
+                                )
+                            )
+                            
+                            print(f"[PATROL] {npc.name} moving {direction} toward waypoint {nearest_waypoint}")
+                            break
+        
+        return events
 
     async def _trigger_npc_player_enter(
         self, room_id: str, player_id: str, skip_npcs: set[str] | None = None

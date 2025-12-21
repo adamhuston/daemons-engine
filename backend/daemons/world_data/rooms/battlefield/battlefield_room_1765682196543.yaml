@@ -6,4 +6,3 @@ area_id: area_battlefield
 z_level: 0
 exits:
   west: battlefield_start
-  east: battlefield_room_1765682232115

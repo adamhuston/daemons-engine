@@ -114,9 +114,11 @@ export function StartScreen({
       const subdirs = [
         'abilities',
         'areas',
+        'biomes',
         'classes',
         'dialogues',
         'factions',
+        'flora',
         'item_instances',
         'items',
         'npc_spawns',
