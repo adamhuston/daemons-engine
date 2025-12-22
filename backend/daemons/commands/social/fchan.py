@@ -124,16 +124,14 @@ def register_faction_chat_commands(router) -> None:
     # Register both commands
     router.register(
         names=["fchan"],
-        handler=cmd_fchan,
         description="Broadcast message to all faction members",
         usage="fchan <message>",
         category="social",
-    )
+    )(cmd_fchan)
 
     router.register(
         names=["fc"],
-        handler=cmd_fc,
         description="Broadcast message to all faction members (alias for fchan)",
         usage="fc <message>",
         category="social",
-    )
+    )(cmd_fc)
