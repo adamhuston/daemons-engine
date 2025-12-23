@@ -1,0 +1,33 @@
+spawns:
+  - template_id: npc_forest_guardian
+    room_id: room_0_2_2
+    respawn_time: 0
+    behavior: stationary
+  - template_id: npc_forest_guardian
+    room_id: room_1_2_2
+    respawn_time: 0
+    behavior: stationary
+  - template_id: npc_ethereal_wisp
+    room_id: room_cave_chamber
+    respawn_time: 0
+    behavior: stationary
+  - template_id: npc_goblin_scout
+    room_id: room_deep_cave
+    respawn_time: 0
+    behavior: stationary
+  - template_id: npc_goblin_scout
+    room_id: room_deep_cave
+    respawn_time: 0
+    behavior: stationary
+  - template_id: npc_goblin_scout
+    room_id: room_deep_cave
+    respawn_time: 0
+    behavior: stationary
+  - template_id: npc_goblin_scout
+    room_id: room_deep_cave
+    respawn_time: 0
+    behavior: stationary
+  - template_id: npc_goblin_scout
+    room_id: room_deep_cave
+    respawn_time: 0
+    behavior: stationary

@@ -1,8 +1,8 @@
 version: 1
 grid_size: 150
 rooms:
-  battlefield_room_1765682196543:
+  room_deep_cave:
     x: 2
-    'y': 0
+    'y': -1
     z: 0
 layer_names: {}

@@ -304,12 +304,18 @@ async def load_data():
                 spawns = data.get("spawns", []) or []
                 for spawn in spawns:
                     instance_id = str(uuid.uuid4())
-                    room_id = spawn["room_id"]
+                    # Support both field name formats: room_id/template_id and spawn_room_id/npc_template_id
+                    room_id = spawn.get("room_id") or spawn.get("spawn_room_id")
+                    template_id = spawn.get("template_id") or spawn.get("npc_template_id")
+
+                    if not room_id or not template_id:
+                        print(f"Skipping spawn with missing room_id or template_id: {spawn}")
+                        continue
 
                     # Get template to set current_health if not specified
                     template_result = await session.execute(
                         select(NpcTemplate).where(
-                            NpcTemplate.id == spawn["template_id"]
+                            NpcTemplate.id == template_id
                         )
                     )
                     template = template_result.scalars().first()
@@ -317,10 +323,10 @@ async def load_data():
                         template.max_health if template else 50
                     )
 
-                    print(f"Loading NPC spawn: {spawn['template_id']} in {room_id}")
+                    print(f"Loading NPC spawn: {template_id} in {room_id}")
                     instance = NpcInstance(
                         id=instance_id,
-                        template_id=spawn["template_id"],
+                        template_id=template_id,
                         room_id=room_id,
                         spawn_room_id=room_id,  # Spawn in same room they're placed
                         current_health=current_health,
@@ -379,32 +385,32 @@ async def load_data():
         # Get all rooms and areas
         rooms_result = await session.execute(select(Room))
         rooms = rooms_result.scalars().all()
-        
+
         areas_result = await session.execute(select(Area))
         areas_by_id = {a.id: a for a in areas_result.scalars().all()}
-        
+
         flora_loaded = 0
         fauna_loaded = 0
-        
+
         for room in rooms:
             area = areas_by_id.get(room.area_id)
             if not area:
                 continue
-                
+
             # Get biome definition
             biome = biome_defs.get(area.biome, {})
-            
+
             # Build compatibility tags from biome
             biome_flora_tags = set(biome.get("flora_tags", []))
             biome_fauna_tags = set(biome.get("fauna_tags", []))
             biome_tags = set(biome.get("tags", []))
-            
+
             # Fallback: use biome name as tag if no specific tags
             if not biome_flora_tags:
                 biome_flora_tags = biome_tags | {area.biome} if area.biome else set()
             if not biome_fauna_tags:
                 biome_fauna_tags = biome_tags | {area.biome} if area.biome else set()
-            
+
             # ----- Seed Flora -----
             if flora_templates and biome_flora_tags:
                 # Check if room already has flora
@@ -420,7 +426,7 @@ async def load_data():
                             rarity = template.get("rarity", "common")
                             weight = {"common": 1.0, "uncommon": 0.5, "rare": 0.2, "very_rare": 0.05}.get(rarity, 1.0)
                             compatible.append((template_id, template, weight))
-                    
+
                     if compatible:
                         # Spawn 1-3 flora types per room
                         num_to_spawn = random.randint(1, min(3, len(compatible)))
@@ -429,11 +435,11 @@ async def load_data():
                             weights=[c[2] for c in compatible],
                             k=num_to_spawn
                         )
-                        
+
                         for template_id, template, _ in templates_to_spawn:
                             cluster_size = template.get("cluster_size", [1, 3])
                             quantity = random.randint(cluster_size[0], cluster_size[1])
-                            
+
                             flora_instance = FloraInstance(
                                 template_id=template_id,
                                 room_id=room.id,
@@ -444,7 +450,7 @@ async def load_data():
                             )
                             session.add(flora_instance)
                             flora_loaded += 1
-            
+
             # ----- Seed Fauna -----
             if fauna_templates and biome_fauna_tags:
                 # Check if room already has fauna
@@ -462,7 +468,7 @@ async def load_data():
                             level = template.get("level", 1)
                             weight = 1.0 / (level * 0.5 + 0.5)
                             compatible.append((template_id, template, weight))
-                    
+
                     if compatible:
                         # 50% chance to spawn fauna in room (not every room needs fauna)
                         if random.random() < 0.5:
@@ -473,11 +479,11 @@ async def load_data():
                                 weights=[c[2] for c in compatible],
                                 k=num_to_spawn
                             )
-                            
+
                             for template_id, template, _ in templates_to_spawn:
                                 # Get max health from template
                                 max_health = template.get("max_health", 50)
-                                
+
                                 instance_id = str(uuid.uuid4())
                                 npc_instance = NpcInstance(
                                     id=instance_id,
@@ -491,7 +497,7 @@ async def load_data():
                                 )
                                 session.add(npc_instance)
                                 fauna_loaded += 1
-        
+
         await session.commit()
         if flora_loaded > 0:
             print(f"Seeded {flora_loaded} flora instances based on biomes")
