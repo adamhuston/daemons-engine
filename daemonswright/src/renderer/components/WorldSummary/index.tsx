@@ -58,6 +58,7 @@ const CONTENT_TYPES: Omit<ContentCount, 'count'>[] = [
   { key: 'classes', label: 'Classes', icon: <TeamOutlined />, folder: 'classes', navigation: { view: 'entity-editor', category: 'classes' } },
   { key: 'quests', label: 'Quests', icon: <FlagOutlined />, folder: 'quests', navigation: { view: 'quest-designer' } },
   { key: 'dialogues', label: 'Dialogues', icon: <CommentOutlined />, folder: 'dialogues', navigation: { view: 'dialogue-editor' } },
+  { key: 'biomes', label: 'Biomes', icon: <span role="img" aria-label="biome">🌍</span>, folder: 'biomes', navigation: { view: 'entity-editor', category: 'biomes' } },
   { key: 'flora', label: 'Flora', icon: <span role="img" aria-label="flora">🌿</span>, folder: 'flora', navigation: { view: 'entity-editor', category: 'flora' } },
   { key: 'fauna', label: 'Fauna', icon: <BugOutlined />, folder: 'npcs/fauna', navigation: { view: 'entity-editor', category: 'fauna' } },
   { key: 'areas', label: 'Areas', icon: <EnvironmentOutlined />, folder: 'areas', navigation: { view: 'room-builder' } },

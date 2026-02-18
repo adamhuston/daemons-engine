@@ -1,0 +1,183 @@
+name: Daemonswright Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'daemonswright/**'
+      - '.github/workflows/daemonswright-release.yml'
+  workflow_dispatch:  # Manual trigger still available
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if version changed
+        id: check
+        run: |
+          VERSION=$(node -p "require('./daemonswright/package.json').version")
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if this version tag already exists
+          if git rev-parse "wright-v$VERSION" >/dev/null 2>&1; then
+            echo "Version v$VERSION already released"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version v$VERSION detected"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact: daemonswright-win.zip
+          - os: ubuntu-latest
+            platform: linux
+            artifact: daemonswright-linux.AppImage
+          - os: macos-latest
+            platform: mac-x64
+            artifact: daemonswright-mac-x64.dmg
+          - os: macos-14  # M1/ARM runner
+            platform: mac-arm64
+            artifact: daemonswright-mac-arm64.dmg
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: daemonswright/package-lock.json
+
+      - name: Install dependencies
+        working-directory: daemonswright
+        run: npm ci
+
+      - name: Build renderer
+        working-directory: daemonswright
+        run: npm run build:renderer
+
+      - name: Build Electron app
+        working-directory: daemonswright
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package with electron-builder (Windows)
+        if: matrix.platform == 'win'
+        working-directory: daemonswright
+        run: npx electron-builder --win --publish never
+
+      - name: Package with electron-builder (Linux)
+        if: matrix.platform == 'linux'
+        working-directory: daemonswright
+        run: npx electron-builder --linux --publish never
+
+      - name: Package with electron-builder (macOS x64)
+        if: matrix.platform == 'mac-x64'
+        working-directory: daemonswright
+        run: npx electron-builder --mac --x64 --publish never
+
+      - name: Package with electron-builder (macOS ARM64)
+        if: matrix.platform == 'mac-arm64'
+        working-directory: daemonswright
+        run: npx electron-builder --mac --arm64 --publish never
+
+      - name: Prepare Windows artifact
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          $version = "${{ needs.check-version.outputs.version }}"
+          Compress-Archive -Path "daemonswright/release/win-unpacked/*" -DestinationPath "daemonswright-$version-win.zip"
+
+      - name: Prepare Linux artifact
+        if: matrix.platform == 'linux'
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          cp daemonswright/release/*.AppImage "daemonswright-$VERSION-linux.AppImage"
+          chmod +x "daemonswright-$VERSION-linux.AppImage"
+
+      - name: Prepare macOS x64 artifact
+        if: matrix.platform == 'mac-x64'
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          cp daemonswright/release/*.dmg "daemonswright-$VERSION-mac-x64.dmg"
+
+      - name: Prepare macOS ARM64 artifact
+        if: matrix.platform == 'mac-arm64'
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          cp daemonswright/release/*.dmg "daemonswright-$VERSION-mac-arm64.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: daemonswright-*
+          retention-days: 5
+
+  release:
+    needs: [check-version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Create Release and Tag
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: wright-${{ needs.check-version.outputs.version }}
+          name: Daemonswright ${{ needs.check-version.outputs.version }}
+          draft: false
+          prerelease: ${{ contains(needs.check-version.outputs.version, 'alpha') || contains(needs.check-version.outputs.version, 'beta') }}
+          files: |
+            artifacts/**/*
+          body: |
+            ## Daemonswright ${{ needs.check-version.outputs.version }}
+
+            Visual content editor for the Daemons game engine.
+
+            ### Installation
+
+            **Via pip (recommended):**
+            ```bash
+            pip install daemons-engine
+            daemons wright
+            ```
+
+            **Direct download:**
+            - **Windows:** Download `daemonswright-${{ needs.check-version.outputs.version }}-win.zip`, extract, and run `Daemonswright.exe`
+            - **macOS (Intel):** Download `daemonswright-${{ needs.check-version.outputs.version }}-mac-x64.dmg`
+            - **macOS (Apple Silicon):** Download `daemonswright-${{ needs.check-version.outputs.version }}-mac-arm64.dmg`
+            - **Linux:** Download `daemonswright-${{ needs.check-version.outputs.version }}-linux.AppImage`, make executable (`chmod +x`), and run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

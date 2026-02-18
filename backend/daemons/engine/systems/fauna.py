@@ -67,6 +67,7 @@ class FaunaType(str, Enum):
     FISH = "fish"
     INSECT = "insect"
     ARACHNID = "arachnid"
+    CRUSTACEAN = "crustacean"
 
 
 class TimeOfDay(str, Enum):

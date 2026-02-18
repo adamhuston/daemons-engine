@@ -63,6 +63,9 @@ class GameContext:
         # Contains {"user_id": str, "role": str} from verified JWT
         self.auth_info: dict | None = None
 
+        # Phase 3: Faction warfare tracking (kill counts per faction)
+        self.faction_kill_counts: dict[str, int] = {}  # faction_id -> kills
+
     # ---------- Event Dispatch Helpers ----------
 
     def msg_to_player(

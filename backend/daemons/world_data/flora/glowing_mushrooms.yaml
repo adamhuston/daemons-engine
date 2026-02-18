@@ -31,5 +31,10 @@ seasonal_variants: {}
 dormant_seasons: []
 
 provides_cover: false
+
+# Bioluminescence - these mushrooms emit light!
+provides_light: true
+light_intensity: 15  # Soft eerie glow (enough to see dimly)
+
 rarity: rare
 cluster_size: [3, 8]

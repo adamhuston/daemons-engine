@@ -1,0 +1,69 @@
+# Test NPC Spawn Configuration for Phase 2 Patrol System
+# Creates patrol groups for testing NPC movement and faction warfare
+
+area_id: area_ethereal_nexus  # Using existing test area
+
+spawns:
+  # Test 1: Single Silver Sanctum Warrior on Loop Patrol
+  - npc_template_id: npc_test_sanctum_warrior
+    spawn_room_id: room_0_0_0
+    patrol_route:
+      - room_0_0_0
+      - room_1_0_0
+      - room_2_0_0
+      - room_1_0_0
+    patrol_mode: loop
+    patrol_interval: 30.0
+    respawn_time: 180
+    instance_data:
+      name_override: "Sanctum Patrol Leader"
+
+  # Test 2: Shadow Syndicate Rogue on Bounce Patrol
+  - npc_template_id: npc_test_syndicate_rogue
+    spawn_room_id: room_0_0_1
+    patrol_route:
+      - room_0_0_1
+      - room_1_0_1
+      - room_2_0_1
+    patrol_mode: bounce
+    patrol_interval: 25.0
+    respawn_time: 180
+    instance_data:
+      name_override: "Syndicate Scout"
+
+  # Test 3: Patrol Group - 3 Sanctum Warriors with Spacing
+  - npc_template_id: npc_test_sanctum_warrior
+    spawn_room_id: room_0_1_0
+    patrol_route:
+      - room_0_1_0
+      - room_1_1_0
+      - room_2_1_0
+      - room_2_1_1
+    patrol_mode: loop
+    patrol_interval: 40.0
+    spawn_as_group: true
+    group_size: 3
+    group_spacing: 1
+    respawn_time: 240
+
+  # Test 4: Stationary NPC (No Patrol) for Control
+  - npc_template_id: npc_test_sanctum_warrior
+    spawn_room_id: room_0_2_0
+    respawn_time: 180
+    instance_data:
+      name_override: "Sanctum Guard Captain"
+
+  # Test 5: One-Time Patrol (Messenger)
+  - npc_template_id: npc_test_syndicate_rogue
+    spawn_room_id: room_0_0_2
+    patrol_route:
+      - room_0_0_2
+      - room_1_0_2
+      - room_2_0_2
+      - room_2_1_2
+      - room_2_2_2
+    patrol_mode: once
+    patrol_interval: 20.0
+    respawn_time: 300
+    instance_data:
+      name_override: "Syndicate Messenger"

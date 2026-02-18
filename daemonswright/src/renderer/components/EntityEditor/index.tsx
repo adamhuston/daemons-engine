@@ -46,6 +46,7 @@ const ENTITY_CATEGORIES: EntityCategory[] = [
   { key: 'abilities', label: 'Abilities', icon: <ThunderboltOutlined />, folder: 'abilities', schemaId: 'abilities' },
   { key: 'classes', label: 'Classes', icon: <TeamOutlined />, folder: 'classes', schemaId: 'classes' },
   { key: 'triggers', label: 'Triggers', icon: <ThunderboltOutlined />, folder: 'triggers', schemaId: 'triggers', useCustomEditor: true },
+  { key: 'biomes', label: 'Biomes', icon: <span role="img" aria-label="biome">🌍</span>, folder: 'biomes', schemaId: 'biomes' },
   { key: 'flora', label: 'Flora', icon: <span role="img" aria-label="flora">🌿</span>, folder: 'flora', schemaId: 'flora' },
   { key: 'fauna', label: 'Fauna', icon: <BugOutlined />, folder: 'npcs/fauna', schemaId: 'npcs' },
 ];

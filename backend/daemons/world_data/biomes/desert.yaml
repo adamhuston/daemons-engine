@@ -8,145 +8,102 @@ description: >
   Life here is specialized for survival - cacti store precious water, and most
   creatures are nocturnal to avoid the scorching daytime heat.
 
-biome_type: DESERT
+# Environmental Ranges (Phase 17.4)
+# ==================================
+temperature_range: [35, 120]
+  # Extreme range due to day/night temperature swings
 
-# Temperature configuration
-temperature:
-  base_min: 35   # Cold desert nights
-  base_max: 120  # Scorching days
-  comfortable_min: 60
-  comfortable_max: 90
+climate_types:
+  - dry
+  - continental
 
-# Seasonal modifiers
-seasonal_effects:
+# Weather Configuration (Phase 17.4)
+# ===================================
+weather_patterns:
+  clear: 0.60
+  cloudy: 0.15
+  overcast: 0.05
+  sandstorm: 0.15
+  dust_devil: 0.05
+
+seasonal_weather_modifiers:
   spring:
-    temperature_modifier: -10
-    precipitation_modifier: 1.5  # Brief rainy season
-    growth_rate: 1.8            # Desert blooms
-    spawn_rate: 1.4
-    light_hours: 12
-    description: "Brief rains bring a sudden explosion of wildflowers across the dunes."
-    
+    rain: +0.05
+    clear: -0.05
+    description: "Brief spring rains bring desert blooms."
   summer:
-    temperature_modifier: 15
-    precipitation_modifier: 0.3
-    growth_rate: 0.3
-    spawn_rate: 0.6            # Too hot for most activity
-    light_hours: 14
-    description: "Blistering heat shimmers above the sand. Only the hardiest creatures stir."
-    
-  autumn:
-    temperature_modifier: -5
-    precipitation_modifier: 0.5
-    growth_rate: 0.5
-    spawn_rate: 1.0
-    light_hours: 11
-    description: "Temperatures become more bearable as the sun's angle softens."
-    
+    clear: +0.10
+    sandstorm: +0.05
+    description: "Relentless sun and occasional fierce sandstorms."
+  fall:
+    sandstorm: -0.05
+    description: "Weather becomes slightly more stable."
   winter:
-    temperature_modifier: -25
-    precipitation_modifier: 0.8
-    growth_rate: 0.4
-    spawn_rate: 0.8
-    light_hours: 9
-    description: "Cool days and frigid nights; a different kind of desert challenge."
+    cloudy: +0.10
+    clear: -0.10
+    description: "Cool season brings more cloud cover."
 
-# Valid weather patterns
-valid_weather:
-  - CLEAR
-  - CLOUDY
-  - OVERCAST
-  - SANDSTORM
-  - DUST_DEVIL
-  - EXTREME_HEAT
+# Seasonal Modifiers (Phase 17.4)
+# ================================
+seasonal_temperature_modifiers:
+  spring: -10
+  summer: +15
+  fall: -5
+  winter: -25
 
-# Weather weights
-weather_weights:
-  CLEAR: 60
-  CLOUDY: 15
-  OVERCAST: 5
-  SANDSTORM: 10
-  DUST_DEVIL: 5
-  EXTREME_HEAT: 5
+seasonal_descriptions:
+  spring: "Brief rains trigger an explosion of wildflowers. The desert transforms into a carpet of color overnight."
+  summer: "Blistering heat shimmers above the sand. Most creatures seek shelter and only emerge at night."
+  fall: "Temperatures moderate. Cooler evenings make travel more bearable."
+  winter: "Cool days and frigid nights bring a different kind of desert challenge. Frost can appear at dawn."
 
-# Valid seasons
-valid_seasons:
-  - SPRING
-  - SUMMER
-  - AUTUMN
-  - WINTER
+# Flora/Fauna Compatibility (Phase 17.4-17.5)
+# ============================================
+flora_tags:
+  - cactus
+  - succulent
+  - hardy_shrub
+  - drought_resistant
+  - desert_flower
+  - tumbleweed
 
-# Spawn modifiers
+fauna_tags:
+  - nocturnal
+  - burrowing
+  - reptilian
+  - desert_adapted
+  - scavenger
+  - heat_resistant
+
+# Spawn Modifiers (Phase 17.5-17.6)
+# ==================================
 spawn_modifiers:
-  herbivore: 0.5    # Limited vegetation
-  predator: 0.7     # Fewer prey means fewer predators
-  omnivore: 0.6     
-  bird: 0.6         # Vultures, roadrunners
-  insect: 0.8       # Scorpions, beetles
-  reptile: 1.5      # Ideal for cold-blooded creatures
-  plant: 0.3        # Sparse vegetation
-  fungus: 0.1       # Too dry
-  undead: 1.2       # Death energy persists
-  elemental: 1.3    # Fire/earth elementals thrive
-  beast: 0.5
+  spring:
+    fauna_spawn_multiplier: 1.4
+    flora_growth_rate: 1.8
+    desert_bloom_active: true
+  summer:
+    fauna_spawn_multiplier: 0.6
+    flora_growth_rate: 0.3
+    nocturnal_activity_peak: true
+  fall:
+    fauna_spawn_multiplier: 1.0
+    flora_growth_rate: 0.5
+  winter:
+    fauna_spawn_multiplier: 0.8
+    flora_growth_rate: 0.4
+    cold_snap_risk: true
 
-# Spawn types
-spawn_types:
-  common:
-    - scorpion
-    - snake
-    - lizard
-    - vulture
-    - beetle
-    - jackrabbit
-  uncommon:
-    - coyote
-    - roadrunner
-    - sidewinder
-    - desert_fox
-  rare:
-    - phoenix
-    - dust_devil_elemental
-    - sphinx
+# Gameplay Modifiers
+# ==================
+danger_modifier: 2
+  # Harsh environment increases danger
 
-# Population limits
-population_limits:
-  herbivore_max: 3
-  predator_max: 2
-  reptile_max: 6
-  plant_max: 4
-  total_creature_max: 6
+magic_affinity: low
+  # Little natural magic in barren landscapes
 
-# Terrain features
-terrain_features:
-  - sand_dunes
-  - rocky_outcrops
-  - cacti
-  - oasis
-  - dried_riverbeds
-  - rock_formations
+movement_modifier: 0.8
+  # Sand and rough terrain slow travel
 
-# Resources
-resources:
-  wood: scarce
-  herbs: rare
-  game: rare
-  water: scarce
-  ore: common
-  gems: uncommon
-
-# Hazards
-hazards:
-  - heatstroke
-  - dehydration
-  - sandstorm
-  - quicksand
-  - scorpion_nests
-
-# Tags
-tags:
-  - desert
-  - arid
-  - hot
-  - sand
-  - harsh
+visibility_modifier: 1.3
+  # Open vistas and clear air improve sight distance (when not in sandstorm)

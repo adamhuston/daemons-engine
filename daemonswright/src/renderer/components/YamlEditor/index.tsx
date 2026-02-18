@@ -33,7 +33,7 @@ export function YamlEditor({
   // Infer content type from file path (moved up so it can be used in effects)
   const contentType = useMemo(() => 
     filePath.split(/[/\\]/).find((segment) =>
-      ['rooms', 'items', 'npcs', 'quests', 'abilities', 'classes', 'areas', 'dialogues', 'triggers', 'factions'].includes(segment)
+      ['rooms', 'items', 'npcs', 'quests', 'abilities', 'classes', 'areas', 'dialogues', 'triggers', 'factions', 'biomes', 'flora'].includes(segment)
     ),
     [filePath]
   );

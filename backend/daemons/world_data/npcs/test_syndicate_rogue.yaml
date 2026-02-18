@@ -1,0 +1,53 @@
+id: npc_test_syndicate_rogue
+name: Shadow Syndicate Rogue
+description: >
+  A shadowy figure wrapped in dark leather armor marked with the emblem
+  of the Shadow Syndicate. Their movements are swift and deadly, always
+  ready to strike at Silver Sanctum enemies.
+
+npc_type: hostile
+
+# Faction affiliation (Phase 1.1)
+faction_id: shadow_syndicate
+
+# Base stats
+level: 5
+max_health: 70
+armor_class: 15
+strength: 12
+dexterity: 18
+intelligence: 12
+
+# Combat properties
+attack_damage_min: 6
+attack_damage_max: 18
+attack_speed: 2.5
+experience_reward: 50
+
+# AI behavior - will attack Silver Sanctum NPCs on sight due to faction hostility
+behavior:
+  - wanders_nowhere       # Guards position
+  - aggressive            # Will also attack players with aggro_on_sight
+  - fearless              # Never flees
+
+# Loot table
+loot_table:
+  - template_id: item_ancient_coin
+    quantity: [2, 5]
+    chance: 0.7
+  - template_id: item_iron_dagger
+    quantity: 1
+    chance: 0.15
+
+# Flavor
+idle_messages:
+  - "The rogue melts into the shadows, watching carefully."
+  - "Dark energy swirls around the Syndicate assassin."
+  - "The rogue's eyes gleam with malice."
+
+keywords:
+  - rogue
+  - syndicate
+  - shadow
+  - assassin
+  - thief

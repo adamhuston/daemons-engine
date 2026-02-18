@@ -122,6 +122,14 @@ temperature_override: int | null (optional)
   # Range: -100 to 200 (realistic range: 0-120)
   # Example: 120 (blacksmith's forge), 20 (ice cave), 70 (magically climate-controlled)
 
+# Phase 17.4: Flora Override (Optional)
+# =====================================
+no_flora: bool (default: false)
+  # Whether flora cannot grow in this room
+  # Set to true for barren rooms like pitch-black caves, magically dead zones, etc.
+  # When true, flora respawn system will skip this room entirely
+  # Example: true (for a deep cave where nothing can grow)
+
 # Room Type Customization (Optional)
 # ==================================
 room_type_emoji: string | null (optional)

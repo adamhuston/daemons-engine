@@ -1497,6 +1497,9 @@ class NpcTemplate:
     is_fauna: bool = False  # True if this is a wildlife NPC
     fauna_data: dict = field(default_factory=dict)  # Fauna-specific properties
 
+    # Phase 10.3+: Faction affiliation
+    faction_id: str | None = None  # Faction membership for warfare
+
     # Resolved behavior config (populated at load time from behavior tags)
     resolved_behavior: dict = field(default_factory=dict)
 
@@ -1551,6 +1554,13 @@ class WorldNpc(WorldEntity):
     hunger: int | None = None
     # Last time hunger was updated (Unix timestamp)
     last_hunger_update: float | None = None
+
+    # Phase 2: Patrol System
+    patrol_route: list[RoomId] = field(default_factory=list)  # List of room IDs to patrol
+    patrol_index: int = 0  # Current waypoint index
+    patrol_mode: str = "loop"  # "loop", "bounce", or "once"
+    home_room_id: RoomId | None = None  # Spawn point for respawn/return
+    _patrol_direction: int = 1  # Internal: 1=forward, -1=backward (for bounce mode)
 
     def __post_init__(self):
         """Ensure entity_type is set correctly."""
@@ -1678,6 +1688,9 @@ class WorldPlayer(WorldEntity):
     # Connection state - whether player is actively connected
     is_connected: bool = False
 
+    # Phase 10.3: Faction membership
+    faction_id: str | None = None  # Faction player belongs to (from factions/*.yaml)
+
     # Quest tracking (Phase X)
     quest_progress: dict[str, Any] = field(
         default_factory=dict
@@ -1784,6 +1797,9 @@ class WorldRoom:
     # ---------- Phase 17.4: Flora System ----------
     # Flora instance IDs in this room (loaded from flora_instances table)
     flora: set[int] = field(default_factory=set)
+    # Whether flora can grow/respawn in this room (default: True)
+    # Set to False for barren rooms like deep caves or magically dead zones
+    no_flora: bool = False
 
     # ---------- Phase 11: Lighting System ----------
     # Room-specific lighting override (replaces area ambient + time calculation)

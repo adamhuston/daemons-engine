@@ -6,6 +6,7 @@ Usage:
     daemons run           Start the game server
     daemons db upgrade    Run database migrations
     daemons client        Launch the reference client
+    daemons wright        Launch Daemonswright content studio
 """
 
 import sys
@@ -428,77 +429,332 @@ def client(host: str, port: int):
         sys.exit(1)
 
 
+def _get_wright_cache_dir() -> Path:
+    """Get the cache directory for Daemonswright binaries."""
+    if sys.platform == "win32":
+        base = Path.home() / "AppData" / "Local" / "daemons"
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Caches" / "daemons"
+    else:
+        base = Path.home() / ".cache" / "daemons"
+    return base / "wright"
+
+
+def _get_platform_info() -> tuple[str, str, str]:
+    """Get platform info for downloading the correct binary.
+
+    Returns:
+        Tuple of (platform_name, archive_extension, executable_name)
+    """
+    import platform
+
+    if sys.platform == "win32":
+        return ("win", ".zip", "Daemonswright.exe")
+    elif sys.platform == "darwin":
+        arch = platform.machine()
+        if arch == "arm64":
+            return ("mac-arm64", ".dmg", "Daemonswright.app")
+        else:
+            return ("mac-x64", ".dmg", "Daemonswright.app")
+    else:
+        return ("linux", ".AppImage", "Daemonswright.AppImage")
+
+
+def _get_latest_wright_version() -> str | None:
+    """Fetch the latest Daemonswright version from GitHub releases."""
+    import json
+    import urllib.request
+
+    api_url = "https://api.github.com/repos/adamhuston/daemons-engine/releases"
+
+    try:
+        req = urllib.request.Request(api_url, headers={"User-Agent": "daemons-cli"})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            releases = json.loads(response.read().decode())
+
+            # Find the first release that has daemonswright assets
+            for release in releases:
+                for asset in release.get("assets", []):
+                    if "daemonswright" in asset["name"].lower():
+                        return release["tag_name"]
+            return None
+    except Exception:
+        return None
+
+
+def _download_wright(version: str, cache_dir: Path) -> Path | None:
+    """Download Daemonswright binary for the current platform.
+
+    Returns:
+        Path to the executable, or None if download failed.
+    """
+    import shutil
+    import urllib.request
+    import zipfile
+
+    platform_name, archive_ext, exe_name = _get_platform_info()
+
+    # Expected asset name pattern: daemonswright-{version}-{platform}{ext}
+    # e.g., daemonswright-v0.1.0-win.zip
+    asset_name = f"daemonswright-{version}-{platform_name}{archive_ext}"
+    download_url = f"https://github.com/adamhuston/daemons-engine/releases/download/{version}/{asset_name}"
+
+    version_dir = cache_dir / version
+    version_dir.mkdir(parents=True, exist_ok=True)
+
+    archive_path = version_dir / asset_name
+
+    click.echo(f"📦 Downloading Daemonswright {version} for {platform_name}...")
+    click.echo(f"   URL: {download_url}")
+    click.echo("")
+
+    try:
+        # Download with progress
+        def reporthook(block_num, block_size, total_size):
+            if total_size > 0:
+                downloaded = block_num * block_size
+                percent = min(100, (downloaded / total_size) * 100)
+                bar_len = 40
+                filled = int(bar_len * percent / 100)
+                bar = "█" * filled + "░" * (bar_len - filled)
+                click.echo(f"\r   [{bar}] {percent:.1f}%", nl=False)
+
+        urllib.request.urlretrieve(download_url, archive_path, reporthook)
+        click.echo("")  # New line after progress bar
+        click.echo(click.style("   ✓ Download complete!", fg="green"))
+
+    except urllib.error.HTTPError as e:
+        click.echo(click.style(f"   ✗ Download failed: HTTP {e.code}", fg="red"))
+        if e.code == 404:
+            click.echo(f"   Release asset not found: {asset_name}")
+            click.echo("   Daemonswright binaries may not be published yet.")
+        return None
+    except Exception as e:
+        click.echo(click.style(f"   ✗ Download failed: {e}", fg="red"))
+        return None
+
+    # Extract the archive
+    click.echo("📂 Extracting...")
+
+    try:
+        extract_dir = version_dir / "extracted"
+        extract_dir.mkdir(exist_ok=True)
+
+        if archive_ext == ".zip":
+            with zipfile.ZipFile(archive_path, "r") as zf:
+                zf.extractall(extract_dir)
+        elif archive_ext == ".AppImage":
+            # AppImage is directly executable, just make it executable
+            exe_path = version_dir / exe_name
+            shutil.move(archive_path, exe_path)
+            exe_path.chmod(exe_path.stat().st_mode | 0o755)
+            click.echo(click.style("   ✓ Ready!", fg="green"))
+            return exe_path
+        elif archive_ext == ".dmg":
+            # For macOS, we'd need to mount the DMG - for now, instruct user
+            click.echo(click.style("   ℹ macOS: Please open the .dmg file manually:", fg="yellow"))
+            click.echo(f"     {archive_path}")
+            return None
+
+        # Find the executable in the extracted files
+        if sys.platform == "win32":
+            # Look for the .exe in extracted directory
+            for exe_path in extract_dir.rglob("*.exe"):
+                if "daemonswright" in exe_path.name.lower():
+                    click.echo(click.style("   ✓ Ready!", fg="green"))
+                    return exe_path
+            # Fallback: look for any .exe
+            for exe_path in extract_dir.rglob("*.exe"):
+                click.echo(click.style("   ✓ Ready!", fg="green"))
+                return exe_path
+
+        click.echo(click.style("   ✗ Could not find executable in archive", fg="red"))
+        return None
+
+    except Exception as e:
+        click.echo(click.style(f"   ✗ Extraction failed: {e}", fg="red"))
+        return None
+
+
+def _find_cached_wright() -> Path | None:
+    """Find a cached Daemonswright executable.
+
+    Returns:
+        Path to the executable, or None if not found.
+    """
+    cache_dir = _get_wright_cache_dir()
+
+    if not cache_dir.exists():
+        return None
+
+    _, _, exe_name = _get_platform_info()
+
+    # Look for any version directory with an executable
+    for version_dir in sorted(cache_dir.iterdir(), reverse=True):
+        if version_dir.is_dir():
+            # Check extracted folder
+            extract_dir = version_dir / "extracted"
+            if extract_dir.exists():
+                if sys.platform == "win32":
+                    for exe_path in extract_dir.rglob("*.exe"):
+                        if exe_path.exists():
+                            return exe_path
+                else:
+                    exe_path = extract_dir / exe_name
+                    if exe_path.exists():
+                        return exe_path
+
+            # Check direct executable (AppImage)
+            exe_path = version_dir / exe_name
+            if exe_path.exists():
+                return exe_path
+
+    return None
+
+
 @main.command()
 @click.option("--world-data", "-w", default=None, help="Path to world_data folder to open")
-def wright(world_data: str | None):
+@click.option("--update", is_flag=True, help="Check for and download the latest version")
+@click.option("--dev", is_flag=True, help="Run from local development source (requires Node.js)")
+def wright(world_data: str | None, update: bool, dev: bool):
     """Launch the Daemonswright Content Studio.
 
     A visual content editor for creating and editing game content.
     Works offline with local YAML files, optionally connects to a
     running server for hot-reload and enhanced validation.
 
+    For pip-installed users, this will automatically download the
+    appropriate binary for your platform on first run.
+
     Examples:
         daemons wright
         daemons wright -w ./my-game/world_data
+        daemons wright --update
+        daemons wright --dev
     """
+    import os
     import subprocess
 
-    # Check if daemonswright is installed/available
+    # Check for local development mode first
     wright_dir = Path(__file__).parent.parent.parent / "daemonswright"
 
-    if not wright_dir.exists():
-        click.echo(click.style("⚠️ Error: Daemonswright not found.", fg="red"))
-        click.echo("")
-        click.echo("Daemonswright is the visual content editor for Daemons.")
-        click.echo("It should be installed alongside the daemons-engine package.")
-        click.echo("")
-        click.echo("If you're developing locally, ensure the daemonswright/ directory exists.")
-        sys.exit(1)
+    if dev or (wright_dir.exists() and (wright_dir / "package.json").exists()):
+        # Development mode: run from source
+        if not wright_dir.exists():
+            click.echo(click.style("⚠️ Error: --dev flag used but daemonswright/ not found.", fg="red"))
+            click.echo("Development mode requires the daemonswright source directory.")
+            sys.exit(1)
 
-    # Check if npm dependencies are installed
-    node_modules = wright_dir / "node_modules"
-    if not node_modules.exists():
-        click.echo(click.style("⚠️ Daemonswright dependencies not installed.", fg="yellow"))
-        click.echo("Installing dependencies (this may take a moment)...")
-        click.echo("")
+        click.echo(click.style("🔧 Development mode", fg="cyan"))
+
+        # Check if npm dependencies are installed
+        node_modules = wright_dir / "node_modules"
+        if not node_modules.exists():
+            click.echo(click.style("⚠️ Daemonswright dependencies not installed.", fg="yellow"))
+            click.echo("Installing dependencies (this may take a moment)...")
+            click.echo("")
+
+            try:
+                subprocess.run(
+                    ["npm", "install"],
+                    cwd=str(wright_dir),
+                    check=True,
+                    shell=True,
+                )
+                click.echo(click.style("✓ Dependencies installed!", fg="green"))
+                click.echo("")
+            except subprocess.CalledProcessError:
+                click.echo(click.style("⚠️ Error: Failed to install dependencies.", fg="red"))
+                click.echo("Try running 'npm install' manually in the daemonswright directory.")
+                sys.exit(1)
+
+        # Launch the electron app in dev mode
+        click.echo("🚀 Launching Daemonswright (dev)...")
+
+        args = ["npm", "run", "electron:dev"]
+        env = os.environ.copy()
+
+        if world_data:
+            env["DAEMONSWRIGHT_WORLD_DATA"] = str(Path(world_data).resolve())
 
         try:
             subprocess.run(
-                ["npm", "install"],
+                args,
                 cwd=str(wright_dir),
-                check=True,
+                env=env,
                 shell=True,
             )
-            click.echo(click.style("✓ Dependencies installed!", fg="green"))
+        except KeyboardInterrupt:
             click.echo("")
-        except subprocess.CalledProcessError:
-            click.echo(click.style("⚠️ Error: Failed to install dependencies.", fg="red"))
-            click.echo("Try running 'npm install' manually in the daemonswright directory.")
+            click.echo("Daemonswright closed.")
+        except subprocess.CalledProcessError as e:
+            click.echo(click.style(f"⚠️ Error launching Daemonswright: {e}", fg="red"))
+            sys.exit(1)
+        return
+
+    # Production mode: use pre-built binary
+    cache_dir = _get_wright_cache_dir()
+    exe_path = None
+
+    # Check for updates or download if needed
+    if update:
+        click.echo("🔍 Checking for updates...")
+        latest_version = _get_latest_wright_version()
+        if latest_version:
+            click.echo(f"   Latest version: {latest_version}")
+            exe_path = _download_wright(latest_version, cache_dir)
+        else:
+            click.echo(click.style("   Could not fetch latest version.", fg="yellow"))
+            click.echo("   Trying cached version...")
+
+    # Try to find cached executable
+    if not exe_path:
+        exe_path = _find_cached_wright()
+
+    # If still not found, download
+    if not exe_path:
+        click.echo("📥 Daemonswright not found locally. Downloading...")
+        click.echo("")
+
+        latest_version = _get_latest_wright_version()
+        if not latest_version:
+            click.echo(click.style("⚠️ Error: Could not determine latest version.", fg="red"))
+            click.echo("")
+            click.echo("Possible causes:")
+            click.echo("  • No internet connection")
+            click.echo("  • Daemonswright releases not yet published on GitHub")
+            click.echo("  • GitHub API rate limit exceeded")
+            click.echo("")
+            click.echo("For development, clone the repo and use: daemons wright --dev")
             sys.exit(1)
 
-    # Launch the electron app
+        exe_path = _download_wright(latest_version, cache_dir)
+
+        if not exe_path:
+            click.echo("")
+            click.echo(click.style("⚠️ Failed to download Daemonswright.", fg="red"))
+            click.echo("Please check your internet connection and try again.")
+            sys.exit(1)
+
+    # Launch the executable
+    click.echo("")
     click.echo("🚀 Launching Daemonswright...")
 
-    args = ["npm", "run", "electron:dev"]
-    env = None
-
+    env = os.environ.copy()
     if world_data:
-        # Pass the world_data path as an environment variable
-        import os
-        env = os.environ.copy()
         env["DAEMONSWRIGHT_WORLD_DATA"] = str(Path(world_data).resolve())
 
     try:
-        subprocess.run(
-            args,
-            cwd=str(wright_dir),
-            env=env,
-            shell=True,
-        )
+        if sys.platform == "win32":
+            subprocess.run([str(exe_path)], env=env)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(exe_path)], env=env)
+        else:
+            subprocess.run([str(exe_path)], env=env)
     except KeyboardInterrupt:
         click.echo("")
         click.echo("Daemonswright closed.")
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         click.echo(click.style(f"⚠️ Error launching Daemonswright: {e}", fg="red"))
         sys.exit(1)
 

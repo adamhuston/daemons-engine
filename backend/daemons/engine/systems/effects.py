@@ -441,27 +441,34 @@ class EffectSystem:
                 # If no applied_at, use full duration (shouldn't happen)
                 remaining_duration = effect.duration
 
+            # Calculate expires_at timestamp
+            expires_at = time.time() + remaining_duration if remaining_duration > 0 else 0
+
+            # Serialize effect data to JSON
+            effect_data = {
+                "name": effect.name,
+                "stat_modifiers": effect.stat_modifiers,
+                "magnitude": effect.magnitude,
+                "tick_interval": effect.interval,
+                "ticks_applied": getattr(effect, "ticks_applied", 0),
+                "remaining_duration": remaining_duration,
+            }
+
             await session.execute(
                 text(
                     """
                     INSERT INTO player_effects
-                    (player_id, effect_id, effect_name, effect_type, stat_modifiers,
-                     remaining_duration, magnitude, tick_interval, ticks_applied, saved_at)
-                    VALUES (:player_id, :effect_id, :effect_name, :effect_type, :stat_modifiers,
-                            :remaining_duration, :magnitude, :tick_interval, :ticks_applied, :saved_at)
+                    (player_id, effect_id, effect_type, effect_data, expires_at, created_at)
+                    VALUES (:player_id, :effect_id, :effect_type, :effect_data, :expires_at, :created_at)
                 """
                 ),
                 {
                     "player_id": player_id,
                     "effect_id": effect_id,
-                    "effect_name": effect.name,
                     "effect_type": effect.effect_type,
-                    "stat_modifiers": json.dumps(effect.stat_modifiers),
-                    "remaining_duration": remaining_duration,
-                    "magnitude": effect.magnitude,
-                    "tick_interval": effect.interval,
-                    "ticks_applied": getattr(effect, "ticks_applied", 0),
-                    "saved_at": time.time(),
+                    "effect_data": json.dumps(effect_data),
+                    "expires_at": expires_at,
+                    "created_at": time.time(),
                 },
             )
 
@@ -497,18 +504,29 @@ class EffectSystem:
         restored_effects = []
 
         for row in rows:
-            saved_at = row.saved_at
-            offline_duration = now - saved_at
-            remaining = row.remaining_duration - offline_duration
+            # Deserialize effect data from JSON
+            effect_data = json.loads(row.effect_data) if row.effect_data else {}
+            
+            effect_name = effect_data.get("name", "Unknown Effect")
+            stat_mods = effect_data.get("stat_modifiers", {})
+            magnitude = effect_data.get("magnitude", 0)
+            tick_interval = effect_data.get("tick_interval", 0.0)
+            
+            # Calculate remaining duration from expires_at
+            remaining = row.expires_at - now if row.expires_at > 0 else 0
 
             if remaining <= 0:
                 # Effect would have expired while offline
                 continue
 
+            # Calculate offline duration (time since effect was saved)
+            created_at = row.created_at if hasattr(row, "created_at") and row.created_at else now
+            offline_duration = now - created_at
+
             # Calculate offline DoT/HoT ticks
-            if row.magnitude != 0 and row.tick_interval > 0:
-                offline_ticks = int(offline_duration / row.tick_interval)
-                total_damage_healed = offline_ticks * row.magnitude
+            if magnitude != 0 and tick_interval > 0:
+                offline_ticks = int(offline_duration / tick_interval)
+                total_damage_healed = offline_ticks * magnitude
 
                 if row.effect_type == "dot":
                     # Apply poison damage from offline ticks
@@ -534,20 +552,18 @@ class EffectSystem:
                         )
 
             # Re-apply effect with remaining duration
-            stat_mods = json.loads(row.stat_modifiers) if row.stat_modifiers else {}
-
             effect_id = self.apply_effect(
                 entity_id=player_id,
-                effect_name=row.effect_name,
+                effect_name=effect_name,
                 effect_type=row.effect_type,
                 duration=remaining,
                 stat_modifiers=stat_mods,
-                magnitude=row.magnitude,
-                interval=row.tick_interval,
+                magnitude=magnitude,
+                interval=tick_interval,
             )
 
             if effect_id:
-                restored_effects.append(row.effect_name)
+                restored_effects.append(effect_name)
 
         # Delete restored effects from database
         await session.execute(

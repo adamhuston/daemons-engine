@@ -87,6 +87,11 @@ class Room(Base):
     # Example: forge room = 110, ice cave = 20
     temperature_override: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Phase 17.4: Flora system
+    # Whether flora cannot grow in this room (default False = flora can grow)
+    # Example: pitch-black caves, magically dead zones
+    no_flora: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0")
+
     # YAML content management
     # True = managed by YAML files, False = created/modified via API
     yaml_managed: Mapped[bool] = mapped_column(
@@ -143,6 +148,11 @@ class Player(Base):
 
     # Misc data (flags, temporary effects, etc.)
     data: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    # Phase 10.3: Faction system - player faction membership
+    faction_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # Faction membership for player (from factions/*.yaml)
 
     # Quest system (Phase X)
     player_flags: Mapped[dict] = mapped_column(
@@ -558,6 +568,11 @@ class NpcTemplate(Base):
         JSON, default=dict
     )  # Fauna-specific properties (biome_tags, diet, etc.)
 
+    # Phase 10.3+: Faction affiliation
+    faction_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # Faction membership for warfare
+
 
 class NpcInstance(Base):
     """Dynamic NPC instance - a specific NPC in the world."""
@@ -589,6 +604,20 @@ class NpcInstance(Base):
     last_killed_at: Mapped[float | None] = mapped_column(
         Float, nullable=True
     )  # Unix timestamp
+
+    # Phase 2: Patrol System
+    patrol_route: Mapped[list] = mapped_column(
+        JSON, nullable=False, server_default="[]"
+    )  # List of room IDs to patrol
+    patrol_index: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )  # Current waypoint index
+    patrol_mode: Mapped[str] = mapped_column(
+        String, nullable=False, server_default="'loop'"
+    )  # loop, bounce, once
+    home_room_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # Spawn point for respawn/return
 
     # Instance-specific overrides (JSON: custom name, modified stats, etc.)
     instance_data: Mapped[dict] = mapped_column(JSON, default=dict)

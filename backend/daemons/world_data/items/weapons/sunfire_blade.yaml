@@ -1,0 +1,57 @@
+# Sunfire Blade - Legendary magical sword
+# A radiant blade wreathed in eternal flames, grants fire-based abilities
+
+id: item_sunfire_blade
+name: Sunfire Blade
+description: A magnificent longsword forged from celestial steel. The blade pulses with inner fire, casting dancing shadows across nearby surfaces. Ancient runes etched along its length glow with a warm, golden light.
+item_type: weapon
+item_subtype: sword
+equipment_slot: weapon
+
+stat_modifiers:
+  strength: 3
+  intelligence: 2
+
+# Combat stats - fire damage type!
+damage_min: 12
+damage_max: 20
+attack_speed: 2.0
+damage_type: fire
+
+weight: 4.0
+max_stack_size: 1
+
+has_durability: true
+max_durability: 150
+
+is_container: false
+is_consumable: false
+
+# Emits light when equipped!
+provides_light: true
+light_intensity: 35
+light_duration: null  # Permanent glow
+
+# Phase 14: Magic item abilities
+# The sword grants the fireball spell when equipped
+class_id: mage
+default_abilities:
+  - fireball
+ability_loadout:
+  - fireball
+
+flavor_text: "Forged in the heart of a dying star, this blade has been wielded by champions since the Age of Fire. Its warmth is comforting to allies but scorches those who dare oppose its bearer."
+rarity: legendary
+value: 2500
+
+flags:
+  soulbound: true
+
+keywords:
+  - sword
+  - blade
+  - fire
+  - sunfire
+  - legendary
+  - weapon
+  - magic

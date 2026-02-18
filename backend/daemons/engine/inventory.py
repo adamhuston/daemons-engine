@@ -209,35 +209,120 @@ def unequip_item(world: World, player_id: PlayerId, item_id: ItemId) -> None:
 
 
 def _apply_equipment_stats(world: World, player_id: PlayerId, item_id: ItemId) -> None:
-    """Apply equipment stat modifiers as an effect."""
+    """
+    Apply equipment stat modifiers and abilities.
+    
+    Phase 14: Magic items can grant abilities when equipped (e.g., Sunfire Blade grants fireball).
+    """
     import time
 
-    from .world import Effect
+    from .world import AbilitySlot, Effect
 
     player = world.players[player_id]
     item = world.items[item_id]
     template = world.item_templates[item.template_id]
 
-    if not template.stat_modifiers:
-        return
+    # Apply stat modifiers as an effect
+    if template.stat_modifiers:
+        # Create permanent effect for equipment stats
+        effect = Effect(
+            effect_id=f"equipment_{item_id}",
+            name=f"{template.name} (equipped)",
+            effect_type="buff",
+            stat_modifiers=template.stat_modifiers,
+            duration=float("inf"),  # Permanent while equipped
+            applied_at=time.time(),
+        )
 
-    # Create permanent effect for equipment stats
-    effect = Effect(
-        effect_id=f"equipment_{item_id}",
-        name=f"{template.name} (equipped)",
-        effect_type="buff",
-        stat_modifiers=template.stat_modifiers,
-        duration=float("inf"),  # Permanent while equipped
-        applied_at=time.time(),
-    )
+        player.apply_effect(effect)
+    
+    # Phase 14: Grant abilities from magic items
+    print(f"[Inventory] _apply_equipment_stats called for {template.name}")
+    print(f"[Inventory]   class_id: {template.class_id}")
+    print(f"[Inventory]   default_abilities: {template.default_abilities}")
+    print(f"[Inventory]   ability_loadout: {template.ability_loadout}")
+    
+    if template.class_id and template.default_abilities:
+        # Ensure player has a character sheet
+        if not player.has_character_sheet():
+            # Can't grant abilities to players without a class
+            print(f"[Inventory] Cannot grant abilities from {template.name} - player has no character sheet")
+            return
+        
+        # Add item abilities to player's learned abilities
+        print(f"[Inventory] Granting abilities from {template.name}: {template.default_abilities}")
+        print(f"[Inventory] Player {player.name} learned abilities before: {player.character_sheet.learned_abilities}")
+        for ability_id in template.default_abilities:
+            player.character_sheet.learned_abilities.add(ability_id)
+        print(f"[Inventory] Player {player.name} learned abilities after: {player.character_sheet.learned_abilities}")
+    else:
+        print(f"[Inventory] Item {template.name} does not grant abilities (class_id={template.class_id}, abilities={template.default_abilities})")
 
-    player.apply_effect(effect)
+        
+        # Add to ability loadout if specified (and there's room)
+        if template.ability_loadout:
+            for ability_id in template.ability_loadout:
+                # Check if ability is already in loadout
+                already_equipped = any(
+                    slot.ability_id == ability_id
+                    for slot in player.character_sheet.ability_loadout
+                )
+                
+                if not already_equipped:
+                    # Find first empty slot or append
+                    empty_slot_idx = None
+                    for idx, slot in enumerate(player.character_sheet.ability_loadout):
+                        if not slot.ability_id:
+                            empty_slot_idx = idx
+                            break
+                    
+                    if empty_slot_idx is not None:
+                        # Fill empty slot
+                        player.character_sheet.ability_loadout[empty_slot_idx].ability_id = ability_id
+                        player.character_sheet.ability_loadout[empty_slot_idx].learned_at = player.level
+                    else:
+                        # Append new slot
+                        player.character_sheet.ability_loadout.append(
+                            AbilitySlot(
+                                slot_id=len(player.character_sheet.ability_loadout),
+                                ability_id=ability_id,
+                                last_used_at=0.0,
+                                learned_at=player.level,
+                            )
+                        )
 
 
 def _remove_equipment_stats(world: World, player_id: PlayerId, item_id: ItemId) -> None:
-    """Remove equipment stat modifiers effect."""
+    """
+    Remove equipment stat modifiers effect and granted abilities.
+    
+    Phase 14: Remove abilities that were granted by magic items.
+    """
     player = world.players[player_id]
+    item = world.items[item_id]
+    template = world.item_templates[item.template_id]
+    
+    # Remove stat modifier effect
     player.remove_effect(f"equipment_{item_id}")
+    
+    # Phase 14: Remove abilities granted by magic items
+    if template.class_id and template.default_abilities:
+        if not player.has_character_sheet():
+            return
+        
+        # Remove item abilities from player's learned abilities
+        for ability_id in template.default_abilities:
+            player.character_sheet.learned_abilities.discard(ability_id)
+        
+        # Remove from ability loadout if present
+        if template.ability_loadout:
+            for ability_id in template.ability_loadout:
+                # Find and remove from loadout
+                for slot in player.character_sheet.ability_loadout:
+                    if slot.ability_id == ability_id:
+                        # Clear the slot (don't remove, just empty it)
+                        slot.ability_id = None
+                        break
 
 
 def find_item_by_name(

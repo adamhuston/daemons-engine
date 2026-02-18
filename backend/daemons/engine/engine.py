@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from ..input_sanitization import sanitize_command
-from .behaviors import BehaviorContext, BehaviorResult, get_behavior_instances
+from .behaviors import BehaviorContext, BehaviorResult, get_behavior_instances, resolve_behaviors
 from .systems import (
     CombatSystem,
     CommandRouter,
@@ -179,6 +179,9 @@ class WorldEngine:
             weather_system=self.weather_system,
         )
         self.ctx.flora_system = self.flora_system
+
+        # Link flora system to lighting system for bioluminescent plants
+        self.lighting_system.flora_system = self.flora_system
 
         # Phase 17.5: Fauna system
         from daemons.engine.systems.fauna import FaunaSystem
@@ -847,6 +850,7 @@ class WorldEngine:
         from daemons.commands.social import (
             register_clan_commands,
             register_faction_commands,
+            register_faction_chat_commands,
             register_follow_commands,
             register_group_commands,
             register_tell_commands,
@@ -859,6 +863,7 @@ class WorldEngine:
         register_yell_commands(self.command_router)
         register_clan_commands(self.command_router)
         register_faction_commands(self.command_router)
+        register_faction_chat_commands(self.command_router)
 
         # Quit command - graceful disconnect
         self.command_router.register_handler(
@@ -1579,10 +1584,19 @@ class WorldEngine:
         if not player:
             return [self._msg_to_player(player_id, "You have no form.")]
 
-        # First check if it's a room ID
+        # First check if it's a room ID (exact match)
+        target_room = None
         if target in self.world.rooms:
             target_room = self.world.rooms[target]
         else:
+            # Try case-insensitive room ID match or partial match
+            target_lower = target.lower()
+            for room_id, room in self.world.rooms.items():
+                if room_id.lower() == target_lower or room_id.lower().startswith(target_lower):
+                    target_room = room
+                    break
+
+        if not target_room:
             # Try to find a player with that name
             target_player = None
             for p in self.world.players.values():
@@ -1611,10 +1625,10 @@ class WorldEngine:
         # Move player
         old_room = self.world.rooms.get(player.room_id)
         if old_room:
-            old_room.players.discard(player.id)
+            old_room.entities.discard(player.id)
 
         player.room_id = target_room.id
-        target_room.players.add(player.id)
+        target_room.entities.add(player.id)
 
         # Show room description
         room_desc = self._format_room_description(target_room, player_id)
@@ -1747,11 +1761,13 @@ class WorldEngine:
             # For now, just create the NPC synchronously
             import uuid
 
+            from .world import EntityType, WorldNpc
+
             npc_id = str(uuid.uuid4())
-            from .world import WorldNpc
 
             npc = WorldNpc(
                 id=npc_id,
+                entity_type=EntityType.NPC,
                 template_id=template.id,
                 name=template.name,
                 room_id=player.room_id,
@@ -1760,9 +1776,17 @@ class WorldEngine:
                 current_health=template.max_health,
                 level=template.level,
                 keywords=template.keywords.copy() if template.keywords else [],
-                behaviors=template.behaviors.copy() if template.behaviors else [],
             )
             self.world.npcs[npc_id] = npc
+            
+            # Add NPC to room
+            room = self.world.rooms.get(player.room_id)
+            if room:
+                room.entities.add(npc_id)
+            
+            # Start NPC behavior timers
+            self._schedule_npc_idle(npc_id)
+            self._schedule_npc_wander(npc_id)
 
             return [
                 self._msg_to_player(
@@ -3569,6 +3593,50 @@ class WorldEngine:
             # Run the on_idle_tick hook for all behaviors
             await self._run_behavior_hook(npc_id, "on_idle_tick")
 
+            # Phase 3: Check if NPC in combat has chased too far from home territory
+            if npc.target_id and npc.home_room_id:
+                max_chase_distance = 5  # Maximum rooms to chase from home
+                distance = self._calculate_room_distance(npc.room_id, npc.home_room_id, max_depth=max_chase_distance + 2)
+                
+                if distance is not None and distance > max_chase_distance:
+                    # Too far from home - disengage and return
+                    print(f"[TERRITORY] {npc.name} is {distance} rooms from home (max {max_chase_distance}), disengaging...")
+                    npc.target_id = None
+                    
+                    # Broadcast disengage message
+                    room = self.world.rooms.get(npc.room_id)
+                    if room:
+                        message = f"⚔️ {npc.name} gives up the chase and returns to patrol."
+                        for entity_id in room.entities:
+                            if entity_id in self.world.players:
+                                player = self.world.players[entity_id]
+                                if player.client:
+                                    player.client.send_message(message)
+                    
+                    # Return to patrol on next idle tick
+                    self._schedule_npc_idle(npc_id)
+                    return
+
+            # Check for hostile targets (faction enemies and aggro_on_sight players)
+            # Only if not already in combat
+            if not npc.target_id:
+                hostile_targets = self._npc_find_hostile_targets(npc_id)
+                if hostile_targets:
+                    # Pick the first hostile target and attack
+                    target_id = hostile_targets[0]
+                    events = self.combat_system.start_attack_entity(npc_id, target_id)
+                    if events:
+                        await self._dispatch_events(events)
+                else:
+                    # No hostile targets - check if NPC needs to return to patrol
+                    if npc.patrol_route and len(npc.patrol_route) >= 2:
+                        # Check if NPC is off patrol route
+                        if npc.room_id not in npc.patrol_route:
+                            print(f"[PATROL] {npc.name} is off patrol route, returning...")
+                            return_events = await self._npc_return_to_patrol(npc_id)
+                            if return_events:
+                                await self._dispatch_events(return_events)
+
             # Reschedule next idle check
             self._schedule_npc_idle(npc_id)
 
@@ -3861,6 +3929,13 @@ class WorldEngine:
         """Get the area a player is currently in."""
         room = self.world.rooms.get(player.room_id)
         if not room:
+            return None
+        return self.world.areas.get(room.area_id)
+
+    def _get_area_for_room(self, room_id: RoomId) -> WorldArea | None:
+        """Get the area for a given room."""
+        room = self.world.rooms.get(room_id)
+        if not room or not room.area_id:
             return None
         return self.world.areas.get(room.area_id)
 
@@ -4804,28 +4879,36 @@ class WorldEngine:
 
         world = self.world
 
-        # Group flora by template name
-        grouped: dict[str, int] = {}
+        # Group flora by template name, tracking if it provides light
+        # Structure: {name: (count, provides_light)}
+        grouped: dict[str, tuple[int, bool]] = {}
         for flora_id in room.flora:
             if flora_id in world.flora_instances:
                 template_id, quantity = world.flora_instances[flora_id]
-                # Get template name from flora_system
+                # Get template from flora_system
                 if hasattr(self, "flora_system") and self.flora_system:
                     template = self.flora_system.get_template(template_id)
                     if template:
                         name = template.name
-                        grouped[name] = grouped.get(name, 0) + quantity
+                        # Check if flora provides light (like glowing mushrooms)
+                        provides_light = getattr(template, "provides_light", False)
+                        if name in grouped:
+                            old_count, old_glow = grouped[name]
+                            grouped[name] = (old_count + quantity, old_glow or provides_light)
+                        else:
+                            grouped[name] = (quantity, provides_light)
 
         if not grouped:
             return ""
 
         # Format as natural language
         parts = []
-        for name, count in grouped.items():
+        for name, (count, provides_light) in grouped.items():
+            glow_suffix = " (glowing)" if provides_light else ""
             if count > 1:
-                parts.append(f"{count} {name}s")
+                parts.append(f"{count} {name}{glow_suffix}")
             else:
-                parts.append(f"a {name}")
+                parts.append(f"a {name}{glow_suffix}")
 
         if len(parts) == 1:
             return f"You see {parts[0]} here."
@@ -5292,7 +5375,8 @@ class WorldEngine:
                 item = world.items[item_id]
                 template = world.item_templates[item.template_id]
                 quantity_str = f" x{item.quantity}" if item.quantity > 1 else ""
-                items_here.append(f"  {template.name}{quantity_str}")
+                glowing_str = " (glowing)" if template.provides_light else ""
+                items_here.append(f"  {template.name}{quantity_str}{glowing_str}")
 
             lines.append("")
             lines.append("Items here:")
@@ -6347,6 +6431,319 @@ class WorldEngine:
     def _show_combat_status(self, player_id: PlayerId) -> list[Event]:
         """Show current combat status. Delegates to CombatSystem."""
         return self.combat_system.show_combat_status(player_id)
+
+    def _npc_find_hostile_targets(self, npc_id: str) -> list[str]:
+        """Find hostile targets for an NPC based on faction and aggro settings.
+        
+        Returns a list of entity IDs (NPCs and players) that this NPC should attack.
+        Prioritizes faction enemies, then aggro_on_sight players if enabled.
+        
+        Args:
+            npc_id: The NPC entity ID
+            
+        Returns:
+            List of entity IDs that are hostile targets
+        """
+        hostile_targets = []
+        
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
+            return hostile_targets
+            
+        template = self.world.npc_templates.get(npc.template_id)
+        if not template:
+            print(f"[FACTION] ERROR: No template found for {npc.name} (template_id: {npc.template_id})")
+            return hostile_targets
+        
+        # DEBUG: Check template attributes
+        print(f"[FACTION] Template for {npc.name}: has faction_id = {hasattr(template, 'faction_id')}, value = {getattr(template, 'faction_id', 'MISSING')}")
+            
+        room = self.world.rooms.get(npc.room_id)
+        if not room:
+            return hostile_targets
+            
+        # Get NPC's faction if any
+        npc_faction_id = template.faction_id
+        
+        # DEBUG: Log faction checking
+        if npc_faction_id:
+            print(f"[FACTION] {npc.name} ({npc_id[:8]}) has faction: {npc_faction_id}")
+        
+        # Check all NPCs in the room for faction hostility
+        if npc_faction_id:
+            for entity_id in room.entities:
+                if entity_id == npc_id:
+                    continue
+                    
+                other_npc = self.world.npcs.get(entity_id)
+                if not other_npc or not other_npc.is_alive():
+                    continue
+                    
+                other_template = self.world.npc_templates.get(other_npc.template_id)
+                if not other_template or not other_template.faction_id:
+                    continue
+                
+                # DEBUG: Log faction comparison
+                print(f"[FACTION] Checking {npc.name} ({npc_faction_id}) vs {other_npc.name} ({other_template.faction_id})")
+                    
+                # Check if factions are hostile
+                if self.faction_system.are_factions_hostile(
+                    npc_faction_id, other_template.faction_id
+                ):
+                    print(f"[FACTION] ✓ HOSTILE! {npc.name} will attack {other_npc.name}")
+                    hostile_targets.append(entity_id)
+                else:
+                    print(f"[FACTION] ✗ Not hostile: {npc_faction_id} vs {other_template.faction_id}")
+        
+        # Check if this NPC has aggro_on_sight for players
+        behavior_config = resolve_behaviors(template.behaviors)
+        if behavior_config.get("aggro_on_sight", False):
+            # Add all players in the room as hostile targets
+            for entity_id in room.entities:
+                if entity_id in self.world.players:
+                    player = self.world.players[entity_id]
+                    if player.is_alive():
+                        print(f"[FACTION] {npc.name} adding player {player.name} to targets (aggro_on_sight)")
+                        hostile_targets.append(entity_id)
+        
+        return hostile_targets
+
+    # ===== Phase 2: Patrol System Helpers =====
+
+    def _calculate_room_distance(
+        self, from_room_id: str, to_room_id: str, max_depth: int = 15
+    ) -> int | None:
+        """
+        Calculate distance in rooms between two locations.
+        
+        Args:
+            from_room_id: Starting room ID
+            to_room_id: Destination room ID
+            max_depth: Maximum distance to check
+            
+        Returns:
+            Number of rooms between locations, or None if unreachable
+        """
+        path = self._find_path_to_room(from_room_id, to_room_id, max_depth)
+        if path is None:
+            return None
+        return len(path) - 1  # Path includes both start and end
+
+    def _find_path_to_room(
+        self, from_room_id: str, to_room_id: str, max_depth: int = 10
+    ) -> list[str] | None:
+        """
+        Find shortest path between two rooms using BFS.
+        
+        Args:
+            from_room_id: Starting room ID
+            to_room_id: Destination room ID
+            max_depth: Maximum path length to search
+            
+        Returns:
+            List of room IDs from source to destination (inclusive), or None if no path
+        """
+        if from_room_id == to_room_id:
+            return [from_room_id]
+        
+        from collections import deque
+        
+        queue = deque([(from_room_id, [from_room_id])])
+        visited = {from_room_id}
+        
+        while queue:
+            current_room_id, path = queue.popleft()
+            
+            # Check depth limit
+            if len(path) > max_depth:
+                continue
+            
+            current_room = self.world.rooms.get(current_room_id)
+            if not current_room:
+                continue
+            
+            # Check all exits
+            for direction, next_room_id in current_room.exits.items():
+                if next_room_id == to_room_id:
+                    return path + [next_room_id]
+                
+                if next_room_id not in visited:
+                    visited.add(next_room_id)
+                    queue.append((next_room_id, path + [next_room_id]))
+        
+        return None
+
+    def _find_nearest_waypoint(
+        self, current_room_id: str, waypoints: list[str]
+    ) -> tuple[str, list[str]] | None:
+        """
+        Find the closest waypoint in a patrol route using BFS.
+        
+        Args:
+            current_room_id: Current room ID
+            waypoints: List of waypoint room IDs
+            
+        Returns:
+            Tuple of (nearest_waypoint_id, path_to_waypoint) or None if unreachable
+        """
+        if not waypoints:
+            return None
+        
+        # Check if already at a waypoint
+        if current_room_id in waypoints:
+            return (current_room_id, [current_room_id])
+        
+        # Find shortest path to any waypoint
+        best_waypoint = None
+        best_path = None
+        best_length = float('inf')
+        
+        for waypoint in waypoints:
+            path = self._find_path_to_room(current_room_id, waypoint, max_depth=15)
+            if path and len(path) < best_length:
+                best_length = len(path)
+                best_waypoint = waypoint
+                best_path = path
+        
+        if best_waypoint and best_path:
+            return (best_waypoint, best_path)
+        
+        return None
+
+    def _get_next_patrol_waypoint(self, npc: "WorldNpc") -> str | None:
+        """
+        Calculate the next waypoint in an NPC's patrol route.
+        
+        Args:
+            npc: The NPC with patrol configuration
+            
+        Returns:
+            Next room ID to move to, or None if no valid waypoint
+        """
+        if not npc.patrol_route or len(npc.patrol_route) < 2:
+            return None
+        
+        route_length = len(npc.patrol_route)
+        current_index = npc.patrol_index
+        mode = npc.patrol_mode
+        
+        if mode == "loop":
+            # Circular patrol: 0 → 1 → 2 → 0 → 1 → ...
+            next_index = (current_index + 1) % route_length
+            npc.patrol_index = next_index
+            return npc.patrol_route[next_index]
+            
+        elif mode == "bounce":
+            # Back-and-forth: 0 → 1 → 2 → 1 → 0 → 1 → ...
+            direction = getattr(npc, "_patrol_direction", 1)
+            
+            next_index = current_index + direction
+            
+            # Check if we've reached an endpoint
+            if next_index >= route_length:
+                next_index = route_length - 2
+                direction = -1
+            elif next_index < 0:
+                next_index = 1
+                direction = 1
+            
+            npc.patrol_index = next_index
+            npc._patrol_direction = direction
+            return npc.patrol_route[next_index]
+            
+        elif mode == "once":
+            # One-time patrol: 0 → 1 → 2 → stop
+            next_index = current_index + 1
+            if next_index >= route_length:
+                return None  # Patrol complete
+            
+            npc.patrol_index = next_index
+            return npc.patrol_route[next_index]
+        
+        # Unknown mode, default to loop
+        next_index = (current_index + 1) % route_length
+        npc.patrol_index = next_index
+        return npc.patrol_route[next_index]
+
+    async def _npc_return_to_patrol(self, npc_id: str) -> list["Event"]:
+        """
+        Return an NPC to its patrol route after combat or deviation.
+        
+        Args:
+            npc_id: NPC entity ID
+            
+        Returns:
+            List of events (movement messages, etc.)
+        """
+        events = []
+        
+        npc = self.world.npcs.get(npc_id)
+        if not npc or not npc.is_alive():
+            return events
+        
+        # Check if NPC has a patrol route
+        if not npc.patrol_route or len(npc.patrol_route) < 2:
+            return events
+        
+        current_room = npc.room_id
+        
+        # Check if NPC is already on patrol route
+        if current_room in npc.patrol_route:
+            # Update patrol index to current position
+            npc.patrol_index = npc.patrol_route.index(current_room)
+            print(f"[PATROL] {npc.name} already on patrol route at waypoint {npc.patrol_index}")
+            return events
+        
+        # Find nearest waypoint
+        result = self._find_nearest_waypoint(current_room, npc.patrol_route)
+        if not result:
+            print(f"[PATROL] {npc.name} cannot find path to any patrol waypoint")
+            # Fall back to home room
+            if npc.home_room_id:
+                print(f"[PATROL] {npc.name} will try to return to home room")
+                result = self._find_nearest_waypoint(current_room, [npc.home_room_id])
+        
+        if result:
+            nearest_waypoint, path = result
+            
+            # Move to next room in path (not all the way to waypoint at once)
+            if len(path) > 1:
+                next_room_id = path[1]  # path[0] is current room
+                
+                # Find which direction to go
+                current_room_obj = self.world.rooms.get(current_room)
+                if current_room_obj:
+                    for direction, dest_id in current_room_obj.exits.items():
+                        if dest_id == next_room_id:
+                            # Move the NPC
+                            npc.room_id = next_room_id
+                            
+                            # Update room entities
+                            if current_room in self.world.rooms:
+                                self.world.rooms[current_room].entities.discard(npc_id)
+                            if next_room_id in self.world.rooms:
+                                self.world.rooms[next_room_id].entities.add(npc_id)
+                            
+                            # Broadcast movement
+                            events.append(
+                                self._msg_to_room(
+                                    current_room,
+                                    f"{npc.name} heads {direction}, returning to patrol.",
+                                    exclude=set(),
+                                )
+                            )
+                            events.append(
+                                self._msg_to_room(
+                                    next_room_id,
+                                    f"{npc.name} arrives from patrol.",
+                                    exclude=set(),
+                                )
+                            )
+                            
+                            print(f"[PATROL] {npc.name} moving {direction} toward waypoint {nearest_waypoint}")
+                            break
+        
+        return events
 
     async def _trigger_npc_player_enter(
         self, room_id: str, player_id: str, skip_npcs: set[str] | None = None
@@ -7458,18 +7855,12 @@ class WorldEngine:
 
             # Phase 11: Add light source if item provides light
             if template.provides_light and template.light_intensity > 0:
-                import time
-
-                expires_at = None
-                if template.light_duration:
-                    expires_at = time.time() + template.light_duration
-
                 self.lighting_system.update_light_source(
                     room_id=player.room_id,
                     source_id=f"item_{found_item_id}",
                     source_type="item",
                     intensity=template.light_intensity,
-                    expires_at=expires_at,
+                    duration=template.light_duration,  # duration in seconds, not expires_at
                 )
 
                 if template.light_duration:
@@ -8093,14 +8484,14 @@ class WorldEngine:
             return [self._msg_to_player(player_id, "You are nowhere.")]
 
         # Get flora in room (need database session)
-        if not self.state_tracker or not self.state_tracker._session_factory:
+        if not self.state_tracker or not self.state_tracker.db_session_factory:
             return [
                 self._msg_to_player(player_id, "Cannot access flora (no database).")
             ]
 
         from sqlalchemy.ext.asyncio import AsyncSession
 
-        async with self.state_tracker._session_factory() as session:
+        async with self.state_tracker.db_session_factory() as session:
             flora_list = await self.flora_system.get_room_flora(room.id, session)
 
             if not flora_list:
@@ -8132,7 +8523,7 @@ class WorldEngine:
             if hasattr(self, "season_system") and self.season_system:
                 area = self._get_area_for_room(room.id)
                 if area:
-                    current_season = self.season_system.get_season(area.id)
+                    current_season = self.season_system.get_season(area)
 
             # Check if player can harvest
             equipped_tool = self._get_equipped_tool_type(player)
@@ -8182,7 +8573,7 @@ class WorldEngine:
                             player_id=player_id,
                             container_id=None,
                             quantity=1,
-                            current_durability=item_template.durability,
+                            current_durability=item_template.max_durability,
                             equipped_slot=None,
                             instance_data={},
                             _description=item_template.description,
@@ -8231,10 +8622,10 @@ class WorldEngine:
             # Broadcast to room
             if result.success:
                 events.append(
-                    self._room_broadcast(
+                    self._msg_to_room(
                         room.id,
                         f"{player.name} harvests from a {matched_template.name}.",
-                        exclude_player=player_id,
+                        exclude={player_id},
                     )
                 )
 
@@ -8242,11 +8633,8 @@ class WorldEngine:
 
     def _get_equipped_tool_type(self, player) -> str | None:
         """Get the item_type of the player's equipped tool (for harvest checks)."""
-        if not player.character_sheet:
-            return None
-
         # Check main hand for tool
-        main_hand = player.character_sheet.equipment.get("main_hand")
+        main_hand = player.equipped_items.get("weapon")
         if main_hand:
             item = self.world.items.get(main_hand)
             if item:

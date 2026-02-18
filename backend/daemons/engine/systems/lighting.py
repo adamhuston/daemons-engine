@@ -106,6 +106,7 @@ class LightingSystem:
     def __init__(self, world: "World", time_manager: "TimeEventManager"):
         self.world = world
         self.time_manager = time_manager
+        self.flora_system = None  # Set after FloraSystem is initialized
 
         # Room light states: room_id -> RoomLightState
         self.room_light_states: dict[RoomId, RoomLightState] = {}
@@ -139,14 +140,14 @@ class LightingSystem:
         """
         Calculate effective light level for a room.
 
-        Sources (additive, clamped to 0-100):
+        Sources:
         - Room lighting_override (if set): Replaces ambient + time calculation
         - Area ambient_lighting (base): 0-90
         - Time-of-day modifier: -20 to +0
-        - Player light spells: +0 to +50
-        - Ground item light sources: +10 to +35
-        - Equipped item light sources: +10 to +35 (player-carried torches, etc.)
-        - Darkness effects: -50 to -100
+        - Player light spells: +0 to +50 (additive)
+        - Physical light sources (items/flora): Only the BRIGHTEST one counts
+          (not cumulative - a torch doesn't add light if mushrooms are brighter)
+        - Darkness effects: -50 to -100 (subtractive)
 
         Args:
             room: The WorldRoom to calculate light for
@@ -185,7 +186,7 @@ class LightingSystem:
                 time_modifier = self._calculate_time_modifier(area, current_time)
                 light_level += time_modifier
 
-        # 3. Active light sources (spells, items, etc.)
+        # 3. Active light sources (spells - these stack additively)
         light_state = self.get_or_create_light_state(room.id)
 
         # Remove expired light sources
@@ -197,17 +198,26 @@ class LightingSystem:
         for source_id in expired:
             del light_state.active_light_sources[source_id]
 
-        # Add remaining light sources
+        # Add remaining light sources (spells are additive)
         for source in light_state.active_light_sources.values():
             light_level += source.intensity
 
-        # 4. Check for items on the ground that provide light (torches, lanterns, etc.)
-        light_level += self._calculate_ground_item_light(room)
+        # 4-6. Physical light sources (items and flora) - only the BRIGHTEST counts
+        # Get the max light from each category
+        ground_item_light = self._calculate_ground_item_light(room)
+        equipped_item_light = self._calculate_equipped_item_light(room)
+        flora_light = self._calculate_flora_light(room)
 
-        # 5. Check for equipped items that provide light (player-carried torches, etc.)
-        light_level += self._calculate_equipped_item_light(room)
+        # Only add the single brightest physical light source
+        brightest_physical = max(ground_item_light, equipped_item_light, flora_light)
+        if brightest_physical > 0:
+            logger.debug(
+                f"Brightest physical light in room {room.id}: +{brightest_physical} "
+                f"(ground={ground_item_light}, equipped={equipped_item_light}, flora={flora_light})"
+            )
+        light_level += brightest_physical
 
-        # 6. Check for darkness effects from players in room
+        # 7. Check for darkness effects from players in room
         darkness_penalty = self._calculate_darkness_penalty(room)
         light_level += darkness_penalty  # Note: penalty is negative
 
@@ -260,12 +270,12 @@ class LightingSystem:
         Calculate light contribution from items on the ground in a room.
 
         Items with provides_light=True contribute their light_intensity
-        to the room's overall light level.
+        to the room's overall light level. Returns the BRIGHTEST item only.
 
         Returns:
-            Total light contribution from ground items (positive integer)
+            Brightest light contribution from ground items (positive integer)
         """
-        total_light = 0
+        max_light = 0
 
         if not hasattr(room, "items") or not room.items:
             return 0
@@ -281,13 +291,14 @@ class LightingSystem:
 
             if getattr(template, "provides_light", False):
                 intensity = getattr(template, "light_intensity", 0)
-                total_light += intensity
-                logger.debug(
-                    f"Ground item '{template.name}' in room {room.id} "
-                    f"contributes +{intensity} light"
-                )
+                if intensity > max_light:
+                    max_light = intensity
+                    logger.debug(
+                        f"Ground item '{template.name}' in room {room.id} "
+                        f"provides +{intensity} light (brightest so far)"
+                    )
 
-        return total_light
+        return max_light
 
     def _calculate_equipped_item_light(self, room: "WorldRoom") -> int:
         """
@@ -295,11 +306,12 @@ class LightingSystem:
 
         Players carrying/wielding light sources (torches, lanterns, etc.)
         contribute their light_intensity to the room's overall light level.
+        Returns the BRIGHTEST equipped item only.
 
         Returns:
-            Total light contribution from equipped items (positive integer)
+            Brightest light contribution from equipped items (positive integer)
         """
-        total_light = 0
+        max_light = 0
 
         # Check all players in the room
         for player_id in room.entities:
@@ -319,13 +331,56 @@ class LightingSystem:
 
                 if getattr(template, "provides_light", False):
                     intensity = getattr(template, "light_intensity", 0)
-                    total_light += intensity
+                    if intensity > max_light:
+                        max_light = intensity
+                        logger.debug(
+                            f"Equipped item '{template.name}' on player {player_id} "
+                            f"in room {room.id} provides +{intensity} light (brightest so far)"
+                        )
+
+        return max_light
+
+    def _calculate_flora_light(self, room: "WorldRoom") -> int:
+        """
+        Calculate light contribution from flora in a room.
+
+        Bioluminescent flora (like glowing mushrooms) with provides_light=True
+        contribute their light_intensity to the room's overall light level.
+        Returns the BRIGHTEST flora only (not cumulative).
+
+        Returns:
+            Brightest light contribution from flora (positive integer)
+        """
+        max_light = 0
+
+        if not hasattr(room, "flora") or not room.flora:
+            return 0
+
+        if not self.flora_system:
+            return 0
+
+        # flora_instances maps flora_id -> (template_id, quantity)
+        for flora_id in room.flora:
+            if flora_id not in self.world.flora_instances:
+                continue
+
+            template_id, quantity = self.world.flora_instances[flora_id]
+
+            template = self.flora_system.get_template(template_id)
+            if not template:
+                continue
+
+            if getattr(template, "provides_light", False):
+                intensity = getattr(template, "light_intensity", 0)
+                # Flora intensity is not multiplied by quantity - just the base intensity
+                if intensity > max_light:
+                    max_light = intensity
                     logger.debug(
-                        f"Equipped item '{template.name}' on player {player_id} "
-                        f"in room {room.id} contributes +{intensity} light"
+                        f"Flora '{template.name}' in room {room.id} "
+                        f"provides +{intensity} light (brightest so far)"
                     )
 
-        return total_light
+        return max_light
 
     def update_light_source(
         self,
