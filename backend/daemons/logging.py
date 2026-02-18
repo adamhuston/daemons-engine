@@ -12,6 +12,7 @@ Provides structured logging using structlog for better observability:
 All log entries include contextual information like player_id, room_id, etc.
 """
 
+import asyncio
 import logging
 import sys
 from datetime import datetime
@@ -576,6 +577,529 @@ class PerformanceLogger:
         )
 
 
+class DebugEventLogger:
+    """
+    Specialized logger for debug events that can be streamed to debugging clients.
+
+    Captures:
+    - Errors and exceptions with full context
+    - Performance anomalies (commands exceeding latency thresholds)
+    - Race condition indicators
+    - WebSocket connection issues
+    - Ability execution failures
+    - State conflicts
+
+    Provides:
+    - Subscription mechanism for real-time event streaming
+    - Circular buffer for recent event retrieval
+    - Event categorization and severity levels
+
+    Usage:
+        # Record an error
+        debug_events.record_error(
+            error_type="ability_execution",
+            message="Failed to cast fireball",
+            context={"player_id": "abc123", "ability_id": "fireball"},
+            exception=e
+        )
+
+        # Subscribe to events (for debugging client)
+        queue = debug_events.subscribe("client_123")
+        try:
+            while True:
+                event = await queue.get()
+                # Process event...
+        finally:
+            debug_events.unsubscribe("client_123")
+    """
+
+    # Event types for categorization
+    EVENT_TYPE_ERROR = "error"
+    EVENT_TYPE_WARNING = "warning"
+    EVENT_TYPE_PERFORMANCE = "performance"
+    EVENT_TYPE_RACE_CONDITION = "race_condition"
+    EVENT_TYPE_CONNECTION = "connection"
+    EVENT_TYPE_STATE_CONFLICT = "state_conflict"
+
+    # Severity levels
+    SEVERITY_DEBUG = "debug"
+    SEVERITY_INFO = "info"
+    SEVERITY_WARNING = "warning"
+    SEVERITY_ERROR = "error"
+    SEVERITY_CRITICAL = "critical"
+
+    def __init__(self, buffer_size: int = 1000):
+        """
+        Initialize the debug event logger.
+
+        Args:
+            buffer_size: Maximum number of events to keep in the circular buffer
+        """
+        self.logger = get_logger("daemons.debug")
+        self._buffer_size = buffer_size
+        self._event_buffer: list[dict[str, Any]] = []
+        self._subscribers: dict[str, "asyncio.Queue[dict[str, Any]]"] = {}
+        self._event_counter = 0
+
+    def _create_event(
+        self,
+        event_type: str,
+        severity: str,
+        message: str,
+        context: dict[str, Any] | None = None,
+        exception: Exception | None = None,
+    ) -> dict[str, Any]:
+        """Create a structured debug event."""
+        import traceback
+
+        self._event_counter += 1
+        event = {
+            "id": self._event_counter,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "type": event_type,
+            "severity": severity,
+            "message": message,
+            "context": context or {},
+        }
+
+        if exception:
+            event["exception"] = {
+                "type": type(exception).__name__,
+                "message": str(exception),
+                "traceback": traceback.format_exc(),
+            }
+
+        return event
+
+    def _emit_event(self, event: dict[str, Any]) -> None:
+        """Add event to buffer and notify subscribers."""
+        import asyncio
+
+        # Add to circular buffer
+        self._event_buffer.append(event)
+        if len(self._event_buffer) > self._buffer_size:
+            self._event_buffer.pop(0)
+
+        # Notify all subscribers (non-blocking)
+        for subscriber_id, queue in list(self._subscribers.items()):
+            try:
+                queue.put_nowait(event)
+            except asyncio.QueueFull:
+                # Drop oldest event if queue is full
+                try:
+                    queue.get_nowait()
+                    queue.put_nowait(event)
+                except (asyncio.QueueEmpty, asyncio.QueueFull):
+                    pass
+
+    def subscribe(self, subscriber_id: str, queue_size: int = 100) -> "asyncio.Queue[dict[str, Any]]":
+        """
+        Subscribe to real-time debug events.
+
+        Args:
+            subscriber_id: Unique identifier for the subscriber
+            queue_size: Maximum events to buffer per subscriber
+
+        Returns:
+            asyncio.Queue that will receive debug events
+        """
+        import asyncio
+
+        if subscriber_id in self._subscribers:
+            return self._subscribers[subscriber_id]
+
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=queue_size)
+        self._subscribers[subscriber_id] = queue
+        self.logger.info(
+            "Debug subscriber added",
+            subscriber_id=subscriber_id,
+            total_subscribers=len(self._subscribers),
+        )
+        return queue
+
+    def unsubscribe(self, subscriber_id: str) -> bool:
+        """
+        Unsubscribe from debug events.
+
+        Args:
+            subscriber_id: Unique identifier for the subscriber
+
+        Returns:
+            True if subscriber was found and removed
+        """
+        if subscriber_id in self._subscribers:
+            del self._subscribers[subscriber_id]
+            self.logger.info(
+                "Debug subscriber removed",
+                subscriber_id=subscriber_id,
+                total_subscribers=len(self._subscribers),
+            )
+            return True
+        return False
+
+    def get_recent_events(
+        self,
+        count: int = 100,
+        event_type: str | None = None,
+        severity: str | None = None,
+        since_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Get recent events from the buffer.
+
+        Args:
+            count: Maximum number of events to return
+            event_type: Filter by event type
+            severity: Filter by severity level
+            since_id: Only return events with ID greater than this
+
+        Returns:
+            List of matching events (most recent last)
+        """
+        events = self._event_buffer
+
+        if since_id is not None:
+            events = [e for e in events if e["id"] > since_id]
+
+        if event_type is not None:
+            events = [e for e in events if e["type"] == event_type]
+
+        if severity is not None:
+            events = [e for e in events if e["severity"] == severity]
+
+        return events[-count:]
+
+    def get_event_counts(self) -> dict[str, dict[str, int]]:
+        """Get counts of events by type and severity."""
+        counts: dict[str, dict[str, int]] = {}
+
+        for event in self._event_buffer:
+            event_type = event["type"]
+            severity = event["severity"]
+
+            if event_type not in counts:
+                counts[event_type] = {}
+
+            counts[event_type][severity] = counts[event_type].get(severity, 0) + 1
+
+        return counts
+
+    def clear_buffer(self) -> int:
+        """Clear the event buffer. Returns number of events cleared."""
+        count = len(self._event_buffer)
+        self._event_buffer.clear()
+        return count
+
+    # ========================================================================
+    # Convenience Methods for Common Event Types
+    # ========================================================================
+
+    def record_error(
+        self,
+        error_type: str,
+        message: str,
+        context: dict[str, Any] | None = None,
+        exception: Exception | None = None,
+        severity: str = SEVERITY_ERROR,
+    ) -> None:
+        """
+        Record an error event.
+
+        Args:
+            error_type: Category of error (ability_execution, command, websocket, etc.)
+            message: Human-readable error description
+            context: Additional context (player_id, room_id, ability_id, etc.)
+            exception: The exception object if available
+            severity: Error severity level
+        """
+        ctx = context or {}
+        ctx["error_type"] = error_type
+
+        event = self._create_event(
+            event_type=self.EVENT_TYPE_ERROR,
+            severity=severity,
+            message=message,
+            context=ctx,
+            exception=exception,
+        )
+
+        self._emit_event(event)
+        log_method = getattr(self.logger, severity, self.logger.error)
+        log_method(
+            message,
+            debug_event_id=event["id"],
+            **ctx,
+        )
+
+    def record_warning(
+        self,
+        warning_type: str,
+        message: str,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """Record a warning event."""
+        ctx = context or {}
+        ctx["warning_type"] = warning_type
+
+        event = self._create_event(
+            event_type=self.EVENT_TYPE_WARNING,
+            severity=self.SEVERITY_WARNING,
+            message=message,
+            context=ctx,
+        )
+
+        self._emit_event(event)
+        self.logger.warning(message, debug_event_id=event["id"], **ctx)
+
+    def record_performance_anomaly(
+        self,
+        operation: str,
+        duration_ms: float,
+        threshold_ms: float,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Record a performance anomaly (operation exceeded expected duration).
+
+        Args:
+            operation: Name of the operation (command, query, tick, etc.)
+            duration_ms: Actual duration in milliseconds
+            threshold_ms: Expected maximum duration
+            context: Additional context
+        """
+        ctx = context or {}
+        ctx["operation"] = operation
+        ctx["duration_ms"] = round(duration_ms, 2)
+        ctx["threshold_ms"] = round(threshold_ms, 2)
+        ctx["exceeded_by_pct"] = round((duration_ms / threshold_ms - 1) * 100, 1)
+
+        event = self._create_event(
+            event_type=self.EVENT_TYPE_PERFORMANCE,
+            severity=self.SEVERITY_WARNING,
+            message=f"Performance anomaly: {operation} took {duration_ms:.1f}ms (threshold: {threshold_ms:.1f}ms)",
+            context=ctx,
+        )
+
+        self._emit_event(event)
+        self.logger.warning(
+            "Performance anomaly detected",
+            debug_event_id=event["id"],
+            **ctx,
+        )
+
+    def record_race_condition_indicator(
+        self,
+        indicator_type: str,
+        message: str,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Record a potential race condition indicator.
+
+        Args:
+            indicator_type: Type of indicator (state_mismatch, concurrent_modification, etc.)
+            message: Description of the indicator
+            context: Additional context
+        """
+        ctx = context or {}
+        ctx["indicator_type"] = indicator_type
+
+        event = self._create_event(
+            event_type=self.EVENT_TYPE_RACE_CONDITION,
+            severity=self.SEVERITY_WARNING,
+            message=message,
+            context=ctx,
+        )
+
+        self._emit_event(event)
+        self.logger.warning(
+            "Race condition indicator",
+            debug_event_id=event["id"],
+            **ctx,
+        )
+
+    def record_connection_event(
+        self,
+        event_subtype: str,
+        message: str,
+        context: dict[str, Any] | None = None,
+        severity: str = SEVERITY_INFO,
+    ) -> None:
+        """
+        Record a WebSocket connection event.
+
+        Args:
+            event_subtype: Type of connection event (connect, disconnect, error, timeout)
+            message: Description
+            context: Additional context (player_id, connection_id, etc.)
+            severity: Event severity
+        """
+        ctx = context or {}
+        ctx["connection_event"] = event_subtype
+
+        event = self._create_event(
+            event_type=self.EVENT_TYPE_CONNECTION,
+            severity=severity,
+            message=message,
+            context=ctx,
+        )
+
+        self._emit_event(event)
+        log_method = getattr(self.logger, severity, self.logger.info)
+        log_method(message, debug_event_id=event["id"], **ctx)
+
+    def record_state_conflict(
+        self,
+        entity_type: str,
+        entity_id: str,
+        field: str,
+        expected_value: Any,
+        actual_value: Any,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Record a state conflict (unexpected value detected).
+
+        Args:
+            entity_type: Type of entity (player, npc, room)
+            entity_id: ID of the entity
+            field: Field with conflict
+            expected_value: Expected value
+            actual_value: Actual value found
+            context: Additional context
+        """
+        ctx = context or {}
+        ctx["entity_type"] = entity_type
+        ctx["entity_id"] = entity_id
+        ctx["field"] = field
+        ctx["expected_value"] = str(expected_value)
+        ctx["actual_value"] = str(actual_value)
+
+        event = self._create_event(
+            event_type=self.EVENT_TYPE_STATE_CONFLICT,
+            severity=self.SEVERITY_WARNING,
+            message=f"State conflict: {entity_type}:{entity_id}.{field} expected {expected_value}, got {actual_value}",
+            context=ctx,
+        )
+
+        self._emit_event(event)
+        self.logger.warning(
+            "State conflict detected",
+            debug_event_id=event["id"],
+            **ctx,
+        )
+
+    def record_ability_error(
+        self,
+        ability_id: str,
+        error_type: str,
+        message: str,
+        player_id: str | None = None,
+        target_id: str | None = None,
+        exception: Exception | None = None,
+    ) -> None:
+        """
+        Record an ability execution error.
+
+        Args:
+            ability_id: ID of the ability
+            error_type: Type of error (validation, execution, effect, etc.)
+            message: Error description
+            player_id: ID of the player using the ability
+            target_id: ID of the target (if applicable)
+            exception: The exception object if available
+        """
+        context = {
+            "ability_id": ability_id,
+            "error_type": error_type,
+        }
+        if player_id:
+            context["player_id"] = player_id
+        if target_id:
+            context["target_id"] = target_id
+
+        self.record_error(
+            error_type=f"ability_{error_type}",
+            message=message,
+            context=context,
+            exception=exception,
+        )
+
+    def record_command_error(
+        self,
+        command: str,
+        error_type: str,
+        message: str,
+        player_id: str | None = None,
+        exception: Exception | None = None,
+    ) -> None:
+        """
+        Record a command execution error.
+
+        Args:
+            command: The command that failed
+            error_type: Type of error (parse, validation, execution, etc.)
+            message: Error description
+            player_id: ID of the player who issued the command
+            exception: The exception object if available
+        """
+        context = {
+            "command": command,
+            "error_type": error_type,
+        }
+        if player_id:
+            context["player_id"] = player_id
+
+        self.record_error(
+            error_type=f"command_{error_type}",
+            message=message,
+            context=context,
+            exception=exception,
+        )
+
+    def record_websocket_error(
+        self,
+        error_type: str,
+        message: str,
+        player_id: str | None = None,
+        connection_id: str | None = None,
+        exception: Exception | None = None,
+    ) -> None:
+        """
+        Record a WebSocket error.
+
+        Args:
+            error_type: Type of error (connection, message, protocol, etc.)
+            message: Error description
+            player_id: ID of the affected player (if known)
+            connection_id: ID of the connection (if known)
+            exception: The exception object if available
+        """
+        context = {"websocket_error_type": error_type}
+        if player_id:
+            context["player_id"] = player_id
+        if connection_id:
+            context["connection_id"] = connection_id
+
+        self.record_error(
+            error_type=f"websocket_{error_type}",
+            message=message,
+            context=context,
+            exception=exception,
+            severity=self.SEVERITY_WARNING,
+        )
+
+    @property
+    def subscriber_count(self) -> int:
+        """Get the number of active subscribers."""
+        return len(self._subscribers)
+
+    @property
+    def buffer_count(self) -> int:
+        """Get the number of events in the buffer."""
+        return len(self._event_buffer)
+
+
 # ============================================================================
 # Global Logger Instances
 # ============================================================================
@@ -584,6 +1108,7 @@ class PerformanceLogger:
 admin_audit = AdminAuditLogger()
 game_events = GameEventLogger()
 performance = PerformanceLogger()
+debug_events = DebugEventLogger()
 
 
 # Configure logging on module import (can be reconfigured later)

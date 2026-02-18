@@ -8,17 +8,16 @@ trigger conditions, and integration with temperature/weather.
 import pytest
 
 from daemons.engine.systems.biome import (
+    DEFAULT_SEASONAL_TEMPERATURE_MODIFIERS,
+    SEASON_IMMUNE_BIOMES,
+    SEASON_ORDER,
     BiomeDefinition,
     BiomeSystem,
     Season,
     SeasonState,
     SeasonSystem,
-    SEASON_ORDER,
-    SEASON_IMMUNE_BIOMES,
-    DEFAULT_SEASONAL_TEMPERATURE_MODIFIERS,
 )
 from daemons.engine.world import World, WorldArea, WorldRoom, WorldTime
-
 
 # ============================================================================
 # Fixtures
@@ -388,7 +387,8 @@ class TestSeasonSystem:
         area = mock_world_with_biomes.areas["area_arctic"]
         modifier = season_system.get_temperature_modifier(area)
 
-        assert modifier == DEFAULT_SEASONAL_TEMPERATURE_MODIFIERS[Season.WINTER]
+        # Arctic biome has custom winter modifier (-20) from YAML
+        assert modifier == -20
         assert modifier < 0
 
     def test_weather_modifiers(
@@ -398,9 +398,9 @@ class TestSeasonSystem:
         area = mock_world_with_biomes.areas["area_arctic"]
         modifiers = season_system.get_weather_modifiers(area)
 
-        # Winter should have snow modifier
-        assert "snow" in modifiers
-        assert modifiers["snow"] > 0
+        # Arctic biome has blizzard modifier for winter (from YAML), not snow
+        assert "blizzard" in modifiers
+        assert modifiers["blizzard"] > 0
 
     def test_check_season_condition(
         self, season_system: SeasonSystem, mock_world_with_biomes: World
@@ -486,7 +486,7 @@ class TestBiomeSystem:
     ):
         """Test getting biome for an area."""
         area = mock_world_with_biomes.areas["area_forest"]
-        biome = biome_system.get_biome_for_area(area)
+        _biome = biome_system.get_biome_for_area(area)
         # May or may not find it depending on YAML files
         # Just verify no error is raised
 
