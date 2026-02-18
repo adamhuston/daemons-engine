@@ -1,6 +1,6 @@
 {
   "name": "daemonswright",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Daemonswright - Daemons game engine content editor",
   "main": "dist/main.js",
   "scripts": {
@@ -25,9 +25,9 @@
     "@types/node": "^20.10.0",
     "@types/react": "^19.2.7",
     "@vitejs/plugin-react": "^4.0.0",
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1",
+    "electron": "^40.4.1",
+    "electron-builder": "^26.8.1",
     "typescript": "^5.3.0",
-    "vite": "^5.0.0"
+    "vite": "^7.3.1"
   }
 }
