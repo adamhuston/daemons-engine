@@ -4216,8 +4216,8 @@ class ContentReloader:
         """
         import yaml
 
-        from daemons.models import Room as RoomModel
         from daemons.engine.world import WorldRoom
+        from daemons.models import Room as RoomModel
 
         rooms_dir = self.world_data_dir / "rooms"
         result = ReloadResult(
@@ -4353,8 +4353,8 @@ class ContentReloader:
         """
         import yaml
 
-        from daemons.models import Area as AreaModel
         from daemons.engine.world import WorldArea, WorldTime
+        from daemons.models import Area as AreaModel
 
         areas_dir = self.world_data_dir / "areas"
         result = ReloadResult(
@@ -4474,10 +4474,11 @@ class ContentReloader:
         - Skips instances that already exist (by checking template_id + room_id combo)
         """
         import uuid
+
         import yaml
 
-        from daemons.models import ItemInstance as ItemInstanceModel
         from daemons.engine.world import WorldItem
+        from daemons.models import ItemInstance as ItemInstanceModel
 
         instances_dir = self.world_data_dir / "item_instances"
         result = ReloadResult(
@@ -4597,10 +4598,11 @@ class ContentReloader:
         - Skips instances that already exist (by checking template_id + room_id combo)
         """
         import uuid
+
         import yaml
 
+        from daemons.engine.world import EntityType, WorldNpc
         from daemons.models import NpcInstance as NpcInstanceModel
-        from daemons.engine.world import WorldNpc, EntityType
 
         spawns_dir = self.world_data_dir / "npc_spawns"
         result = ReloadResult(
@@ -4726,6 +4728,7 @@ class ContentReloader:
         """
         import random
         import time
+
         import yaml
 
         from daemons.models import FloraInstance as FloraInstanceModel
@@ -4856,10 +4859,11 @@ class ContentReloader:
         """
         import random
         import uuid
+
         import yaml
 
+        from daemons.engine.world import EntityType, WorldNpc
         from daemons.models import NpcInstance as NpcInstanceModel
-        from daemons.engine.world import WorldNpc, EntityType
 
         result = ReloadResult(
             success=True,
@@ -6422,3 +6426,281 @@ async def batch_validate_content(
     except Exception as e:
         logger.exception("Batch validation failed")
         raise HTTPException(status_code=500, detail=f"Batch validation error: {str(e)}")
+
+
+# ============================================================================
+# Debug Endpoints (Phase QA)
+# ============================================================================
+
+
+class DebugEventFilter(BaseModel):
+    """Filter criteria for debug events."""
+
+    event_types: list[str] | None = Field(None, description="Filter by event types")
+    player_id: str | None = Field(None, description="Filter by player ID")
+    since_id: int | None = Field(None, description="Only events with ID > this value")
+    limit: int = Field(100, ge=1, le=1000, description="Max events to return")
+
+
+class LoadTestConfig(BaseModel):
+    """Configuration for load testing."""
+
+    num_connections: int = Field(
+        10, ge=1, le=100, description="Number of concurrent connections"
+    )
+    commands_per_connection: int = Field(
+        10, ge=1, le=100, description="Commands per connection"
+    )
+    delay_between_commands_ms: int = Field(
+        100, ge=0, le=5000, description="Delay between commands"
+    )
+
+
+@router.get("/debug/events")
+async def get_debug_events(
+    event_type: str | None = None,
+    severity: str | None = None,
+    player_id: str | None = None,
+    since_id: int | None = None,
+    limit: int = 100,
+    admin: dict = Depends(get_current_admin),
+) -> dict:
+    """
+    Get recent debug events from the buffer.
+
+    Args:
+        event_type: Filter by event type (error, warning, performance, etc.)
+        severity: Filter by severity level (debug, info, warning, error, critical)
+        player_id: Filter by player ID in context
+        since_id: Only return events with ID greater than this
+        limit: Maximum number of events to return (1-1000)
+
+    Returns:
+        List of debug events with metadata
+
+    Requires: MODERATOR+
+    """
+    from daemons.logging import debug_events
+
+    events = debug_events.get_recent_events(
+        count=limit,
+        event_type=event_type,
+        severity=severity,
+        since_id=since_id,
+    )
+
+    # Apply player_id filter (check in context)
+    if player_id:
+        events = [
+            e
+            for e in events
+            if e.get("context", {}).get("player_id") == player_id
+        ]
+
+    return {
+        "success": True,
+        "events": events,
+        "total_count": len(events),
+        "buffer_size": debug_events.buffer_count,
+        "subscriber_count": debug_events.subscriber_count,
+    }
+
+
+@router.get("/debug/error-summary")
+async def get_error_summary(
+    hours: int = 24,
+    admin: dict = Depends(get_current_admin),
+) -> dict:
+    """
+    Get a summary of errors over the specified time period.
+
+    Args:
+        hours: Number of hours to look back (default: 24)
+
+    Returns:
+        Error counts by type and recent error samples
+
+    Requires: MODERATOR+
+    """
+    from datetime import datetime, timedelta
+
+    from daemons.logging import debug_events
+
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    cutoff_str = cutoff.isoformat() + "Z"
+
+    events = debug_events.get_recent_events(count=1000)
+    recent_errors = [
+        e
+        for e in events
+        if e.get("type") == "error" and e.get("timestamp", "") >= cutoff_str
+    ]
+
+    # Aggregate by error type
+    error_counts: dict[str, int] = {}
+    for e in recent_errors:
+        error_type = e.get("context", {}).get("error_type", "unknown")
+        error_counts[error_type] = error_counts.get(error_type, 0) + 1
+
+    return {
+        "success": True,
+        "period_hours": hours,
+        "total_errors": len(recent_errors),
+        "errors_by_type": error_counts,
+        "recent_errors": recent_errors[:10],  # Last 10 for preview
+    }
+
+
+@router.get("/debug/performance-anomalies")
+async def get_performance_anomalies(
+    threshold_pct: float = 200.0,  # 200% = 3x expected
+    limit: int = 50,
+    admin: dict = Depends(get_current_admin),
+) -> dict:
+    """
+    Get recent performance anomalies exceeding threshold.
+
+    Args:
+        threshold_pct: Minimum deviation percentage to include (default: 200%)
+        limit: Maximum anomalies to return
+
+    Returns:
+        List of performance anomalies with timing details
+
+    Requires: MODERATOR+
+    """
+    from daemons.logging import debug_events
+
+    events = debug_events.get_recent_events(count=500, event_type="performance")
+    anomalies = [
+        e
+        for e in events
+        if e.get("context", {}).get("exceeded_by_pct", 0) >= threshold_pct
+    ]
+
+    return {
+        "success": True,
+        "threshold_pct": threshold_pct,
+        "anomalies": anomalies[:limit],
+        "total_count": len(anomalies),
+    }
+
+
+@router.get("/debug/connection-stats")
+async def get_connection_stats(
+    admin: dict = Depends(get_current_admin),
+) -> dict:
+    """
+    Get WebSocket connection statistics.
+
+    Returns:
+        Connection counts by IP, account, and total active connections
+
+    Requires: MODERATOR+
+    """
+    from daemons.websocket_security import ws_security_manager
+
+    limiter = ws_security_manager.connection_limiter
+
+    return {
+        "success": True,
+        "connections_by_ip": {
+            ip: len(conns) for ip, conns in limiter._ip_connections.items()
+        },
+        "connections_by_account": {
+            acc: len(conns) for acc, conns in limiter._account_connections.items()
+        },
+        "total_active_connections": len(limiter._connection_info),
+        "config": {
+            "max_per_ip": limiter.max_per_ip,
+            "max_per_account": limiter.max_per_account,
+        },
+    }
+
+
+@router.get("/debug/event-counts")
+async def get_debug_event_counts(
+    admin: dict = Depends(get_current_admin),
+) -> dict:
+    """
+    Get counts of debug events by type and severity.
+
+    Returns:
+        Event counts organized by type and severity
+
+    Requires: MODERATOR+
+    """
+    from daemons.logging import debug_events
+
+    counts = debug_events.get_event_counts()
+
+    return {
+        "success": True,
+        "counts_by_type": counts,
+        "buffer_size": debug_events.buffer_count,
+        "subscriber_count": debug_events.subscriber_count,
+    }
+
+
+@router.post("/debug/load-test")
+async def trigger_load_test(
+    config: LoadTestConfig,
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS)),
+) -> dict:
+    """
+    Acknowledge a load test configuration (ADMIN only).
+
+    The actual load test should be executed via the debugging client,
+    not directly on the server. This endpoint validates configuration
+    and returns acknowledgment.
+
+    Requires: ADMIN with SERVER_COMMANDS permission
+    """
+    admin_audit_logger.log_action(
+        admin_id=admin.get("user_id", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action="load_test_config",
+        target_type="debug",
+        target_id="load_test",
+        details=config.model_dump(),
+        success=True,
+    )
+
+    return {
+        "success": True,
+        "message": "Load test configuration accepted",
+        "config": config.model_dump(),
+        "note": "Execute load test via debugging client with this configuration",
+    }
+
+
+@router.delete("/debug/clear-buffer")
+async def clear_debug_buffer(
+    admin: dict = Depends(require_permission(Permission.SERVER_COMMANDS)),
+) -> dict:
+    """
+    Clear the debug event buffer.
+
+    This is useful for testing or after addressing a batch of issues.
+
+    Requires: ADMIN with SERVER_COMMANDS permission
+    """
+    from daemons.logging import debug_events
+
+    cleared_count = debug_events.clear_buffer()
+
+    admin_audit_logger.log_action(
+        admin_id=admin.get("user_id", "unknown"),
+        admin_name=admin.get("username", "unknown"),
+        action="clear_debug_buffer",
+        target_type="debug",
+        target_id="buffer",
+        details={"cleared_count": cleared_count},
+        success=True,
+    )
+
+    return {
+        "success": True,
+        "message": f"Cleared {cleared_count} events from debug buffer",
+        "cleared_count": cleared_count,
+    }

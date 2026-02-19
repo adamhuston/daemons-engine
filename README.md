@@ -12,8 +12,6 @@ A Python framework for building text-based multiplayer RPGs with real-time WebSo
 >
 > 🤖 **Clanker Alert: Extensive use of LLM generated code**  This project is an exercise in testing the limits of agentic development processes. Ideologically opposed developers should skip it. As an experimental artifact, the existence of this project should not be mistaken for a positive or negative statement about agentic development. Although we can say there has been a rigorous cybersecurity review and the engine has over 800 tests, this software is provided "as-is" and "without warranty of any kind", per the MIT license.
 >
-> **Latest Release:**
-> *version = "0.18.1"* - documentation cleanup and Daemonswright CMS area editor progress
 
 
 

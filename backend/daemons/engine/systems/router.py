@@ -10,12 +10,19 @@ Provides:
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from daemons.logging import debug_events
+from daemons.metrics import record_command_error, record_command_latency_summary
+
 if TYPE_CHECKING:
     pass
+
+logger = logging.getLogger(__name__)
 
 # Type alias for event
 Event = dict[str, Any]
@@ -222,15 +229,44 @@ class CommandRouter:
 
         # Call handler with arguments (await if it's a coroutine)
         # Pass cmd_name as 4th argument for handlers that need it (e.g., emotes)
+        start_time = time.perf_counter()
         try:
             result = meta.handler(self.engine, player_id, args, cmd_name)
             # Check if the handler is async (returns a coroutine)
             if hasattr(result, "__await__"):
-                return await result
-            return result
+                events = await result
+            else:
+                events = result
+
+            # Record successful command latency
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            record_command_latency_summary(cmd_name, duration_ms / 1000)
+
+            # Log performance anomaly if command took too long (>100ms threshold)
+            if duration_ms > 100:
+                debug_events.record_performance_anomaly(
+                    operation=f"command:{cmd_name}",
+                    duration_ms=duration_ms,
+                    threshold_ms=100.0,
+                    context={"player_id": player_id, "args": args[:50] if args else ""},
+                )
+
+            return events
         except Exception as e:
-            # Log error and return generic message
-            print(f"[CommandError] {cmd_name}: {e}")
+            # Record error metrics
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            record_command_error(cmd_name)
+
+            # Log error with debug_events for real-time monitoring
+            debug_events.record_command_error(
+                command=cmd_name,
+                error_type="execution",
+                message=str(e),
+                player_id=player_id,
+                exception=e,
+            )
+
+            logger.error(f"Command execution error: {cmd_name}", exc_info=True)
             return [
                 self.engine._msg_to_player(
                     player_id, "Something went wrong executing that command."

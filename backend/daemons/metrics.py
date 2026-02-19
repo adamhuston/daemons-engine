@@ -21,6 +21,7 @@ from prometheus_client import (
     Gauge,
     Histogram,
     Info,
+    Summary,
     generate_latest,
 )
 
@@ -234,6 +235,72 @@ content_reload_errors = Counter(
 
 
 # ============================================================================
+# Debug & Anomaly Detection Metrics (Phase QA)
+# ============================================================================
+
+errors_total = Counter(
+    "daemons_errors_total",
+    "Total errors by type and severity",
+    ["error_type", "severity"],
+    registry=METRICS_REGISTRY,
+)
+
+race_condition_indicators = Counter(
+    "daemons_race_condition_indicators_total",
+    "Potential race condition indicators detected",
+    ["indicator_type"],
+    registry=METRICS_REGISTRY,
+)
+
+websocket_connection_errors = Counter(
+    "daemons_websocket_connection_errors_total",
+    "WebSocket connection errors by type",
+    ["error_type"],
+    registry=METRICS_REGISTRY,
+)
+
+ability_execution_errors = Counter(
+    "daemons_ability_execution_errors_total",
+    "Ability execution failures by ability and error type",
+    ["ability_id", "error_type"],
+    registry=METRICS_REGISTRY,
+)
+
+command_errors = Counter(
+    "daemons_command_errors_total",
+    "Command processing errors by command type",
+    ["command"],
+    registry=METRICS_REGISTRY,
+)
+
+state_conflicts = Counter(
+    "daemons_state_conflicts_total",
+    "State conflict incidents (potential race conditions)",
+    ["conflict_type"],
+    registry=METRICS_REGISTRY,
+)
+
+command_latency_summary = Summary(
+    "daemons_command_latency_summary",
+    "Command latency summary with percentiles",
+    ["command"],
+    registry=METRICS_REGISTRY,
+)
+
+debug_events_buffered = Gauge(
+    "daemons_debug_events_buffered",
+    "Number of debug events currently in buffer",
+    registry=METRICS_REGISTRY,
+)
+
+debug_subscribers_active = Gauge(
+    "daemons_debug_subscribers_active",
+    "Number of active debug event subscribers",
+    registry=METRICS_REGISTRY,
+)
+
+
+# ============================================================================
 # Server State Metrics
 # ============================================================================
 
@@ -387,3 +454,49 @@ def get_metrics() -> bytes:
 def get_metrics_content_type() -> str:
     """Get the content type for Prometheus metrics."""
     return CONTENT_TYPE_LATEST
+
+
+# ============================================================================
+# Debug Metrics Helper Functions (Phase QA)
+# ============================================================================
+
+
+def record_debug_error(error_type: str, severity: str = "error") -> None:
+    """Record an error occurrence for debug tracking."""
+    errors_total.labels(error_type=error_type, severity=severity).inc()
+
+
+def record_race_condition_indicator(indicator_type: str) -> None:
+    """Record a potential race condition indicator."""
+    race_condition_indicators.labels(indicator_type=indicator_type).inc()
+
+
+def record_websocket_connection_error(error_type: str) -> None:
+    """Record a WebSocket connection error."""
+    websocket_connection_errors.labels(error_type=error_type).inc()
+
+
+def record_ability_execution_error(ability_id: str, error_type: str) -> None:
+    """Record an ability execution error."""
+    ability_execution_errors.labels(ability_id=ability_id, error_type=error_type).inc()
+
+
+def record_command_error(command: str) -> None:
+    """Record a command processing error."""
+    command_errors.labels(command=command).inc()
+
+
+def record_state_conflict(conflict_type: str) -> None:
+    """Record a state conflict incident."""
+    state_conflicts.labels(conflict_type=conflict_type).inc()
+
+
+def record_command_latency_summary(command: str, duration_seconds: float) -> None:
+    """Record command latency for summary statistics."""
+    command_latency_summary.labels(command=command).observe(duration_seconds)
+
+
+def update_debug_metrics(events_buffered: int, subscribers_active: int) -> None:
+    """Update debug event gauges."""
+    debug_events_buffered.set(events_buffered)
+    debug_subscribers_active.set(subscribers_active)

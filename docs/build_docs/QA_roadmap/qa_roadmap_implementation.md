@@ -198,13 +198,30 @@ class DebugEventLogger:
 debug_events = DebugEventLogger()
 ```
 
-### 1.2 Debug Metrics Extension
+### 1.2 Debug Metrics Extension ✅ COMPLETE
 
 **Purpose**: Add new Prometheus metrics specifically for debugging and anomaly detection.
 
 **File**: `backend/daemons/metrics.py`
 
-**Add these metrics**:
+**Status**: Implemented on 2026-02-18
+
+**Implementation Notes**:
+- Added `Summary` to prometheus_client imports
+- New Counter metrics: `errors_total`, `race_condition_indicators`, `websocket_connection_errors`, `ability_execution_errors`, `command_errors`, `state_conflicts`
+- New Summary metric: `command_latency_summary` for latency percentile tracking
+- New Gauge metrics: `debug_events_buffered`, `debug_subscribers_active`
+- Helper functions added:
+  - `record_debug_error()` - Record errors with type and severity
+  - `record_race_condition_indicator()` - Track race condition signals
+  - `record_websocket_connection_error()` - Track WebSocket errors
+  - `record_ability_execution_error()` - Track ability failures
+  - `record_command_error()` - Track command processing errors
+  - `record_state_conflict()` - Track state consistency issues
+  - `record_command_latency_summary()` - Record latency for summary stats
+  - `update_debug_metrics()` - Update debug event gauge values
+
+**Reference Implementation** (see actual code in `metrics.py`):
 
 ```python
 # ============================================================================
@@ -278,6 +295,38 @@ def record_websocket_error(error_type: str) -> None:
     """Record a WebSocket connection error."""
     websocket_connection_errors.labels(error_type=error_type).inc()
 ```
+
+### Engine Integration (Tasks 1.3, 1.6, 1.7) ✅ COMPLETE
+
+**Purpose**: Integrate debug logging and metrics collection throughout the engine, command router, ability system, and WebSocket handlers.
+
+**Status**: Implemented on 2026-02-18
+
+**Files Modified**:
+- `backend/daemons/engine/engine.py` - Added debug_events and metrics imports
+- `backend/daemons/engine/systems/router.py` - Added command timing and error logging
+- `backend/daemons/engine/systems/abilities.py` - Added ability error logging
+- `backend/daemons/main.py` - Added WebSocket error and connection logging
+
+**Implementation Notes**:
+
+**Command Router (router.py)**:
+- Added timing around command execution with `time.perf_counter()`
+- Records command latency via `record_command_latency_summary()`
+- Logs performance anomalies when commands exceed 100ms threshold
+- Records command errors with full context via `debug_events.record_command_error()`
+- Records metrics via `record_command_error()`
+
+**Ability Executor (abilities.py)**:
+- Logs ability execution errors with `debug_events.record_ability_error()`
+- Records ability error metrics via `record_ability_execution_error()`
+- Includes caster_id, target_id, and exception details
+
+**WebSocket Handlers (main.py)**:
+- Logs connection events (disconnect) via `debug_events.record_connection_event()`
+- Logs WebSocket errors via `debug_events.record_websocket_error()`
+- Records WebSocket error metrics via `record_websocket_connection_error()`
+- Covers both authenticated and legacy WebSocket endpoints
 
 ### 1.3 Debug Admin API Endpoints
 
@@ -1210,13 +1259,13 @@ docs/
 | # | Task | File | Priority | Estimate | Status |
 |---|------|------|----------|----------|--------|
 | 1.1 | Add `DebugEventLogger` class | `logging.py` | High | 2h | ✅ Complete |
-| 1.2 | Add debug metrics to Prometheus | `metrics.py` | High | 1h | Not Started |
-| 1.3 | Integrate debug logging into engine | `engine/engine.py` | High | 2h | Not Started |
-| 1.4 | Add `/api/admin/debug/*` endpoints | `routes/admin.py` | High | 2h | Not Started |
-| 1.5 | Add `/ws/debug` WebSocket endpoint | `main.py` | High | 1h | Not Started |
-| 1.6 | Update WebSocket handlers to log errors | `main.py` | Medium | 1h | Not Started |
-| 1.7 | Add performance timing to commands | `engine/engine.py` | Medium | 2h | Not Started |
-| 1.8 | Write unit tests for debug logging | `tests/unit/test_debug_logging.py` | Medium | 2h | Not Started |
+| 1.2 | Add debug metrics to Prometheus | `metrics.py` | High | 1h | ✅ Complete |
+| 1.3 | Integrate debug logging into engine | `engine/engine.py`, `router.py`, `abilities.py` | High | 2h | ✅ Complete |
+| 1.4 | Add `/api/admin/debug/*` endpoints | `routes/admin.py` | High | 2h | ✅ Complete |
+| 1.5 | Add `/ws/debug` WebSocket endpoint | `main.py` | High | 1h | ✅ Complete |
+| 1.6 | Update WebSocket handlers to log errors | `main.py` | Medium | 1h | ✅ Complete |
+| 1.7 | Add performance timing to commands | `router.py` | Medium | 2h | ✅ Complete |
+| 1.8 | Write unit tests for debug logging | `tests/unit/test_debug_logging.py` | Medium | 2h | ✅ Complete |
 
 ### Phase 2 Tasks (Debugging Client)
 

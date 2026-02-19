@@ -1,6 +1,7 @@
 # backend/app/main.py
 import asyncio
 import contextlib
+import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -37,7 +38,8 @@ from .input_sanitization import sanitize_player_name
 from .legacy_deprecation import (
     legacy_deprecation_manager,
 )
-from .metrics import init_metrics
+from .logging import debug_events
+from .metrics import init_metrics, record_websocket_connection_error
 from .models import Base, Player, PlayerInventory, UserAccount
 from .rate_limit import (
     RATE_LIMITS,
@@ -1681,9 +1683,21 @@ async def _ws_receiver_auth(
     except WebSocketDisconnect:
         logger.info("WebSocketDisconnect for player %s", player_id)
         ws_rate_limiter.disconnect(player_id)
+        debug_events.record_connection_event(
+            event_subtype="disconnect",
+            message=f"Player {player_id} disconnected normally",
+            context={"player_id": player_id},
+        )
     except Exception as exc:
         logger.exception("Error in _ws_receiver_auth for player %s: %s", player_id, exc)
         ws_rate_limiter.disconnect(player_id)
+        debug_events.record_websocket_error(
+            error_type="receiver",
+            message=str(exc),
+            player_id=player_id,
+            exception=exc,
+        )
+        record_websocket_connection_error("receiver_error")
 
 
 # Legacy WebSocket endpoint (deprecated - kept for backward compatibility)
@@ -1870,9 +1884,21 @@ async def _ws_receiver(
         # Normal disconnect; let game_ws handle cleanup
         logger.info("WebSocketDisconnect for player %s", player_id)
         ws_rate_limiter.disconnect(player_id)
+        debug_events.record_connection_event(
+            event_subtype="disconnect",
+            message=f"Player {player_id} disconnected (legacy endpoint)",
+            context={"player_id": player_id, "endpoint": "legacy"},
+        )
     except Exception as exc:
         logger.exception("Error in _ws_receiver for player %s: %s", player_id, exc)
         ws_rate_limiter.disconnect(player_id)
+        debug_events.record_websocket_error(
+            error_type="receiver_legacy",
+            message=str(exc),
+            player_id=player_id,
+            exception=exc,
+        )
+        record_websocket_connection_error("receiver_error_legacy")
 
 
 async def _ws_sender(
@@ -1891,3 +1917,133 @@ async def _ws_sender(
         pass
     except Exception as exc:
         logger.exception("Error in _ws_sender: %s", exc)
+
+
+# ---------- Debug WebSocket Endpoint (Phase QA) ----------
+
+
+@app.websocket("/ws/debug")
+async def debug_ws(
+    websocket: WebSocket,
+    token: str | None = Query(None, description="Access token (optional, use Sec-WebSocket-Protocol header)"),
+) -> None:
+    """
+    Debug WebSocket endpoint for real-time debug event streaming.
+
+    Requires MODERATOR+ role. Events are streamed as they are recorded.
+
+    Token can be passed via:
+    - Sec-WebSocket-Protocol header: access_token, <your_token>
+    - Query string: ?token=<your_token>
+    """
+    from daemons.engine.systems.auth import UserRole
+
+    client_ip = get_client_ip_from_websocket(websocket)
+
+    # Extract token from Sec-WebSocket-Protocol header first
+    ws_protocols = websocket.headers.get("sec-websocket-protocol", "")
+    header_token = None
+    subprotocol = None
+
+    if ws_protocols:
+        protocols = [p.strip() for p in ws_protocols.split(",")]
+        if len(protocols) >= 2 and protocols[0] == "access_token":
+            header_token = protocols[1]
+            subprotocol = "access_token"
+
+    effective_token = header_token or token
+
+    if not effective_token:
+        await websocket.close(code=4001, reason="No token provided")
+        return
+
+    # Verify token
+    claims = verify_access_token(effective_token)
+    if not claims:
+        await websocket.close(code=4001, reason="Invalid or expired token")
+        return
+
+    user_id = claims.get("user_id", "unknown")
+    role = claims.get("role", "")
+
+    # Check role (MODERATOR+ required)
+    allowed_roles = [UserRole.MODERATOR.value, UserRole.GAME_MASTER.value, UserRole.ADMIN.value]
+    if role not in allowed_roles:
+        logger.warning("Debug WebSocket rejected for user %s with role %s", user_id, role)
+        await websocket.close(code=4003, reason="Insufficient permissions (MODERATOR+ required)")
+        return
+
+    # Accept connection
+    if subprotocol:
+        await websocket.accept(subprotocol=subprotocol)
+    else:
+        await websocket.accept()
+
+    logger.info("Debug WebSocket connected for user %s (role: %s, IP: %s)", user_id, role, client_ip)
+
+    # Subscribe to debug events
+    event_queue = debug_events.subscribe()
+
+    try:
+        # Send initial handshake
+        await websocket.send_json({
+            "type": "debug_connected",
+            "user_id": user_id,
+            "role": role,
+            "buffer_size": debug_events.buffer_count,
+            "subscriber_count": debug_events.subscriber_count,
+        })
+
+        # Stream events
+        while True:
+            # Check for incoming messages (for ping/pong)
+            try:
+                # Non-blocking check for client messages
+                raw_message = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=0.1
+                )
+                try:
+                    data = json.loads(raw_message)
+                    if data.get("type") == "ping":
+                        await websocket.send_json({
+                            "type": "pong",
+                            "timestamp": data.get("timestamp"),
+                        })
+                    elif data.get("type") == "get_buffer":
+                        # Client can request recent events
+                        events = debug_events.get_recent_events(
+                            count=data.get("count", 100),
+                            event_type=data.get("event_type"),
+                            severity=data.get("severity"),
+                        )
+                        await websocket.send_json({
+                            "type": "buffer_contents",
+                            "events": events,
+                            "count": len(events),
+                        })
+                except json.JSONDecodeError:
+                    pass
+            except asyncio.TimeoutError:
+                pass
+
+            # Check for debug events (non-blocking)
+            try:
+                event = await asyncio.wait_for(
+                    event_queue.get(),
+                    timeout=0.1
+                )
+                await websocket.send_json({
+                    "type": "debug_event",
+                    **event,
+                })
+            except asyncio.TimeoutError:
+                pass
+
+    except WebSocketDisconnect:
+        logger.info("Debug WebSocket disconnected for user %s", user_id)
+    except Exception as exc:
+        logger.exception("Error in debug WebSocket for user %s: %s", user_id, exc)
+    finally:
+        debug_events.unsubscribe(event_queue)
+        logger.info("Debug WebSocket cleanup complete for user %s", user_id)

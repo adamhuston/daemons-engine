@@ -18,6 +18,8 @@ import yaml
 
 from daemons.engine.systems.context import GameContext
 from daemons.engine.world import ResourceDef, StatGrowth, WorldEntity, WorldNpc
+from daemons.logging import debug_events
+from daemons.metrics import record_ability_execution_error
 
 logger = logging.getLogger(__name__)
 
@@ -702,6 +704,18 @@ class AbilityExecutor:
 
         except Exception as e:
             logger.error(f"Error executing ability {ability_id}: {e}", exc_info=True)
+
+            # Record ability error for debug monitoring
+            debug_events.record_ability_error(
+                ability_id=ability_id,
+                error_type="execution",
+                message=str(e),
+                player_id=caster.id if hasattr(caster, 'id') else None,
+                target_id=targets[0].id if targets else None,
+                exception=e,
+            )
+            record_ability_execution_error(ability_id, "execution")
+
             error_msg = f"Ability execution failed: {str(e)}"
             error_event = self.context.event_dispatcher.ability_error(
                 caster.id, ability_id, ability_id, error_msg
@@ -722,35 +736,35 @@ class AbilityExecutor:
     def _is_ability_from_item(self, caster: WorldEntity, ability_id: str) -> bool:
         """
         Check if an ability is granted by an equipped item (magic weapon/armor).
-        
+
         Item-granted abilities bypass level requirements since the item itself
         has the power, not the player's class progression.
-        
+
         Args:
             caster: The entity casting the ability
             ability_id: The ability being checked
-            
+
         Returns:
             True if the ability comes from an equipped item, False otherwise
         """
         # Only check for players (NPCs don't equip items with abilities currently)
         if not hasattr(caster, 'equipped_items'):
             return False
-        
+
         # Check each equipped item
         for item_id in caster.equipped_items.values():
             item = self.context.world.items.get(item_id)
             if not item:
                 continue
-                
+
             template = self.context.world.item_templates.get(item.template_id)
             if not template:
                 continue
-            
+
             # Check if this item grants the ability
             if template.class_id and ability_id in template.default_abilities:
                 return True
-        
+
         return False
 
     def _validate_ability_use(self, caster: WorldEntity, ability_id: str) -> str | None:
